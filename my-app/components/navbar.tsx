@@ -42,7 +42,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-screen-2xl items-center">
+      <div className="flex h-14 w-full items-center px-4">
         <div className="flex flex-1 items-center justify-between md:justify-start">
           {/* Mobile Menu */}
           <Sheet>
