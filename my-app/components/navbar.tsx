@@ -38,6 +38,11 @@ export default function Navbar() {
       label: "Users",
       active: pathname === "/users" || pathname.startsWith("/users/"),
     },
+    {
+      href: "/calendar",
+      label: "Calendar",
+      active: pathname === "/calendar" || pathname.startsWith("/calendar/"),
+    },
   ]
 
   return (

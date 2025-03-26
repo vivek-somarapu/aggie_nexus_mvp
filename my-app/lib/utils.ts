@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Mock data for the MVP
+// Keep the mock data for development/testing purposes
 export const mockUsers = [
   {
     id: "1",
@@ -238,4 +238,13 @@ export function formatDate(dateString: string) {
     day: "numeric",
   })
 }
+
+// New functions for data abstraction
+export async function getCurrentUser() {
+  // This would integrate with your auth provider
+  // For now, return a mock user
+  return mockUsers[0];
+}
+
+// Add more helper functions as needed
 
