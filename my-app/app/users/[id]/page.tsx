@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useParams, notFound } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useParams, notFound, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -18,19 +18,145 @@ import {
   Mail,
   MessageSquare,
   Share2,
+  Loader2,
 } from "lucide-react"
-import { mockUsers, mockProjects } from "@/lib/utils"
+import { userService } from "@/lib/services/user-service"
+import { projectService } from "@/lib/services/project-service"
+import { bookmarkService } from "@/lib/services/bookmark-service"
+import { useAuth } from "@/lib"
+import { User } from "@/lib/models/users"
+import { Project } from "@/lib/services/project-service"
+
+// Simple Alert component
+function Alert({ variant, className, children }: { 
+  variant?: "default" | "destructive", 
+  className?: string, 
+  children: React.ReactNode 
+}) {
+  return (
+    <div className={`rounded-lg border p-4 ${variant === "destructive" ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 bg-gray-50"} ${className || ""}`}>
+      {children}
+    </div>
+  );
+}
+
+function AlertDescription({ children }: { children: React.ReactNode }) {
+  return <div className="text-sm">{children}</div>;
+}
 
 export default function UserPage() {
-  const { id } = useParams()
-  const user = mockUsers.find((u) => u.id === id)
-
-  if (!user) {
-    notFound()
-  }
-
-  const userProjects = mockProjects.filter((p) => p.owner_id === user.id)
+  const { id } = useParams() as { id: string }
+  const router = useRouter()
+  const { user: currentUser } = useAuth()
+  
+  const [user, setUser] = useState<User | null>(null)
+  const [userProjects, setUserProjects] = useState<Project[]>([])
   const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isLoadingUser, setIsLoadingUser] = useState(true)
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true)
+  const [isLoadingBookmark, setIsLoadingBookmark] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null)
+  
+  // Fetch user data
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        setIsLoadingUser(true)
+        const userData = await userService.getUser(id);
+        if (!userData) {
+          return notFound();
+        }
+        setUser(userData);
+      } catch (err) {
+        console.error("Error fetching user:", err);
+        setError("Failed to load user data. Please try again later.");
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    
+    fetchUser();
+  }, [id]);
+  
+  // Fetch user's projects
+  useEffect(() => {
+    const fetchUserProjects = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoadingProjects(true);
+        // Ideally, there would be an API endpoint like /api/users/{id}/projects
+        // For now, we'll filter all projects by owner_id
+        const projects = await projectService.getProjects();
+        const filteredProjects = projects.filter(p => p.owner_id === user.id);
+        setUserProjects(filteredProjects);
+      } catch (err) {
+        console.error("Error fetching user projects:", err);
+        // Don't set the main error as this is not critical
+      } finally {
+        setIsLoadingProjects(false);
+      }
+    };
+    
+    fetchUserProjects();
+  }, [user]);
+  
+  // Check if user is bookmarked
+  useEffect(() => {
+    const checkBookmarkStatus = async () => {
+      if (!currentUser || !user) return;
+      
+      try {
+        setIsLoadingBookmark(true);
+        const isBookmarked = await bookmarkService.isUserBookmarked(currentUser.id, id);
+        setIsBookmarked(isBookmarked);
+      } catch (err) {
+        console.error("Error checking bookmark status:", err);
+        // Don't set the main error as this is not critical
+      } finally {
+        setIsLoadingBookmark(false);
+      }
+    };
+    
+    checkBookmarkStatus();
+  }, [currentUser, id, user]);
+  
+  const handleBookmarkToggle = async () => {
+    if (!currentUser) {
+      // Redirect to login if not authenticated
+      router.push('/login');
+      return;
+    }
+    
+    try {
+      setBookmarkError(null);
+      const newBookmarkStatus = await bookmarkService.toggleUserBookmark(currentUser.id, id);
+      setIsBookmarked(newBookmarkStatus);
+    } catch (err) {
+      console.error("Error toggling bookmark:", err);
+      setBookmarkError("Failed to update bookmark. Please try again.");
+    }
+  };
+  
+  if (isLoadingUser) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <span className="ml-2">Loading user profile...</span>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <Alert variant="destructive" className="my-4">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+  
+  if (!user) return null;
 
   return (
     <div className="space-y-6">
@@ -50,7 +176,7 @@ export default function UserPage() {
               <div className="flex justify-between items-start">
                 <div className="flex items-start gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={user.avatar} alt={user.full_name} />
+                    <AvatarImage src={user.avatar || undefined} alt={user.full_name} />
                     <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
@@ -69,8 +195,21 @@ export default function UserPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon" onClick={() => setIsBookmarked(!isBookmarked)}>
-                    <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-primary" : ""}`} />
+                  {bookmarkError && (
+                    <span className="text-destructive text-sm mr-2">{bookmarkError}</span>
+                  )}
+                  
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={handleBookmarkToggle}
+                    disabled={isLoadingBookmark}
+                  >
+                    {isLoadingBookmark ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-primary" : ""}`} />
+                    )}
                     <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Bookmark user"}</span>
                   </Button>
                   <Button variant="outline" size="icon">
@@ -119,7 +258,7 @@ export default function UserPage() {
                         <Mail className="h-4 w-4 text-muted-foreground" />
                         <span>{user.email}</span>
                       </div>
-                      {user.contact.phone && (
+                      {user.contact?.phone && (
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-muted-foreground" />
                           <span>{user.contact.phone}</span>
@@ -154,7 +293,7 @@ export default function UserPage() {
                           <span>Website</span>
                         </a>
                       )}
-                      {user.additional_links?.map((link, index) => (
+                      {user.additional_links && user.additional_links.map((link, index) => (
                         <a
                           key={index}
                           href={link.url}
@@ -185,7 +324,12 @@ export default function UserPage() {
               <CardDescription>Projects created or owned by {user.full_name}</CardDescription>
             </CardHeader>
             <CardContent>
-              {userProjects.length > 0 ? (
+              {isLoadingProjects ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                  <span className="ml-2">Loading projects...</span>
+                </div>
+              ) : userProjects.length > 0 ? (
                 <div className="space-y-4">
                   {userProjects.map((project) => (
                     <div key={project.id} className="border-b pb-4 last:border-0 last:pb-0">
@@ -252,28 +396,84 @@ export default function UserPage() {
               <CardTitle className="text-lg">Similar Users</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {mockUsers
-                .filter((u) => u.id !== user.id && u.industry.some((i) => user.industry.includes(i)))
-                .slice(0, 3)
-                .map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 border-b pb-4 last:border-0 last:pb-0">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={u.avatar} alt={u.full_name} />
-                      <AvatarFallback>{u.full_name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <Link href={`/users/${u.id}`} className="font-medium hover:underline">
-                        {u.full_name}
-                      </Link>
-                      <p className="text-sm text-muted-foreground truncate">{u.industry.join(", ")}</p>
-                    </div>
-                  </div>
-                ))}
+              {isLoadingUser ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                  <span className="ml-2">Loading similar users...</span>
+                </div>
+              ) : (
+                <SimilarUsers userId={user.id} industries={user.industry} />
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
+  )
+}
+
+// Component to fetch and display similar users
+function SimilarUsers({ userId, industries }: { userId: string, industries: string[] }) {
+  const [similarUsers, setSimilarUsers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  
+  useEffect(() => {
+    const fetchSimilarUsers = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Fetch users with similar industries
+        // In a real implementation, there could be a dedicated endpoint for similar users
+        // For now, we'll get all users and filter on the client side
+        const allUsers = await userService.getUsers()
+        const filtered = allUsers
+          .filter(u => 
+            u.id !== userId && 
+            u.industry.some(i => industries.includes(i))
+          )
+          .slice(0, 3)
+        
+        setSimilarUsers(filtered)
+      } catch (err) {
+        console.error("Error fetching similar users:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    fetchSimilarUsers()
+  }, [userId, industries])
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-4">
+        <Loader2 className="h-5 w-5 text-primary animate-spin" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    )
+  }
+  
+  if (similarUsers.length === 0) {
+    return <p className="text-muted-foreground text-center">No similar users found.</p>
+  }
+  
+  return (
+    <>
+      {similarUsers.map((u) => (
+        <div key={u.id} className="flex items-center gap-3 border-b pb-4 last:border-0 last:pb-0">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={u.avatar || undefined} alt={u.full_name} />
+            <AvatarFallback>{u.full_name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <Link href={`/users/${u.id}`} className="font-medium hover:underline">
+              {u.full_name}
+            </Link>
+            <p className="text-sm text-muted-foreground truncate">{u.industry.join(", ")}</p>
+          </div>
+        </div>
+      ))}
+    </>
   )
 }
 

@@ -1,101 +1,160 @@
 import { CalendarEvent } from "@/components/ui/full-calendar";
-import { mockProjects } from "@/lib/utils";
 
 export type Project = {
   id: string;
   title: string;
   description: string;
-  industry: string[];
-  project_status: string;
-  location_type: string;
-  estimated_start: Date;
-  recruitment_status: string;
-  is_idea: boolean;
   owner_id: string;
+  is_idea: boolean;
+  recruitment_status: string;
+  industry: string[];
+  required_skills: string[];
+  location_type: string;
+  estimated_start: string;
+  estimated_end: string;
+  contact_info: { email: string; phone?: string };
   views: number;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  last_updated: string;
+  project_status: string;
+  deleted: boolean;
 };
 
+export interface ProjectSearchParams {
+  search?: string;
+  skill?: string;
+  tamu?: boolean;
+}
 
 export const projectService = {
   // Get all projects
-  getProjects: async (): Promise<Project[]> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return mockProjects;
+  getProjects: async (params?: ProjectSearchParams): Promise<Project[]> => {
+    let url = '/api/projects';
+    
+    if (params) {
+      const searchParams = new URLSearchParams();
+      if (params.search) searchParams.append('search', params.search);
+      if (params.skill) searchParams.append('skill', params.skill);
+      if (params.tamu !== undefined) searchParams.append('tamu', params.tamu.toString());
+      
+      if (searchParams.toString()) {
+        url += `?${searchParams.toString()}`;
+      }
+    }
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch projects: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
 
   // Get a single project by ID
   getProject: async (id: string): Promise<Project | null> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const project = mockProjects.find(p => p.id === id);
-    return project || null;
+    const response = await fetch(`/api/projects/${id}`);
+    
+    if (response.status === 404) {
+      return null;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch project: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  // Get featured projects
+  getFeaturedProjects: async (): Promise<Project[]> => {
+    const response = await fetch('/api/projects/featured');
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch featured projects: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+  
+  // Advanced search for projects
+  searchProjects: async (query: string, skill?: string): Promise<Project[]> => {
+    const searchParams = new URLSearchParams();
+    searchParams.append('q', query);
+    if (skill) searchParams.append('skill', skill);
+    
+    const response = await fetch(`/api/search/projects?${searchParams.toString()}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to search projects: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
 
   // Create a new project
-  createProject: async (projectData: Omit<Project, "id" | "views" | "created_at" | "updated_at">): Promise<Project> => {
-    await new Promise(resolve => setTimeout(resolve, 600));
+  createProject: async (projectData: Omit<Project, "id" | "views" | "created_at" | "last_updated" | "deleted">): Promise<Project> => {
+    const response = await fetch('/api/projects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(projectData),
+    });
     
-    // Generate a new project with default values
-    const newProject: Project = {
-      id: Math.random().toString(36).substring(2, 9),
-      views: 0,
-      created_at: new Date(),
-      updated_at: new Date(),
-      ...projectData
-    };
+    if (!response.ok) {
+      throw new Error(`Failed to create project: ${response.statusText}`);
+    }
     
-    // In a real implementation, this would call the API
-    // mockProjects.push(newProject);
-    
-    return newProject;
+    return response.json();
   },
 
   // Update an existing project
   updateProject: async (id: string, projectData: Partial<Project>): Promise<Project | null> => {
-    await new Promise(resolve => setTimeout(resolve, 400));
+    const response = await fetch(`/api/projects/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(projectData),
+    });
     
-    const projectIndex = mockProjects.findIndex(p => p.id === id);
-    if (projectIndex === -1) return null;
+    if (response.status === 404) {
+      return null;
+    }
     
-    // In a real implementation, this would call the API
-    // const updatedProject = {
-    //   ...mockProjects[projectIndex],
-    //   ...projectData,
-    //   updated_at: new Date()
-    // };
-    // mockProjects[projectIndex] = updatedProject;
+    if (!response.ok) {
+      throw new Error(`Failed to update project: ${response.statusText}`);
+    }
     
-    return mockProjects[projectIndex];
+    return response.json();
   },
 
   // Delete a project
   deleteProject: async (id: string): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
+    const response = await fetch(`/api/projects/${id}`, {
+      method: 'DELETE',
+    });
     
-    const projectIndex = mockProjects.findIndex(p => p.id === id);
-    if (projectIndex === -1) return false;
-    
-    // In a real implementation, this would call the API
-    // mockProjects.splice(projectIndex, 1);
-    
-    return true;
+    return response.ok;
   },
 
   // Convert project to calendar event
   projectToCalendarEvent: (project: Project): CalendarEvent => {
     // Create an end date 2 hours after the start date
     const startDate = new Date(project.estimated_start);
-    const endDate = new Date(startDate);
-    endDate.setHours(endDate.getHours() + 2);
+    const endDate = project.estimated_end ? new Date(project.estimated_end) : new Date(startDate);
+    
+    if (!project.estimated_end) {
+      endDate.setHours(endDate.getHours() + 2);
+    }
 
     return {
       id: project.id,
       title: project.title,
       start: startDate,
       end: endDate,
-      color: project.is_idea ? "yellow" : "green",
+      color: project.is_idea ? "default" : "green",
     };
   }
 }; 

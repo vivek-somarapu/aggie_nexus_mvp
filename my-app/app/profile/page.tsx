@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -12,88 +11,69 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Bookmark, ExternalLink, GraduationCap, Linkedin, Pencil, Save, User } from "lucide-react"
-import { mockUsers, mockProjectBookmarks, mockUserBookmarks, mockProjects } from "@/lib/utils"
-
-// temporary type definitions
-interface Project {
-  id: string
-  title: string
-  description: string
-  owner_id: string
-  is_idea: boolean
-  recruitment_status: string
-  industry: string[]
-  required_skills: string[]
-  location_type: string
-  estimated_start: string
-  deleted: boolean
-}
-
-// temporary type definitions
-interface User {
-  id: string
-  full_name: string
-  avatar: string
-  industry: string[]
-  // add other user properties as needed
-}
-
-// interface ProjectBookmark {
-//   id: string
-//   user_id: string
-//   project_id: string
-// }
-
-
+import { Bookmark, ExternalLink, GraduationCap, Linkedin, Loader2, Pencil, Save, User } from "lucide-react"
+import { useAuth } from "@/lib"
+import { userService } from "@/lib/services/user-service"
+import { bookmarkService } from "@/lib/services/bookmark-service"
+import { User as UserType } from "@/lib/models/users"
+import { Project } from "@/lib/services/project-service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ProfilePage() {
-  // Mock current user - in a real app this would come from auth context
-  const currentUser = mockUsers[0]
-
-  // Get bookmarked projects and users
-  // const bookmarkedProjects = mockProjectBookmarks
-  //   .filter((bookmark) => bookmark.user_id === currentUser.id)
-  //   .map((bookmark) => {
-  //     const project = mockProjects.find((p) => p.id === bookmark.project_id)
-  //     return project
-  //   })
-  //   .filter(Boolean)
-
-  const bookmarkedProjects = mockProjectBookmarks
-    .filter((bookmark) => bookmark.user_id === currentUser.id)
-    .map((bookmark) => {
-      const project = mockProjects.find((p) => p.id === bookmark.project_id)
-      return project!
-    })
-    .filter(Boolean) as Project[]
-
-  // const bookmarkedUsers = mockUserBookmarks
-  //   .filter((bookmark) => bookmark.user_id === currentUser.id)
-  //   .map((bookmark) => {
-  //     const user = mockUsers.find((u) => u.id === bookmark.bookmarked_user_id)
-  //     return user
-  //   })
-  //   .filter(Boolean)
-
-  const bookmarkedUsers = mockUserBookmarks
-    .filter((bookmark) => bookmark.user_id === currentUser.id)
-    .map((bookmark) => {
-      const user = mockUsers.find((u) => u.id === bookmark.bookmarked_user_id)
-      return user!
-    })
-    .filter(Boolean) as User[]
-
+  const { user: currentUser } = useAuth()
+  
+  const [isLoading, setIsLoading] = useState(true)
+  const [bookmarksLoading, setBookmarksLoading] = useState(true)
+  const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([])
+  const [bookmarkedUsers, setBookmarkedUsers] = useState<UserType[]>([])
   const [isEditing, setIsEditing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
-    full_name: currentUser.full_name,
-    email: currentUser.email,
-    bio: currentUser.bio,
-    linkedin_url: currentUser.linkedin_url,
-    website_url: currentUser.website_url,
-    graduation_year: currentUser.graduation_year,
-    is_texas_am_affiliate: currentUser.is_texas_am_affiliate,
+    full_name: '',
+    email: '',
+    bio: '',
+    linkedin_url: '',
+    website_url: '',
+    graduation_year: 0,
+    is_texas_am_affiliate: false,
   })
+
+  // Load user data into form
+  useEffect(() => {
+    if (currentUser) {
+      setFormData({
+        full_name: currentUser.full_name,
+        email: currentUser.email,
+        bio: currentUser.bio || '',
+        linkedin_url: currentUser.linkedin_url || '',
+        website_url: currentUser.website_url || '',
+        graduation_year: currentUser.graduation_year || 0,
+        is_texas_am_affiliate: currentUser.is_texas_am_affiliate || false,
+      })
+      setIsLoading(false)
+    }
+  }, [currentUser])
+  
+  // Load bookmarks
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      if (!currentUser) return
+      
+      try {
+        setBookmarksLoading(true)
+        const bookmarks = await bookmarkService.getAllBookmarks(currentUser.id)
+        setBookmarkedProjects(bookmarks.projects)
+        setBookmarkedUsers(bookmarks.users)
+      } catch (err) {
+        console.error("Error fetching bookmarks:", err)
+        setError("Failed to load bookmarks. Please try again later.")
+      } finally {
+        setBookmarksLoading(false)
+      }
+    }
+    
+    fetchBookmarks()
+  }, [currentUser])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -105,10 +85,32 @@ export default function ProfilePage() {
     setFormData((prev) => ({ ...prev, [name]: checked }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would save to the backend
-    setIsEditing(false)
+    
+    if (!currentUser) return
+    
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      // Update user via API
+      await userService.updateUser(currentUser.id, formData)
+      setIsEditing(false)
+    } catch (err) {
+      console.error("Error updating profile:", err)
+      setError("Failed to update profile. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  
+  if (!currentUser) {
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <p>Please log in to view your profile.</p>
+      </div>
+    )
   }
 
   return (
@@ -119,6 +121,12 @@ export default function ProfilePage() {
           <p className="text-muted-foreground">Manage your profile information and bookmarks</p>
         </div>
       </div>
+      
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="mb-6">
@@ -137,9 +145,12 @@ export default function ProfilePage() {
                 </div>
                 <Button
                   variant={isEditing ? "default" : "outline"}
-                  onClick={() => (isEditing ? handleSubmit : setIsEditing(true))}
+                  onClick={() => isEditing ? handleSubmit : setIsEditing(true)}
+                  disabled={isLoading}
                 >
-                  {isEditing ? (
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : isEditing ? (
                     <>
                       <Save className="h-4 w-4 mr-2" />
                       Save Changes
@@ -158,7 +169,7 @@ export default function ProfilePage() {
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="flex flex-col items-center gap-4">
                     <Avatar className="h-24 w-24">
-                      <AvatarImage src={currentUser.avatar} alt={currentUser.full_name} />
+                      <AvatarImage src={currentUser.avatar || undefined} alt={currentUser.full_name} />
                       <AvatarFallback>
                         <User className="h-12 w-12" />
                       </AvatarFallback>
@@ -178,7 +189,7 @@ export default function ProfilePage() {
                         name="full_name"
                         value={formData.full_name}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isLoading}
                       />
                     </div>
 
@@ -190,7 +201,7 @@ export default function ProfilePage() {
                         type="email"
                         value={formData.email}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isLoading}
                       />
                     </div>
 
@@ -201,7 +212,7 @@ export default function ProfilePage() {
                         name="bio"
                         value={formData.bio}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isLoading}
                         rows={4}
                       />
                     </div>
@@ -222,7 +233,7 @@ export default function ProfilePage() {
                         name="linkedin_url"
                         value={formData.linkedin_url}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isLoading}
                         className="rounded-l-none"
                       />
                     </div>
@@ -239,7 +250,7 @@ export default function ProfilePage() {
                         name="website_url"
                         value={formData.website_url}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isLoading}
                         className="rounded-l-none"
                       />
                     </div>
@@ -255,9 +266,9 @@ export default function ProfilePage() {
                         id="graduation_year"
                         name="graduation_year"
                         type="number"
-                        value={formData.graduation_year}
+                        value={formData.graduation_year || ''}
                         onChange={handleChange}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isLoading}
                         className="rounded-l-none"
                       />
                     </div>
@@ -270,121 +281,122 @@ export default function ProfilePage() {
                       name="is_texas_am_affiliate"
                       checked={formData.is_texas_am_affiliate}
                       onChange={handleCheckboxChange}
-                      disabled={!isEditing}
+                      disabled={!isEditing || isLoading}
                       className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
-                    <Label htmlFor="is_texas_am_affiliate">I am a Texas A&amp;M affiliate</Label>
+                    <Label htmlFor="is_texas_am_affiliate" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      I am affiliated with Texas A&M University
+                    </Label>
                   </div>
                 </div>
-
-                {isEditing && (
-                  <div className="flex justify-end gap-4">
-                    <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit">Save Changes</Button>
-                  </div>
-                )}
               </form>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="bookmarks" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookmarked Projects</CardTitle>
-              <CardDescription>Projects you&apos;ve saved for later</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {bookmarkedProjects.length > 0 ? (
-                <div className="space-y-4">
-                  {bookmarkedProjects.map((project) => (
-                    <div
-                      key={project.id}
-                      className="flex justify-between items-start border-b pb-4 last:border-0 last:pb-0"
-                    >
-                      <div>
-                        <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
-                          {project.title}
-                        </Link>
-                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{project.description}</p>
-                      </div>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <Bookmark className="h-4 w-4 fill-primary" />
-                        <span className="sr-only">Remove bookmark</span>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">You haven&apos;t bookmarked any projects yet.</p>
-                  <Button variant="outline" className="mt-4" asChild>
-                    <Link href="/projects">Browse Projects</Link>
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookmarked Users</CardTitle>
-              <CardDescription>Users you&apos;ve saved for later</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {bookmarkedUsers.length > 0 ? (
-                <div className="space-y-4">
-                  {bookmarkedUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex justify-between items-start border-b pb-4 last:border-0 last:pb-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={user.avatar} alt={user.full_name} />
-                          <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <Link href={`/users/${user.id}`} className="font-medium hover:underline">
-                            {user.full_name}
-                          </Link>
-                          <p className="text-sm text-muted-foreground">{user.industry.join(", ")}</p>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bookmarked Users</CardTitle>
+                <CardDescription>People you've bookmarked</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {bookmarksLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading bookmarks...</span>
+                  </div>
+                ) : bookmarkedUsers.length > 0 ? (
+                  <div className="space-y-4">
+                    {bookmarkedUsers.map((user) => (
+                      <div key={user.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={user.avatar || undefined} alt={user.full_name} />
+                            <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <Link href={`/users/${user.id}`} className="font-medium hover:underline">
+                              {user.full_name}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">
+                              {user.skills?.slice(0, 2).join(", ")}
+                              {user.skills && user.skills.length > 2 ? "..." : ""}
+                            </p>
+                          </div>
                         </div>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/users/${user.id}`}>View</Link>
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <Bookmark className="h-4 w-4 fill-primary" />
-                        <span className="sr-only">Remove bookmark</span>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">You haven&apos;t bookmarked any users yet.</p>
-                  <Button variant="outline" className="mt-4" asChild>
-                    <Link href="/users">Browse Users</Link>
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">You haven't bookmarked any users yet.</p>
+                    <Button variant="outline" size="sm" className="mt-4" asChild>
+                      <Link href="/users">
+                        Browse Users
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Bookmarked Projects</CardTitle>
+                <CardDescription>Projects you've bookmarked</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {bookmarksLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2">Loading bookmarks...</span>
+                  </div>
+                ) : bookmarkedProjects.length > 0 ? (
+                  <div className="space-y-4">
+                    {bookmarkedProjects.map((project) => (
+                      <div key={project.id} className="flex flex-col">
+                        <div className="flex justify-between items-start">
+                          <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
+                            {project.title}
+                          </Link>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/projects/${project.id}`}>View</Link>
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                          {project.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">You haven't bookmarked any projects yet.</p>
+                    <Button variant="outline" size="sm" className="mt-4" asChild>
+                      <Link href="/projects">
+                        Browse Projects
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="messages" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Messages</CardTitle>
-              <CardDescription>Your conversations with other users</CardDescription>
+              <CardDescription>Manage your conversations</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">You don&apos;t have any messages yet.</p>
-                <Button variant="outline" className="mt-4" asChild>
-                  <Link href="/users">Find Users to Message</Link>
-                </Button>
-              </div>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">Message functionality coming soon!</p>
             </CardContent>
           </Card>
         </TabsContent>
