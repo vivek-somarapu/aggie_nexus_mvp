@@ -1,4 +1,7 @@
+"use client";
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
 // Define a simplified User type for auth purposes
 export type User = {
@@ -26,7 +29,7 @@ interface AuthContextType {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  signup: (userData: Partial<User>) => Promise<void>;
+  signup: (email: string, password: string, userData: Partial<User>) => Promise<void>;
 }
 
 // Create a context with a default value
@@ -44,17 +47,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
 
   // Check for user session on mount
   useEffect(() => {
     const checkUserSession = async () => {
       try {
-        // In a real implementation, this would check with your backend
-        // to validate the session token stored in cookies/localStorage
-        const response = await fetch('/api/auth/me');
+        // Check Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (response.ok) {
-          const userData = await response.json();
+        if (session) {
+          // Get user profile data
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (userError) throw userError;
           setUser(userData);
         }
       } catch (err) {
@@ -65,30 +75,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // Get user profile data
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (userError) {
+            console.error('Error fetching user data:', userError);
+            return;
+          }
+          
+          setUser(userData);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      }
+    );
+
     checkUserSession();
-  }, []);
+
+    // Clean up subscription
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // In a real implementation, this would call your login endpoint
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Login failed');
-      }
-      
-      const userData = await response.json();
-      setUser(userData);
+      if (error) throw error;
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'Failed to login');
@@ -101,12 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       setIsLoading(true);
-      
-      // In a real implementation, this would call your logout endpoint
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-      });
-      
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       setUser(null);
     } catch (err) {
       console.error('Logout error:', err);
@@ -115,27 +139,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const signup = async (userData: Partial<User>) => {
+  const signup = async (email: string, password: string, userData: Partial<User>) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // In a real implementation, this would call your signup endpoint
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
+      // First create the authentication account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
       });
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Signup failed');
-      }
+      if (authError) throw authError;
       
-      const newUser = await response.json();
-      setUser(newUser);
+      if (authData.user) {
+        // Then create the user profile
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id,
+            email,
+            full_name: userData.full_name,
+            bio: userData.bio,
+            industry: userData.industry,
+            skills: userData.skills,
+            linkedin_url: userData.linkedin_url,
+            website_url: userData.website_url,
+            resume_url: userData.resume_url,
+            additional_links: userData.additional_links,
+            contact: userData.contact || { email },
+            graduation_year: userData.graduation_year,
+            is_texas_am_affiliate: userData.is_texas_am_affiliate,
+            avatar: userData.avatar
+          });
+        
+        if (profileError) throw profileError;
+      }
     } catch (err: any) {
       console.error('Signup error:', err);
       setError(err.message || 'Failed to signup');

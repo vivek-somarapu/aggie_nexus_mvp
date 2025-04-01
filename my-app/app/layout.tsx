@@ -5,6 +5,7 @@ import "./globals.css"
 import Navbar from "@/components/navbar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { AuthProvider } from "@/lib/auth"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,9 +23,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <Navbar />
-          <main className="container mx-auto py-6 px-4">{children}</main>
-          <ThemeToggle />
+          <AuthProvider>
+            <Navbar />
+            <main className="container mx-auto py-6 px-4">{children}</main>
+            <ThemeToggle />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

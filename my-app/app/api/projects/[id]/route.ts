@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProjectById, updateProject, deleteProject, incrementProjectViews } from "@/lib/models/projects";
+import { withAuth } from "@/lib/auth-middleware";
 
 // GET /api/projects/[id] - Get a single project
 export async function GET(
@@ -35,27 +36,38 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const id = params.id;
-    const body = await req.json();
-    
-    const updatedProject = await updateProject(id, body);
-    
-    if (!updatedProject) {
+  return withAuth(req, async (userId, req) => {
+    try {
+      const id = params.id;
+      const body = await req.json();
+      
+      // Check if the user is the owner of the project
+      const project = await getProjectById(id);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404 }
+        );
+      }
+      
+      if (project.owner_id !== userId) {
+        return NextResponse.json(
+          { error: "You don't have permission to update this project" },
+          { status: 403 }
+        );
+      }
+      
+      const updatedProject = await updateProject(id, body);
+      
+      return NextResponse.json(updatedProject);
+    } catch (error) {
+      console.error('Error updating project:', error);
       return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
+        { error: "Failed to update project" },
+        { status: 500 }
       );
     }
-    
-    return NextResponse.json(updatedProject);
-  } catch (error) {
-    console.error('Error updating project:', error);
-    return NextResponse.json(
-      { error: "Failed to update project" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 // DELETE /api/projects/[id] - Delete a project
@@ -63,23 +75,35 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const id = params.id;
-    const success = await deleteProject(id);
-    
-    if (!success) {
+  return withAuth(req, async (userId, req) => {
+    try {
+      const id = params.id;
+      
+      // Check if the user is the owner of the project
+      const project = await getProjectById(id);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404 }
+        );
+      }
+      
+      if (project.owner_id !== userId) {
+        return NextResponse.json(
+          { error: "You don't have permission to delete this project" },
+          { status: 403 }
+        );
+      }
+      
+      const success = await deleteProject(id);
+      
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting project:', error);
       return NextResponse.json(
-        { error: "Project not found" },
-        { status: 404 }
+        { error: "Failed to delete project" },
+        { status: 500 }
       );
     }
-    
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting project:', error);
-    return NextResponse.json(
-      { error: "Failed to delete project" },
-      { status: 500 }
-    );
-  }
+  });
 } 
