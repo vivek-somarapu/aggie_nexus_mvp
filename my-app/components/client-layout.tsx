@@ -12,22 +12,20 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   
   // Use a more robust approach to track auth state
   useEffect(() => {
-    console.log("Layout auth state change:", authLoading ? "loading" : "ready", user ? "user exists" : "no user");
-    
-    // Don't mark as ready until auth loading is complete
+    // Skip the redirect-loop fix - always mark as ready when auth state has loaded
     if (!authLoading) {
-      // Add a small delay to ensure state is fully propagated
-      const stabilizeTimer = setTimeout(() => {
-        setLayoutReady(true);
-        console.log("Layout fully stabilized, user state:", user ? "logged in" : "not logged in");
-      }, 250); // Added delay to ensure state stability
+      console.log("Layout auth state loaded:", user ? "user exists" : "no user");
       
-      return () => clearTimeout(stabilizeTimer);
+      // Immediately mark layout as ready once auth loading is done
+      setLayoutReady(true);
+      console.log("Layout marked as ready with user state:", user ? "logged in" : "not logged in");
+      
+      // No delay timer needed - this was causing the login loop
     }
   }, [authLoading, user]);
 
-  // During initial auth check or while stabilizing, show loading state
-  if (authLoading || !layoutReady) {
+  // Show simplified loading indicator only during initial auth check
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
@@ -44,7 +42,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     console.error("Auth error in layout:", error);
   }
 
-  // After auth state is stable, render appropriate layout
+  // After auth state is available, render appropriate layout regardless of layoutReady state
   return (
     <div className="min-h-screen flex flex-col">
       {user ? (

@@ -25,16 +25,31 @@ const publicRoutes = [
   '/calendar',
 ];
 
+// Skip middleware for callback route to avoid conflicts with client-side auth
+const bypassMiddleware = [
+  '/auth/callback',
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  
+  // Skip auth checks for specific routes to avoid conflicts
+  if (bypassMiddleware.some(route => pathname.startsWith(route))) {
+    console.log(`Middleware: Bypassing auth checks for ${pathname}`);
+    return NextResponse.next();
+  }
   
   // Create supabase client with response
   const { supabase, response } = createClient(request);
   
   // Get session
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   
-  // Log session state for debugging
+  // Log session state and errors for debugging
+  if (sessionError) {
+    console.error(`Middleware: Session error for ${pathname}:`, sessionError);
+  }
+  
   console.log(`Middleware: Path ${pathname}, Session ${session ? 'exists' : 'does not exist'}`);
   
   // Check if the path is a public route
@@ -43,6 +58,7 @@ export async function middleware(request: NextRequest) {
   );
   
   if (isPublicRoute) {
+    console.log(`Middleware: Allowing public route ${pathname}`);
     return response;
   }
   
@@ -55,7 +71,7 @@ export async function middleware(request: NextRequest) {
     console.log(`Middleware: Redirecting unauthenticated user from ${pathname} to login`);
     // Redirect unauthenticated users to login
     const redirectUrl = new URL('/auth/login', request.url);
-    redirectUrl.searchParams.set('redirect', pathname);
+    redirectUrl.searchParams.set('redirect', encodeURIComponent(pathname));
     return NextResponse.redirect(redirectUrl);
   }
   

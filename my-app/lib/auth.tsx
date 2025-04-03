@@ -160,25 +160,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (event === 'SIGNED_IN' && session) {
           setIsLoading(true);
-          const userData = await getUserData(session.user.id);
           
-          if (userData) {
-            setUser(userData);
-            console.log('User signed in and profile loaded:', userData.full_name);
+          try {
+            const userData = await getUserData(session.user.id);
             
-            // Only redirect if we're on an auth page
-            const currentPath = window.location.pathname;
-            if (currentPath.startsWith('/auth/')) {
-              console.log('Redirecting from auth page to home after login');
-              router.push('/');
+            if (userData) {
+              setUser(userData);
+              console.log('User signed in and profile loaded:', userData.full_name);
+              
+              // Only redirect if we're on an auth page and not already redirecting
+              const currentPath = window.location.pathname;
+              if (currentPath.startsWith('/auth/') && currentPath !== '/auth/callback') {
+                console.log('Redirecting from auth page to home after login');
+                
+                // Use a more reliable way to navigate
+                window.location.href = '/';
+              }
+            } else {
+              setError('Failed to load user profile');
             }
-          } else {
-            setError('Failed to load user profile');
+          } catch (err) {
+            console.error('Error handling sign in event:', err);
+            setError('Failed to process authentication');
+          } finally {
+            setIsLoading(false);
           }
-          setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           console.log('User signed out');
+          
+          // Check if we need to redirect after sign out
+          const currentPath = window.location.pathname;
+          const protectedRoutes = ['/profile', '/projects/new', '/projects/edit', '/bookmarks'];
+          
+          if (protectedRoutes.some(route => currentPath.startsWith(route))) {
+            console.log('Redirecting from protected page after logout');
+            window.location.href = '/';
+          }
         } else if (event === 'PASSWORD_RECOVERY') {
           router.push('/auth/reset-password');
         } else if (event === 'TOKEN_REFRESHED') {
