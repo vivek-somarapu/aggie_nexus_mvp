@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Calendar as CalendarIcon, Clock } from "lucide-react";
 import {
   Calendar,
   CalendarCurrentDate,
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/full-calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, addDays, isWithinInterval } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EventDetailCard, EventDetailProps } from "@/components/EventDetailCard";
 
 // Event type definition
 type CalendarEvent = {
@@ -43,6 +45,8 @@ export default function CalendarPage() {
   const [upcomingEvents, setUpcomingEvents] = useState<ProcessedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Fetch events from the database
   useEffect(() => {
@@ -148,6 +152,15 @@ export default function CalendarPage() {
     }
   }, [events]);
 
+  const handleEventClick = (event: FullCalendarEvent) => {
+    // Find the full event data including description and location
+    const fullEvent = events.find(e => e.id === event.id);
+    if (fullEvent) {
+      setSelectedEvent(fullEvent);
+      setDialogOpen(true);
+    }
+  };
+
   // Prevent hydration mismatch
   if (!mounted) {
     return (
@@ -168,14 +181,14 @@ export default function CalendarPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 mb-6 rounded-md">
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 mb-6 rounded-md dark:bg-destructive/20">
           {error}
         </div>
       )}
 
-      <Calendar events={events}>
-        <div className="h-[calc(100vh-230px)] flex flex-col border rounded-lg overflow-hidden">
-          <div className="flex p-4 items-center gap-2 border-b">
+      <Calendar events={events} onEventClick={handleEventClick}>
+        <div className="h-[calc(100vh-230px)] flex flex-col border rounded-lg overflow-hidden dark:border-border">
+          <div className="flex p-4 items-center gap-2 border-b dark:border-border">
             <CalendarViewTrigger className="aria-[current=true]:bg-accent" view="day">
               Day
             </CalendarViewTrigger>
@@ -232,25 +245,67 @@ export default function CalendarPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {upcomingEvents.map((event) => (
-              <Card key={event.id} className="overflow-hidden">
-                <CardHeader className="py-2" style={{ backgroundColor: `var(--${event.color || 'default'}-100, #f0f9ff)` }}>
-                  <CardTitle className="text-lg">{event.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <p className="text-sm text-gray-600 mb-2">{event.description}</p>
-                  <div className="flex items-center text-sm text-gray-500 mb-1">
-                    <span className="font-medium mr-2">Location:</span> {event.location}
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500">
-                    <span className="font-medium mr-2">Time:</span> 
-                    {format(event.start, "MMMM d, yyyy 'at' h:mm a")} - {format(event.end, "h:mm a")}
-                  </div>
-                </CardContent>
-              </Card>
+              <div
+                key={event.id}
+                className="transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                onClick={() => {
+                  setSelectedEvent(event);
+                  setDialogOpen(true);
+                }}
+              >
+                <Card className="overflow-hidden hover:shadow-md transition-shadow h-full">
+                  <CardHeader 
+                    className={`py-3 border-b ${
+                      event.color === "green" ? "bg-green-100 dark:bg-green-900/20 border-green-200 dark:border-green-800/30" :
+                      event.color === "blue" ? "bg-blue-100 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/30" :
+                      event.color === "pink" ? "bg-pink-100 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800/30" :
+                      event.color === "purple" ? "bg-purple-100 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/30" :
+                      "bg-gray-100 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700/40"
+                    }`}
+                  >
+                    <CardTitle className="text-lg">{event.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{event.description}</p>
+                    <div className="flex items-center text-sm text-muted-foreground mb-1">
+                      <MapPin className="h-3.5 w-3.5 mr-2 text-muted-foreground/70" />
+                      <span>{event.location}</span>
+                    </div>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <CalendarIcon className="h-3.5 w-3.5 mr-2 text-muted-foreground/70" />
+                      <span>{format(event.start, "MMM d, yyyy")}</span>
+                    </div>
+                    <div className="flex items-center text-sm text-muted-foreground mt-1">
+                      <Clock className="h-3.5 w-3.5 mr-2 text-muted-foreground/70" />
+                      <span>{format(event.start, "h:mm a")} - {format(event.end, "h:mm a")}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Event Detail Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Event Details</DialogTitle>
+          </DialogHeader>
+          {selectedEvent && (
+            <EventDetailCard
+              id={selectedEvent.id}
+              title={selectedEvent.title}
+              description={selectedEvent.description}
+              location={selectedEvent.location}
+              start={selectedEvent.start}
+              end={selectedEvent.end}
+              color={selectedEvent.color}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 } 

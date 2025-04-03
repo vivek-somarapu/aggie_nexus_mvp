@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state change:', event, session ? 'with session' : 'no session');
+        console.log('Auth state change:', event, session ? `with session (user: ${session.user.id})` : 'no session');
         
         if (event === 'SIGNED_IN' && session) {
           setIsLoading(true);
@@ -164,7 +164,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           if (userData) {
             setUser(userData);
-            console.log('User signed in:', userData.full_name);
+            console.log('User signed in and profile loaded:', userData.full_name);
+            
+            // Only redirect if we're on an auth page
+            const currentPath = window.location.pathname;
+            if (currentPath.startsWith('/auth/')) {
+              console.log('Redirecting from auth page to home after login');
+              router.push('/');
+            }
           } else {
             setError('Failed to load user profile');
           }
@@ -176,6 +183,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.push('/auth/reset-password');
         } else if (event === 'TOKEN_REFRESHED') {
           console.log('Auth token refreshed');
+        } else if (event === 'USER_UPDATED') {
+          console.log('User data updated, refreshing profile');
+          if (session) {
+            const userData = await getUserData(session.user.id);
+            if (userData) {
+              setUser(userData);
+            }
+          }
         }
       }
     );
@@ -193,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       
       console.log('Signing in user:', email);
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -203,9 +218,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
       
-      console.log('Sign in successful');
-      router.push('/');
-      // Note: Auth state listener will handle updating the user state
+      console.log('Sign in successful with session:', data.session ? 'valid' : 'invalid');
+      
+      // Don't navigate immediately - let the auth state listener handle it
+      // The router.push was causing issues with race conditions
+      // The auth state change listener will update the user state
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to login';
       setError(errorMessage);

@@ -22,6 +22,7 @@ const publicRoutes = [
   '/',
   '/projects',
   '/users',
+  '/calendar',
 ];
 
 export async function middleware(request: NextRequest) {
@@ -32,6 +33,9 @@ export async function middleware(request: NextRequest) {
   
   // Get session
   const { data: { session } } = await supabase.auth.getSession();
+  
+  // Log session state for debugging
+  console.log(`Middleware: Path ${pathname}, Session ${session ? 'exists' : 'does not exist'}`);
   
   // Check if the path is a public route
   const isPublicRoute = publicRoutes.some(route => 
@@ -48,6 +52,7 @@ export async function middleware(request: NextRequest) {
   );
 
   if (isProtectedRoute && !session) {
+    console.log(`Middleware: Redirecting unauthenticated user from ${pathname} to login`);
     // Redirect unauthenticated users to login
     const redirectUrl = new URL('/auth/login', request.url);
     redirectUrl.searchParams.set('redirect', pathname);
@@ -60,6 +65,7 @@ export async function middleware(request: NextRequest) {
   );
   
   if (isAuthRoute && session) {
+    console.log(`Middleware: Redirecting authenticated user from ${pathname} to home`);
     // Redirect authenticated users to home
     return NextResponse.redirect(new URL('/', request.url));
   }

@@ -16,20 +16,33 @@ export const createClient = (request: NextRequest) => {
     {
       cookies: {
         get(name) {
-          return request.cookies.get(name)?.value;
+          try {
+            return request.cookies.get(name)?.value;
+          } catch (error) {
+            console.error(`Error getting cookie ${name}:`, error);
+            return undefined;
+          }
         },
         set(name, value, options) {
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          });
+          try {
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            });
+          } catch (error) {
+            console.error(`Error setting cookie ${name}:`, error);
+          }
         },
         remove(name, options) {
-          response.cookies.delete({
-            name,
-            ...options,
-          });
+          try {
+            response.cookies.delete({
+              name,
+              ...options,
+            });
+          } catch (error) {
+            console.error(`Error removing cookie ${name}:`, error);
+          }
         },
       },
     }
