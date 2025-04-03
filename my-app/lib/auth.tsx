@@ -206,8 +206,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Sign in successful');
       router.push('/');
       // Note: Auth state listener will handle updating the user state
-    } catch (err: any) {
-      setError(err.message || 'Failed to login');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to login';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -230,9 +231,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Sign out successful');
       setUser(null);
       router.push('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Logout error:', err);
-      setError(err.message || 'Failed to logout');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -282,9 +284,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Redirect to login with success message
         router.push('/auth/login?signup=success');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Signup error:', err);
-      setError(err.message || 'Failed to signup');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to signup';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -309,9 +312,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Google login error:', error);
         throw error;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Google sign in error:', err);
-      setError(err.message || 'Failed to login with Google');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to login with Google';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -336,9 +340,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('GitHub login error:', error);
         throw error;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('GitHub sign in error:', err);
-      setError(err.message || 'Failed to login with GitHub');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to login with GitHub';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -362,9 +367,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       console.log('Password reset email sent');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Password reset request error:', err);
-      setError(err.message || 'Failed to send password reset email');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send password reset email';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -390,9 +396,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Password reset successful');
       // Redirect to login with success message
       router.push('/auth/login?reset=success');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Password reset error:', err);
-      setError(err.message || 'Failed to reset password');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reset password';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);

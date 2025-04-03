@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEventById, updateEvent, deleteEvent } from '@/lib/models/events';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+interface Params {
+  id: string;
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Params }
+) {
   try {
     const id = params.id;
     const event = await getEventById(id);
@@ -28,7 +35,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Params }
+) {
   try {
     const id = params.id;
     const body = await request.json();
@@ -68,7 +78,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Params }
+) {
   try {
     const id = params.id;
     const success = await deleteEvent(id);

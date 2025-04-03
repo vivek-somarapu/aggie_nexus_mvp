@@ -5,7 +5,6 @@ import { useEffect, useState } from "react"
 import Navbar from "@/components/navbar"
 import LandingNavbar from "@/components/landing-navbar"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Skeleton } from "@/components/ui/skeleton"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading, error } = useAuth()

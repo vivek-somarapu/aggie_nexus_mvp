@@ -13,6 +13,7 @@ import {
   CalendarViewTrigger,
   CalendarWeekView,
   CalendarYearView,
+  CalendarEvent as FullCalendarEvent,
 } from "@/components/ui/full-calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, addDays, isWithinInterval } from "date-fns";
@@ -28,11 +29,18 @@ type CalendarEvent = {
   color: string;
 };
 
+// Type for the component's internal state
+type ProcessedEvent = Omit<FullCalendarEvent, 'color'> & {
+  description: string;
+  location: string;
+  color: "default" | "green" | "blue" | "pink" | "purple" | null | undefined;
+};
+
 export default function CalendarPage() {
   // Use client-side rendering to avoid hydration mismatch
   const [mounted, setMounted] = useState(false);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([]);
+  const [events, setEvents] = useState<ProcessedEvent[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<ProcessedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,12 +56,38 @@ export default function CalendarPage() {
         
         const data = await response.json();
         
-        // Convert string dates to Date objects
-        const formattedEvents = data.map((event: any) => ({
-          ...event,
-          start: new Date(event.start),
-          end: new Date(event.end)
-        }));
+        // Convert string dates to Date objects and map colors to valid variants
+        const formattedEvents = data.map((event: any) => {
+          // Map string colors to valid color variants
+          let validColor: "default" | "green" | "blue" | "pink" | "purple" | null | undefined;
+          
+          switch(event.color) {
+            case "green":
+              validColor = "green";
+              break;
+            case "blue":
+              validColor = "blue";
+              break;
+            case "pink":
+              validColor = "pink";
+              break;
+            case "purple":
+              validColor = "purple";
+              break;
+            default:
+              validColor = "default";
+          }
+          
+          return {
+            id: event.id,
+            start: new Date(event.start),
+            end: new Date(event.end),
+            title: event.title,
+            description: event.description || "",
+            location: event.location || "",
+            color: validColor
+          };
+        });
         
         setEvents(formattedEvents);
         setError(null);
@@ -199,7 +233,7 @@ export default function CalendarPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {upcomingEvents.map((event) => (
               <Card key={event.id} className="overflow-hidden">
-                <CardHeader className="py-2" style={{ backgroundColor: `var(--${event.color}-100, #f0f9ff)` }}>
+                <CardHeader className="py-2" style={{ backgroundColor: `var(--${event.color || 'default'}-100, #f0f9ff)` }}>
                   <CardTitle className="text-lg">{event.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">

@@ -18,8 +18,7 @@ export default function LoginPage() {
     // Check for success messages from URL parameters
     const signup = searchParams.get("signup")
     const reset = searchParams.get("reset")
-    const redirectPath = searchParams.get("redirect")
-
+    
     if (signup === "success") {
       setSuccessMessage("Account created successfully! Please check your email to verify your account.")
     } else if (reset === "success") {

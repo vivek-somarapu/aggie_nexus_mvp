@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllEvents, createEvent } from '@/lib/models/events';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const events = await getAllEvents();
     

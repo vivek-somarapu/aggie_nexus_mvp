@@ -8,13 +8,12 @@ import { AlertCircle } from "lucide-react"
 
 export default function SignupPage() {
   const { signUp, signInWithGoogle, signInWithGitHub, isLoading, error } = useAuth()
-  const [customError, setCustomError] = useState<string | null>(null)
 
   const handleSubmit = async (data: { fullName: string; email: string; password: string }) => {
     try {
       await signUp(data.email, data.password, data.fullName)
     } catch (err) {
-      // Most errors are handled by the auth context, but we can add custom ones here
+      // Most errors are handled by the auth context
       console.error("Signup error:", err)
     }
   }
@@ -37,10 +36,10 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         <h1 className="text-3xl font-bold text-center mb-6">Join Aggie Nexus</h1>
 
-        {customError && (
+        {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{customError}</AlertDescription>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
@@ -48,7 +47,7 @@ export default function SignupPage() {
           type="signup"
           onSubmit={handleSubmit}
           loading={isLoading}
-          error={error || customError}
+          error={error}
           onOAuthLogin={handleOAuthLogin}
         />
       </div>
