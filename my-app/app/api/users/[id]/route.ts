@@ -1,17 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserById, updateUser, deleteUser, incrementUserViews } from '@/lib/models/users';
+import { createClient } from '@supabase/supabase-js';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+// Create a Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+interface RouteParams {
+  params: {
+    id: string;
+  }
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const id = params.id;
-    const user = await getUserById(id);
+    const { id } = params;
     
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Increment view count - simpler approach without RPC
+    try {
+      // First get current view count
+      const { data: userData } = await supabase
+        .from('users')
+        .select('views')
+        .eq('id', id)
+        .single();
+      
+      // Then increment it if found
+      if (userData) {
+        const newViews = (userData.views || 0) + 1;
+        await supabase
+          .from('users')
+          .update({ views: newViews })
+          .eq('id', id);
+      }
+    } catch (viewErr) {
+      // Don't let view count errors fail the whole request
+      console.error('Error updating view count:', viewErr);
     }
     
-    // Increment view count asynchronously
-    incrementUserViews(id).catch(console.error);
+    // Get user data
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .eq('deleted', false)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      console.error('Error fetching user:', error);
+      return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
+    }
     
     return NextResponse.json(user);
   } catch (error) {
@@ -20,34 +62,52 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const id = params.id;
+    const { id } = params;
     const body = await request.json();
     
-    const updatedUser = await updateUser(id, body);
+    // Remove fields that shouldn't be updated directly
+    const { id: userId, views, created_at, updated_at, deleted, ...updateData } = body;
     
-    if (!updatedUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const { data: user, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+      console.error('Error updating user:', error);
+      return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
     }
     
-    return NextResponse.json(updatedUser);
+    return NextResponse.json(user);
   } catch (error) {
     console.error('Error updating user:', error);
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const id = params.id;
-    const success = await deleteUser(id);
+    const { id } = params;
     
-    if (!success) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Soft delete by setting deleted flag
+    const { error } = await supabase
+      .from('users')
+      .update({ deleted: true })
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting user:', error);
+      return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
     }
     
-    return NextResponse.json({ success: true });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('Error deleting user:', error);
     return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });

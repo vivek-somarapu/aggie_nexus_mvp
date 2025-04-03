@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
 
 // Define a simplified User type for auth purposes
 export type User = {
@@ -28,8 +29,14 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   signup: (email: string, password: string, userData: Partial<User>) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithGitHub: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (password: string) => Promise<void>;
 }
 
 // Create a context with a default value
@@ -38,87 +45,168 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   error: null,
   login: async () => {},
-  logout: () => {},
+  logout: async () => {},
   signup: async () => {},
+  signIn: async () => {},
+  signUp: async () => {},
+  signInWithGoogle: async () => {},
+  signInWithGitHub: async () => {},
+  requestPasswordReset: async () => {},
+  resetPassword: async () => {},
 });
+
+// Initialize Supabase client outside of component to avoid recreation
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Make sure we have valid config
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables');
+}
+
+// Create a stable Supabase instance
+const supabase = createClient(
+  supabaseUrl!,
+  supabaseAnonKey!,
+  {
+    auth: {
+      persistSession: true,
+      storageKey: 'aggie-nexus-auth',
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    }
+  }
+);
 
 // Create a provider component that will wrap the app
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  const router = useRouter();
 
-  // Check for user session on mount
+  // Check for user session on mount and listen for auth changes
   useEffect(() => {
-    const checkUserSession = async () => {
+    console.log('Auth provider initializing...');
+    
+    // Function to fetch user data with a fallback
+    const getUserData = async (userId: string) => {
       try {
-        // Check Supabase session
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
         
-        if (session) {
-          // Get user profile data
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+        if (error) {
+          console.error('Error fetching user data:', error);
+          return null;
+        }
+        
+        return data;
+      } catch (err) {
+        console.error('Unexpected error fetching user data:', err);
+        return null;
+      }
+    };
+    
+    // Check the current session
+    const initializeAuth = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get session from Supabase
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setError('Authentication error');
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+        
+        if (session?.user) {
+          console.log('Found existing session, fetching user data...');
+          const userData = await getUserData(session.user.id);
           
-          if (userError) throw userError;
-          setUser(userData);
+          if (userData) {
+            console.log('User data loaded successfully');
+            setUser(userData);
+          } else {
+            console.log('No user data found, treating as logged out');
+            setUser(null);
+          }
+        } else {
+          console.log('No active session found');
+          setUser(null);
         }
       } catch (err) {
-        console.error('Error checking auth session:', err);
-        setError('Failed to authenticate user');
+        console.error('Auth initialization error:', err);
+        setError('Failed to initialize authentication');
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
-
-    // Set up auth state change listener
+    
+    // Initialize auth
+    initializeAuth();
+    
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session ? 'with session' : 'no session');
+        
         if (event === 'SIGNED_IN' && session) {
-          // Get user profile data
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          setIsLoading(true);
+          const userData = await getUserData(session.user.id);
           
-          if (userError) {
-            console.error('Error fetching user data:', userError);
-            return;
+          if (userData) {
+            setUser(userData);
+            console.log('User signed in:', userData.full_name);
+          } else {
+            setError('Failed to load user profile');
           }
-          
-          setUser(userData);
+          setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
+          console.log('User signed out');
+        } else if (event === 'PASSWORD_RECOVERY') {
+          router.push('/auth/reset-password');
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('Auth token refreshed');
         }
       }
     );
-
-    checkUserSession();
-
-    // Clean up subscription
+    
+    // Clean up the subscription
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
-
-  const login = async (email: string, password: string) => {
+  }, [router]);
+  
+  // Sign in with email and password
+  const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
       setError(null);
       
+      console.log('Signing in user:', email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Login error:', error);
+        throw error;
+      }
+      
+      console.log('Sign in successful');
+      router.push('/');
+      // Note: Auth state listener will handle updating the user state
     } catch (err: any) {
-      console.error('Login error:', err);
       setError(err.message || 'Failed to login');
       throw err;
     } finally {
@@ -126,54 +214,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const logout = async () => {
+  // Sign out the user
+  const signOut = async () => {
     try {
       setIsLoading(true);
+      
+      console.log('Signing out user');
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Logout error:', error);
+        throw error;
+      }
+      
+      console.log('Sign out successful');
       setUser(null);
-    } catch (err) {
+      router.push('/');
+    } catch (err: any) {
       console.error('Logout error:', err);
+      setError(err.message || 'Failed to logout');
     } finally {
       setIsLoading(false);
     }
   };
   
-  const signup = async (email: string, password: string, userData: Partial<User>) => {
+  // Sign up a new user
+  const signUp = async (email: string, password: string, fullName: string) => {
     try {
       setIsLoading(true);
       setError(null);
       
+      console.log('Creating new account');
       // First create the authentication account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName
+          }
+        }
       });
       
-      if (authError) throw authError;
+      if (authError) {
+        console.error('Signup auth error:', authError);
+        throw authError;
+      }
       
-      if (authData.user) {
+      if (data.user) {
+        console.log('Auth account created, creating user profile');
         // Then create the user profile
         const { error: profileError } = await supabase
           .from('users')
           .insert({
-            id: authData.user.id,
+            id: data.user.id,
             email,
-            full_name: userData.full_name,
-            bio: userData.bio,
-            industry: userData.industry,
-            skills: userData.skills,
-            linkedin_url: userData.linkedin_url,
-            website_url: userData.website_url,
-            resume_url: userData.resume_url,
-            additional_links: userData.additional_links,
-            contact: userData.contact || { email },
-            graduation_year: userData.graduation_year,
-            is_texas_am_affiliate: userData.is_texas_am_affiliate,
-            avatar: userData.avatar
+            full_name: fullName,
+            contact: { email }
           });
         
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('User profile creation error:', profileError);
+          throw profileError;
+        }
+        
+        console.log('Signup successful, redirecting to login');
+        // Redirect to login with success message
+        router.push('/auth/login?signup=success');
       }
     } catch (err: any) {
       console.error('Signup error:', err);
@@ -182,6 +289,127 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Sign in with Google OAuth
+  const signInWithGoogle = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Initiating Google sign in');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) {
+        console.error('Google login error:', error);
+        throw error;
+      }
+    } catch (err: any) {
+      console.error('Google sign in error:', err);
+      setError(err.message || 'Failed to login with Google');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Sign in with GitHub OAuth
+  const signInWithGitHub = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Initiating GitHub sign in');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) {
+        console.error('GitHub login error:', error);
+        throw error;
+      }
+    } catch (err: any) {
+      console.error('GitHub sign in error:', err);
+      setError(err.message || 'Failed to login with GitHub');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Request password reset
+  const requestPasswordReset = async (email: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Requesting password reset for:', email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      
+      if (error) {
+        console.error('Password reset request error:', error);
+        throw error;
+      }
+      
+      console.log('Password reset email sent');
+    } catch (err: any) {
+      console.error('Password reset request error:', err);
+      setError(err.message || 'Failed to send password reset email');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Reset password
+  const resetPassword = async (password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Resetting password');
+      const { error } = await supabase.auth.updateUser({
+        password,
+      });
+      
+      if (error) {
+        console.error('Password reset error:', error);
+        throw error;
+      }
+      
+      console.log('Password reset successful');
+      // Redirect to login with success message
+      router.push('/auth/login?reset=success');
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      setError(err.message || 'Failed to reset password');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Legacy methods for backward compatibility
+  const login = async (email: string, password: string) => {
+    return signIn(email, password);
+  };
+  
+  const logout = async () => {
+    return signOut();
+  };
+  
+  const signup = async (email: string, password: string, userData: Partial<User>) => {
+    return signUp(email, password, userData.full_name || '');
   };
 
   return (
@@ -192,7 +420,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error,
         login,
         logout,
-        signup
+        signup,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        signInWithGitHub,
+        requestPasswordReset,
+        resetPassword
       }}
     >
       {children}

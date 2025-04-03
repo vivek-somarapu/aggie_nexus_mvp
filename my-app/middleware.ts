@@ -1,9 +1,70 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/utils/supabase/middleware';
 
+// List of routes that require authentication
+const protectedRoutes = [
+  '/profile',
+  '/projects/new',
+  '/projects/edit',
+  '/bookmarks',
+];
+
+// List of routes that should be redirected to home if already authenticated
+const authRoutes = [
+  '/auth/login',
+  '/auth/signup',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+];
+
+// List of public routes that don't require authentication
+const publicRoutes = [
+  '/',
+  '/projects',
+  '/users',
+];
+
 export async function middleware(request: NextRequest) {
-  // Get response from supabase middleware
-  return createClient(request);
+  const { pathname } = request.nextUrl;
+  
+  // Create supabase client with response
+  const { supabase, response } = createClient(request);
+  
+  // Get session
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  // Check if the path is a public route
+  const isPublicRoute = publicRoutes.some(route => 
+    pathname === route || pathname.startsWith(`${route}/`)
+  );
+  
+  if (isPublicRoute) {
+    return response;
+  }
+  
+  // Check if the path is a protected route and user is not authenticated
+  const isProtectedRoute = protectedRoutes.some(route => 
+    pathname.startsWith(route)
+  );
+
+  if (isProtectedRoute && !session) {
+    // Redirect unauthenticated users to login
+    const redirectUrl = new URL('/auth/login', request.url);
+    redirectUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+  
+  // Check if the path is an auth route and user is authenticated
+  const isAuthRoute = authRoutes.some(route => 
+    pathname.startsWith(route)
+  );
+  
+  if (isAuthRoute && session) {
+    // Redirect authenticated users to home
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+  
+  return response;
 }
 
 export const config = {
@@ -14,7 +75,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api routes
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }; 

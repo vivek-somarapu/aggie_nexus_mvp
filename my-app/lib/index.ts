@@ -1,1 +1,2 @@
-export { useAuth, AuthProvider, User } from './auth.tsx'; 
+export { useAuth, AuthProvider } from './auth';
+export type { User } from './auth'; 

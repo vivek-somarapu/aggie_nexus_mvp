@@ -3,7 +3,21 @@ import { User } from "@/lib/models/users";
 export interface UserSearchParams {
   search?: string;
   skill?: string;
+  tamu?: boolean;
 }
+
+// Helper function for retrying fetch operations
+const fetchWithRetry = async (url: string, options?: RequestInit, retries = 3): Promise<Response> => {
+  try {
+    const response = await fetch(url, options);
+    return response;
+  } catch (err) {
+    if (retries <= 1) throw err;
+    console.log(`Retrying fetch to ${url}, ${retries-1} attempts left`);
+    await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+    return fetchWithRetry(url, options, retries - 1);
+  }
+};
 
 export const userService = {
   // Get all users
@@ -14,34 +28,50 @@ export const userService = {
       const searchParams = new URLSearchParams();
       if (params.search) searchParams.append('search', params.search);
       if (params.skill) searchParams.append('skill', params.skill);
+      if (params.tamu !== undefined) searchParams.append('tamu', params.tamu.toString());
       
       if (searchParams.toString()) {
         url += `?${searchParams.toString()}`;
       }
     }
+
+    console.log(`Fetching users from ${url}`);
     
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch users: ${response.statusText}`);
+    try {
+      const response = await fetchWithRetry(url);
+      
+      if (!response.ok) {
+        console.error(`Error fetching users: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to fetch users: ${response.statusText}`);
+      }
+      
+      const users = await response.json();
+      console.log(`Fetched ${users.length} users successfully`);
+      return users;
+    } catch (error) {
+      console.error('Network error fetching users:', error);
+      throw error;
     }
-    
-    return response.json();
   },
 
   // Get a single user by ID
   getUser: async (id: string): Promise<User | null> => {
-    const response = await fetch(`/api/users/${id}`);
-    
-    if (response.status === 404) {
-      return null;
+    try {
+      const response = await fetchWithRetry(`/api/users/${id}`);
+      
+      if (response.status === 404) {
+        return null;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error(`Error fetching user ${id}:`, error);
+      throw error;
     }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user: ${response.statusText}`);
-    }
-    
-    return response.json();
   },
 
   // Advanced search for users
@@ -50,42 +80,57 @@ export const userService = {
     searchParams.append('q', query);
     if (skill) searchParams.append('skill', skill);
     
-    const response = await fetch(`/api/search/users?${searchParams.toString()}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to search users: ${response.statusText}`);
+    try {
+      const response = await fetchWithRetry(`/api/search/users?${searchParams.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to search users: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Error searching users:', error);
+      throw error;
     }
-    
-    return response.json();
   },
 
   // Update an existing user
   updateUser: async (id: string, userData: Partial<User>): Promise<User | null> => {
-    const response = await fetch(`/api/users/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
-    
-    if (response.status === 404) {
-      return null;
+    try {
+      const response = await fetchWithRetry(`/api/users/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      if (response.status === 404) {
+        return null;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update user: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error(`Error updating user ${id}:`, error);
+      throw error;
     }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to update user: ${response.statusText}`);
-    }
-    
-    return response.json();
   },
 
   // Delete a user
   deleteUser: async (id: string): Promise<boolean> => {
-    const response = await fetch(`/api/users/${id}`, {
-      method: 'DELETE',
-    });
-    
-    return response.ok;
+    try {
+      const response = await fetchWithRetry(`/api/users/${id}`, {
+        method: 'DELETE',
+      });
+      
+      return response.ok;
+    } catch (error) {
+      console.error(`Error deleting user ${id}:`, error);
+      return false;
+    }
   },
 }; 

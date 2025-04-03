@@ -1,0 +1,244 @@
+Aggie Nexus
+
+⸻
+🚀 Aggie Nexus  – Enhanced Project Context (Next.js MVP)
+This is a Next.js web application called “Aggie Nexus” serving as a platform for Texas A&M University affiliates to connect, collaborate, and share opportunities. It uses TypeScript, Tailwind CSS, shadcn/ui, and Supabase as the backend/database service.
+⸻
+🛠 Current Development Phase
+The app is currently transitioning from a frontend-only MVP using mock data to a full-stack app that fetches real users and projects from a Supabase database.
+✅ Currently Working:
+* Projects successfully pulled from Supabase and displayed.
+⚠️ Immediate Task (Highest Priority):
+* Replace mock data in user view with real data from Supabase.
+* Verify user data directly from the MCP Supabase server for correctness.
+⸻
+🔜 Major Updates (Upcoming)
+After connecting users-view to the database, these updates will follow:
+1. UI Overhaul aligned with formal brand guidelines
+2. Full authentication (login, signup, password reset via Supabase Auth)
+3. Profile editing functionality
+4. Viewing detailed user profiles
+5. Filtering and search for projects/users
+6. Project creation/editing functionality
+⸻
+📦 Data Structures & Features
+✅ Users:
+* Full name, Email, Bio, Industry, Skills, Social/Professional Links
+✅ Projects:
+* Title, Description, Recruitment status, Skills needed, Location type
+✅ Current Features:
+* Bookmarking projects/users
+* Viewing user profiles
+* Viewing project details
+⸻
+⚠️ Mock Data Usage
+Components currently still using mock data (primarily from lib/utils.ts and components/navbar.tsx) must transition to real data fetching from Supabase via MCP tools.
+⸻
+🧑‍🎨 Design & Technical Stack
+* Fonts: Montserrat, Playfair Display, Inter (Google Fonts)
+* Next.js best practices: Server Components, React Hooks, Context for Auth state, Supabase client, SSR, TypeScript
+* Styling: Tailwind CSS, shadcn/ui
+⸻
+✅ Current Implementation Status
+1. Database Schema: Supabase with tables (users, projects, bookmarks, events), proper relationships, constraints, and indexing
+2. Authentication Framework: Supabase Auth (setup in lib/auth.tsx), middleware (lib/auth-middleware.ts), context provider
+3. API Routes: (/api/users, /api/projects, /api/search/users, /api/bookmarks)
+4. Models & Services: CRUD-ready User, Project, Bookmark, and Event models
+5. UI Components: Navigation bar, cards, layout, theme provider, using shadcn/ui and Tailwind
+⸻
+❌ Areas Still Missing or Incomplete
+Authentication UI
+* Login/signup/password reset pages not yet implemented
+* Navbar currently shows mock user data
+User Management
+* Profile page and editing incomplete
+* User search still using mock data
+* Users listing needs real data from Supabase
+Project Management
+* Missing project creation/editing forms
+* Project detail page incomplete
+* Project search/filtering disconnected from database
+Data Integration
+* Replace mock data with actual Supabase data fetching
+* Implement robust loading/error states for all data-fetching components
+Additional Features
+* Bookmarking functionality incomplete
+* Event management features incomplete
+* Messaging feature not implemented
+Security
+* Missing authorization checks, input validation, error handling, rate-limiting
+⸻
+🎯 Your Immediate Focus (Important)
+Primary Task: Implement the users view to correctly pull user profiles from the Supabase MCP server instead of using mock data.
+* Use Supabase Client SDK for data fetching (supabase-js)
+* Validate and verify data directly using MCP-provided browser tools
+* Confirm connection using filesystem-based MCP development servers and Supabase instance from MCP installer
+⸻
+🧑‍💻 Role & Expectations
+You are:
+* An expert full-stack developer
+* Proficient in Next.js, Supabase, Tailwind CSS, TypeScript
+* Focused on clear, readable, secure, bug-free code adhering to latest best practices
+⸻
+🧰 Technical Preferences
+* Use kebab-case for files/components (e.g., user-card.tsx)
+* Prefer React Server Components & Next.js SSR
+* Use "use client" minimally and explicitly
+* Always handle loading/error states for Supabase data fetching
+* Include error handling and logging
+* Verify data interactions with browser-based MCP debugging tools
+* Validate integrations with filesystem-based MCP development server provided by MCP installer
+* Write semantic, accessible HTML
+⸻
+✅ General Guidelines
+* Strictly follow all requirements without assumptions
+* Fully implement functionality (no placeholders or TODOs)
+* Prioritize readability and correctness over performance
+* Clearly reference filenames and paths in explanations
+* Be concise yet comprehensive in your responses
+* Explicitly state uncertainties—do not guess
+⸻
+Your immediate goal: Successfully transition the user-view from mock data to real-time Supabase data using MCP installer/server and validate using browser tools provided by the MCP ecosystem.
+ _____ Aggie Nexus Implementation Plan
+Based on the current state of the project and your requirements, here's a prioritized implementation plan with JIRA-style stories:
+Sprint 1: Core Data Integration & Authentication
+Epic: Replace Mock Data with Real Database Calls
+AGN-001: Replace Mock User Data with Supabase Integration
+* Priority: Highest
+* Description: Update users page to fetch real user data from Supabase instead of mockUsers
+* Acceptance Criteria:
+* Users listing page displays real users from database
+* Filtering works with real data
+* Loading states shown during data fetching
+* Error handling implemented
+AGN-002: Implement Authentication Pages
+* Priority: High
+* Description: Create login, signup, and password reset pages
+* Acceptance Criteria:
+* Login page with email/password fields
+* Signup page with required user information
+* Password reset flow
+* Connect to existing Supabase auth framework
+AGN-003: Update Navbar User Profile
+* Priority: High
+* Description: Replace mock user data in navbar with authenticated user data
+* Acceptance Criteria:
+* Navbar displays current user info from Supabase
+* Login/Logout functionality works
+* Proper state management for auth changes
+AGN-004: Implement User Profile Page
+* Priority: Medium
+* Description: Complete user profile page with real data and editing capability
+* Acceptance Criteria:
+* Display user details from Supabase
+* Add editing functionality
+* Handle profile picture uploads
+* Save changes to database
+Sprint 2: Project Management & Search
+AGN-005: Implement Project Creation Form
+* Priority: High
+* Description: Create form for users to add new projects to the platform
+* Acceptance Criteria:
+* Form with all required project fields
+* Validation and error handling
+* Save to Supabase
+* Redirect to new project page after creation
+AGN-006: Implement Project Editing
+* Priority: Medium
+* Description: Allow project owners to edit their projects
+* Acceptance Criteria:
+* Edit form pre-populated with project data
+* Save changes to database
+* Proper authorization (only owner can edit)
+AGN-007: Enhance Search Functionality
+* Priority: Medium
+* Description: Complete search functionality for both users and projects
+* Acceptance Criteria:
+* Real-time search results from database
+* Filter by multiple criteria
+* Optimized queries
+* Pagination support
+Sprint 3: Bookmarking & Relationship Features
+AGN-008: Complete Bookmarking System
+* Priority: Medium
+* Description: Finish implementation of user and project bookmarking
+* Acceptance Criteria:
+* Toggle bookmarks for users and projects
+* View bookmarked items in user profile
+* Real-time UI updates
+* Proper database persistence
+AGN-009: Implement Similar Users/Projects Feature
+* Priority: Medium
+* Description: Add recommendations for similar users and projects
+* Acceptance Criteria:
+* Algorithm to find users with similar skills/interests
+* Display recommendations on profile pages
+* Efficient database queries
+Sprint 4: UI/UX Improvements & Brand Alignment
+AGN-010: Update UI to Match Brand Guidelines
+* Priority: High
+* Description: Overhaul UI components to match Texas A&M brand guidelines
+* Acceptance Criteria:
+* Updated color scheme
+* Typography following brand standards
+* Consistent component styling
+* Responsive design improvements
+AGN-011: Implement Dashboard for Users
+* Priority: Medium
+* Description: Create personalized dashboard for logged-in users
+* Acceptance Criteria:
+* Activity feed
+* Recommended connections
+* Quick access to bookmarked items
+* Project progress tracking
+Sprint 5: Advanced Features
+AGN-012: Implement Messaging System
+* Priority: Low
+* Description: Add direct messaging between users
+* Acceptance Criteria:
+* Real-time messaging
+* Message history
+* Notifications
+* Thread organization
+AGN-013: Implement Event Management
+* Priority: Low
+* Description: Complete event creation, listing, and RSVP functionality
+* Acceptance Criteria:
+* Event creation form
+* Calendar view
+* RSVP feature
+* Event reminders
+Sprint 6: Security & Performance
+AGN-014: Implement Security Enhancements
+* Priority: High
+* Description: Add comprehensive security features
+* Acceptance Criteria:
+* Input validation
+* Rate limiting
+* CSRF protection
+* Permission-based access control
+AGN-015: Performance Optimization
+* Priority: Medium
+* Description: Optimize application performance
+* Acceptance Criteria:
+* Optimized database queries
+* Code splitting
+* Image optimization
+* Reduced bundle size
+Technical Debt & Infrastructure
+AGN-016: Add Comprehensive Testing
+* Priority: Medium
+* Description: Implement unit and integration tests
+* Acceptance Criteria:
+* Test coverage for core functionality
+* API endpoint tests
+* Component tests
+* CI/CD integration
+AGN-017: Documentation & Developer Guidelines
+* Priority: Low
+* Description: Create comprehensive documentation
+* Acceptance Criteria:
+* API documentation
+* Component library documentation
+* Setup guide
+* Contribution guidelines

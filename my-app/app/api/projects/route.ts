@@ -1,25 +1,77 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllProjects, createProject, searchProjects, filterProjectsBySkill } from "@/lib/models/projects";
 import { withAuth } from "@/lib/auth-middleware";
+import { createClient } from '@supabase/supabase-js';
+
+// Create a Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // GET /api/projects - List all projects
 export async function GET(request: NextRequest) {
   try {
+    console.log('Fetching projects from API');
     const searchParams = request.nextUrl.searchParams;
     const searchTerm = searchParams.get('search');
     const skill = searchParams.get('skill');
+    const tamuParam = searchParams.get('tamu');
+    const isIdeaParam = searchParams.get('is_idea');
     
-    let projects;
+    // Create a query builder
+    let query = supabase.from('projects').select('*').eq('deleted', false);
     
+    // Apply filters if provided
     if (searchTerm) {
-      projects = await searchProjects(searchTerm);
-    } else if (skill) {
-      projects = await filterProjectsBySkill(skill);
-    } else {
-      projects = await getAllProjects();
+      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
     }
     
-    return NextResponse.json(projects);
+    if (skill) {
+      query = query.contains('required_skills', [skill]);
+    }
+    
+    // Filter by TAMU affiliation (we need to join with users table)
+    if (tamuParam === 'true' || tamuParam === 'false') {
+      const isTamu = tamuParam === 'true';
+      
+      // First get the IDs of projects with TAMU/non-TAMU owners
+      const { data: ownerData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('is_texas_am_affiliate', isTamu);
+      
+      if (ownerData && ownerData.length > 0) {
+        const ownerIds = ownerData.map(owner => owner.id);
+        query = query.in('owner_id', ownerIds);
+      }
+    }
+    
+    // Filter by is_idea if provided
+    if (isIdeaParam === 'true' || isIdeaParam === 'false') {
+      const isIdea = isIdeaParam === 'true';
+      query = query.eq('is_idea', isIdea);
+    }
+    
+    // Order by creation date
+    query = query.order('created_at', { ascending: false });
+    
+    const { data: projects, error } = await query;
+    
+    if (error) {
+      console.error('Supabase query error:', error);
+      return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
+    }
+    
+    // Process projects to ensure consistent format
+    const processedProjects = (projects || []).map(project => ({
+      ...project,
+      industry: project.industry || [],
+      required_skills: project.required_skills || [],
+      contact_info: project.contact_info || {}
+    }));
+    
+    console.log(`Fetched ${processedProjects.length} projects successfully`);
+    return NextResponse.json(processedProjects);
   } catch (error) {
     console.error('Error fetching projects:', error);
     return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
@@ -46,8 +98,31 @@ export async function POST(request: NextRequest) {
         owner_id: userId
       };
       
-      const project = await createProject(projectData);
-      return NextResponse.json(project, { status: 201 });
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          title: projectData.title,
+          description: projectData.description,
+          owner_id: projectData.owner_id,
+          is_idea: projectData.is_idea || false,
+          recruitment_status: projectData.recruitment_status || "Not recruiting",
+          industry: projectData.industry || [],
+          required_skills: projectData.required_skills || [],
+          location_type: projectData.location_type || "Remote",
+          estimated_start: projectData.estimated_start || null,
+          estimated_end: projectData.estimated_end || null,
+          contact_info: projectData.contact_info || {},
+          project_status: projectData.project_status || "Not Started"
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error creating project in Supabase:', error);
+        return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
+      }
+      
+      return NextResponse.json(data, { status: 201 });
     } catch (error) {
       console.error('Error creating project:', error);
       return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });

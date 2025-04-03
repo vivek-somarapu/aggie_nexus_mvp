@@ -1,4 +1,4 @@
-import { query } from '../db';
+import { supabase } from '../db';
 
 export type UserBookmark = {
   id: string;
@@ -15,39 +15,65 @@ export type ProjectBookmark = {
 };
 
 export async function getUserBookmarks(userId: string): Promise<UserBookmark[]> {
-  const result = await query(
-    'SELECT * FROM user_bookmarks WHERE user_id = $1 ORDER BY saved_at DESC',
-    [userId]
-  );
+  const { data, error } = await supabase
+    .from('user_bookmarks')
+    .select('*')
+    .eq('user_id', userId)
+    .order('saved_at', { ascending: false });
   
-  return result.rows;
+  if (error) {
+    console.error('Error fetching user bookmarks:', error);
+    throw new Error('Failed to fetch user bookmarks');
+  }
+  
+  return data || [];
 }
 
 export async function getProjectBookmarks(userId: string): Promise<ProjectBookmark[]> {
-  const result = await query(
-    'SELECT * FROM project_bookmarks WHERE user_id = $1 ORDER BY saved_at DESC',
-    [userId]
-  );
+  const { data, error } = await supabase
+    .from('project_bookmarks')
+    .select('*')
+    .eq('user_id', userId)
+    .order('saved_at', { ascending: false });
   
-  return result.rows;
+  if (error) {
+    console.error('Error fetching project bookmarks:', error);
+    throw new Error('Failed to fetch project bookmarks');
+  }
+  
+  return data || [];
 }
 
 export async function isUserBookmarked(userId: string, bookmarkedUserId: string): Promise<boolean> {
-  const result = await query(
-    'SELECT 1 FROM user_bookmarks WHERE user_id = $1 AND bookmarked_user_id = $2',
-    [userId, bookmarkedUserId]
-  );
+  const { data, error } = await supabase
+    .from('user_bookmarks')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('bookmarked_user_id', bookmarkedUserId)
+    .maybeSingle();
   
-  return result.rows.length > 0;
+  if (error) {
+    console.error('Error checking user bookmark:', error);
+    throw new Error('Failed to check user bookmark');
+  }
+  
+  return !!data;
 }
 
 export async function isProjectBookmarked(userId: string, projectId: string): Promise<boolean> {
-  const result = await query(
-    'SELECT 1 FROM project_bookmarks WHERE user_id = $1 AND project_id = $2',
-    [userId, projectId]
-  );
+  const { data, error } = await supabase
+    .from('project_bookmarks')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('project_id', projectId)
+    .maybeSingle();
   
-  return result.rows.length > 0;
+  if (error) {
+    console.error('Error checking project bookmark:', error);
+    throw new Error('Failed to check project bookmark');
+  }
+  
+  return !!data;
 }
 
 export async function toggleUserBookmark(userId: string, bookmarkedUserId: string): Promise<boolean> {
@@ -56,41 +82,70 @@ export async function toggleUserBookmark(userId: string, bookmarkedUserId: strin
   
   if (exists) {
     // Remove bookmark
-    await query(
-      'DELETE FROM user_bookmarks WHERE user_id = $1 AND bookmarked_user_id = $2',
-      [userId, bookmarkedUserId]
-    );
+    const { error } = await supabase
+      .from('user_bookmarks')
+      .delete()
+      .eq('user_id', userId)
+      .eq('bookmarked_user_id', bookmarkedUserId);
+    
+    if (error) {
+      console.error('Error removing user bookmark:', error);
+      throw new Error('Failed to remove user bookmark');
+    }
+    
     return false;
   } else {
     // Add bookmark
-    await query(
-      'INSERT INTO user_bookmarks (user_id, bookmarked_user_id) VALUES ($1, $2)',
-      [userId, bookmarkedUserId]
-    );
+    const { error } = await supabase
+      .from('user_bookmarks')
+      .insert({
+        user_id: userId,
+        bookmarked_user_id: bookmarkedUserId,
+        saved_at: new Date().toISOString()
+      });
+    
+    if (error) {
+      console.error('Error adding user bookmark:', error);
+      throw new Error('Failed to add user bookmark');
+    }
+    
     return true;
   }
 }
 
 export async function toggleProjectBookmark(userId: string, projectId: string): Promise<{ action: 'added' | 'removed' }> {
   // First check if the bookmark exists
-  const checkResult = await query(
-    'SELECT id FROM project_bookmarks WHERE user_id = $1 AND project_id = $2',
-    [userId, projectId]
-  );
+  const exists = await isProjectBookmarked(userId, projectId);
   
-  if (checkResult.rows.length > 0) {
+  if (exists) {
     // Bookmark exists, so remove it
-    await query(
-      'DELETE FROM project_bookmarks WHERE user_id = $1 AND project_id = $2',
-      [userId, projectId]
-    );
+    const { error } = await supabase
+      .from('project_bookmarks')
+      .delete()
+      .eq('user_id', userId)
+      .eq('project_id', projectId);
+    
+    if (error) {
+      console.error('Error removing project bookmark:', error);
+      throw new Error('Failed to remove project bookmark');
+    }
+    
     return { action: 'removed' };
   } else {
     // Bookmark doesn't exist, so add it
-    await query(
-      'INSERT INTO project_bookmarks (id, user_id, project_id, saved_at) VALUES (gen_random_uuid(), $1, $2, NOW())',
-      [userId, projectId]
-    );
+    const { error } = await supabase
+      .from('project_bookmarks')
+      .insert({
+        user_id: userId,
+        project_id: projectId,
+        saved_at: new Date().toISOString()
+      });
+    
+    if (error) {
+      console.error('Error adding project bookmark:', error);
+      throw new Error('Failed to add project bookmark');
+    }
+    
     return { action: 'added' };
   }
 } 

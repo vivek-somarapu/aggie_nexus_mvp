@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -8,42 +8,196 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bookmark, GraduationCap } from "lucide-react"
-import { mockUsers } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Bookmark, GraduationCap, Loader2 } from "lucide-react"
+import { User } from "@/lib/models/users"
+import { userService, UserSearchParams } from "@/lib/services/user-service"
+import { bookmarkService } from "@/lib/services/bookmark-service"
+import { useAuth } from "@/lib"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useRouter } from "next/navigation"
 
 export default function UsersPage() {
+  const { user: currentUser, isLoading: authLoading } = useAuth()
+  const router = useRouter()
+  
+  const [users, setUsers] = useState<User[]>([])
+  const [bookmarkedUsers, setBookmarkedUsers] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [dataFetched, setDataFetched] = useState(false)
+  
   const [searchQuery, setSearchQuery] = useState("")
   const [industryFilter, setIndustryFilter] = useState("all")
   const [skillFilter, setSkillFilter] = useState("all")
   const [tamuFilter, setTamuFilter] = useState("all")
+  const [userTypeFilter, setUserTypeFilter] = useState("all")
+
+  // Fetch users once auth state is resolved
+  useEffect(() => {
+    // Wait for auth loading to complete
+    if (authLoading) return;
+    
+    // Check if we already fetched data
+    if (dataFetched) return;
+    
+    const fetchUsers = async () => {
+      try {
+        console.log("Fetching users data...");
+        setIsLoading(true);
+        setError(null);
+        
+        const searchParams: UserSearchParams = {};
+        
+        if (tamuFilter === "tamu") {
+          searchParams.tamu = true;
+        } else if (tamuFilter === "non-tamu") {
+          searchParams.tamu = false;
+        }
+        
+        if (searchQuery) {
+          searchParams.search = searchQuery;
+        }
+        
+        if (skillFilter !== "all") {
+          searchParams.skill = skillFilter;
+        }
+        
+        const fetchedUsers = await userService.getUsers(searchParams);
+        setUsers(fetchedUsers);
+        setDataFetched(true);
+        console.log(`Successfully loaded ${fetchedUsers.length} users`);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        setError("Failed to load users. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUsers();
+  }, [authLoading, dataFetched, searchQuery, tamuFilter, skillFilter]);
+  
+  // Re-fetch when filters change
+  useEffect(() => {
+    // Skip if auth is still loading or we haven't done initial data fetch
+    if (authLoading || !dataFetched) return;
+    
+    const fetchFilteredUsers = async () => {
+      try {
+        console.log("Fetching filtered users data...");
+        setIsLoading(true);
+        setError(null);
+        
+        const searchParams: UserSearchParams = {};
+        
+        if (tamuFilter === "tamu") {
+          searchParams.tamu = true;
+        } else if (tamuFilter === "non-tamu") {
+          searchParams.tamu = false;
+        }
+        
+        if (searchQuery) {
+          searchParams.search = searchQuery;
+        }
+        
+        if (skillFilter !== "all") {
+          searchParams.skill = skillFilter;
+        }
+        
+        const fetchedUsers = await userService.getUsers(searchParams);
+        setUsers(fetchedUsers);
+      } catch (err) {
+        console.error("Error fetching users with filters:", err);
+        setError("Failed to apply filters. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchFilteredUsers();
+  }, [searchQuery, tamuFilter, skillFilter, authLoading, dataFetched]);
+  
+  // Fetch bookmarked users if user is logged in
+  useEffect(() => {
+    // Skip if no user or auth still loading
+    if (!currentUser || authLoading) return;
+    
+    const fetchBookmarks = async () => {
+      try {
+        console.log("Fetching user bookmarks...");
+        const bookmarks = await bookmarkService.getUserBookmarks(currentUser.id);
+        setBookmarkedUsers(bookmarks.map(bookmark => bookmark.bookmarked_user_id));
+        console.log(`Loaded ${bookmarks.length} bookmarked users`);
+      } catch (err) {
+        console.error("Error fetching bookmarks:", err);
+        // Don't set the main error as this is not critical
+      }
+    };
+    
+    fetchBookmarks();
+  }, [currentUser, authLoading]);
+  
+  const handleBookmarkToggle = async (userId: string, event: React.MouseEvent) => {
+    event.preventDefault(); // Prevent navigating to user detail
+    
+    if (!currentUser) {
+      // If not logged in, redirect to login
+      router.push('/auth/login?redirect=/users');
+      return;
+    }
+    
+    try {
+      setIsBookmarkLoading(true);
+      const isBookmarked = await bookmarkService.toggleUserBookmark(currentUser.id, userId);
+      
+      if (isBookmarked) {
+        setBookmarkedUsers(prev => [...prev, userId]);
+      } else {
+        setBookmarkedUsers(prev => prev.filter(id => id !== userId));
+      }
+    } catch (err) {
+      console.error("Error toggling bookmark:", err);
+    } finally {
+      setIsBookmarkLoading(false);
+    }
+  };
 
   // Get all unique industries and skills from users
-  const industries = Array.from(new Set(mockUsers.flatMap((user) => user.industry)))
+  const industries = Array.from(new Set(users.flatMap((user) => user.industry || [])));
+  const skills = Array.from(new Set(users.flatMap((user) => user.skills || [])));
 
-  const skills = Array.from(new Set(mockUsers.flatMap((user) => user.skills)))
-
-  // Filter users based on search query and filters
-  const filteredUsers = mockUsers.filter((user) => {
-    // Filter by search query
-    const matchesSearch =
-      user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.bio.toLowerCase().includes(searchQuery.toLowerCase())
-
+  // Filter users based on filters
+  const filteredUsers = users.filter((user: User) => {
     // Filter by industry
-    const matchesIndustry = industryFilter === "all" || user.industry.includes(industryFilter)
-
-    // Filter by skill
-    const matchesSkill = skillFilter === "all" || user.skills.includes(skillFilter)
-
-    // Filter by TAMU affiliation
-    const matchesTamu =
-      tamuFilter === "all" ||
-      (tamuFilter === "tamu" && user.is_texas_am_affiliate) ||
-      (tamuFilter === "non-tamu" && !user.is_texas_am_affiliate)
-
-    return matchesSearch && matchesIndustry && matchesSkill && matchesTamu
-  })
+    const matchesIndustry = 
+      industryFilter === "all" || 
+      (user.industry && user.industry.includes(industryFilter));
+    
+    // Filter by user type based on industry keywords
+    const matchesUserType = 
+      userTypeFilter === "all" || 
+      (userTypeFilter === "builders" && user.industry && 
+        user.industry.some(ind => 
+          ["Engineering", "Science", "Technology", "Research", "Development"].includes(ind)
+        )) ||
+      (userTypeFilter === "funders" && user.industry && 
+        user.industry.some(ind => 
+          ["Investing", "Finance", "Venture Capital", "Angel Investing", "Investment Banking"].includes(ind)
+        ));
+    
+    const isMatch = matchesIndustry && matchesUserType;
+    return isMatch;
+  });
+  
+  // Log filtering results for debugging
+  useEffect(() => {
+    if (dataFetched) {
+      console.log(`Filtering users: ${users.length} total, ${filteredUsers.length} after filters`);
+      console.log(`Filters: userType=${userTypeFilter}, tamu=${tamuFilter}, industry=${industryFilter}, skill=${skillFilter}`);
+    }
+  }, [filteredUsers, users, userTypeFilter, tamuFilter, industryFilter, skillFilter, dataFetched]);
 
   return (
     <div className="space-y-6">
@@ -53,39 +207,31 @@ export default function UsersPage() {
           <p className="text-muted-foreground">Find collaborators, builders, and funders for your projects</p>
         </div>
       </div>
+      
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <Tabs defaultValue="all" className="w-full">
+      <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-          <TabsList className="mb-4 md:mb-0">
-            <TabsTrigger value="all">All Users</TabsTrigger>
-            <TabsTrigger value="builders">Builders</TabsTrigger>
-            <TabsTrigger value="funders">Funders</TabsTrigger>
-          </TabsList>
+          <Tabs value={userTypeFilter} onValueChange={setUserTypeFilter}>
+            <TabsList className="mb-4 md:mb-0">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="builders">Builders</TabsTrigger>
+              <TabsTrigger value="funders">Funders</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div className="flex flex-col md:flex-row gap-4">
-            <TabsList>
-              <TabsTrigger
-                value="all"
-                onClick={() => setTamuFilter("all")}
-                className={tamuFilter === "all" ? "bg-primary text-primary-foreground" : ""}
-              >
-                All
-              </TabsTrigger>
-              <TabsTrigger
-                value="tamu"
-                onClick={() => setTamuFilter("tamu")}
-                className={tamuFilter === "tamu" ? "bg-primary text-primary-foreground" : ""}
-              >
-                TAMU
-              </TabsTrigger>
-              <TabsTrigger
-                value="non-tamu"
-                onClick={() => setTamuFilter("non-tamu")}
-                className={tamuFilter === "non-tamu" ? "bg-primary text-primary-foreground" : ""}
-              >
-                Non-TAMU
-              </TabsTrigger>
-            </TabsList>
+            <Tabs value={tamuFilter} onValueChange={setTamuFilter}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="tamu">TAMU</TabsTrigger>
+                <TabsTrigger value="non-tamu">Non-TAMU</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
 
@@ -104,7 +250,7 @@ export default function UsersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Industries</SelectItem>
-              {industries.map((industry) => (
+              {industries.map((industry: string) => (
                 <SelectItem key={industry} value={industry}>
                   {industry}
                 </SelectItem>
@@ -117,7 +263,7 @@ export default function UsersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Skills</SelectItem>
-              {skills.map((skill) => (
+              {skills.map((skill: string) => (
                 <SelectItem key={skill} value={skill}>
                   {skill}
                 </SelectItem>
@@ -126,86 +272,88 @@ export default function UsersPage() {
           </Select>
         </div>
 
-        <TabsContent value="all" className="mt-0">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredUsers.map((user) => (
-              <Link href={`/users/${user.id}`} key={user.id}>
-                <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={user.avatar} alt={user.full_name} />
-                        <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Bookmark className="h-4 w-4" />
-                        <span className="sr-only">Bookmark user</span>
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="mb-2">
-                      <h3 className="font-semibold text-lg">{user.full_name}</h3>
-                      {user.is_texas_am_affiliate && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <GraduationCap className="h-3 w-3" />
-                          <span>Texas A&M Affiliate</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-muted-foreground line-clamp-3 mb-4">{user.bio}</p>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {user.industry.map((ind) => (
-                        <Badge key={ind} variant="secondary" className="text-xs">
-                          {ind}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                  <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                    {user.skills.slice(0, 4).map((skill) => (
-                      <Badge key={skill} variant="outline" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                    {user.skills.length > 4 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{user.skills.length - 4}
-                      </Badge>
-                    )}
-                  </CardFooter>
-                </Card>
-              </Link>
-            ))}
-          </div>
-
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">No users found matching your criteria.</p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => {
-                  setSearchQuery("")
-                  setIndustryFilter("all")
-                  setSkillFilter("all")
-                  setTamuFilter("all")
-                }}
-              >
-                Clear Filters
-              </Button>
+        <div className="mt-0">
+          {isLoading || authLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <span className="ml-2">Loading users...</span>
             </div>
+          ) : (
+            <>
+              {filteredUsers.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-lg font-medium">No users found</p>
+                  <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredUsers.map((user: User) => (
+                    <Link href={`/users/${user.id}`} key={user.id}>
+                      <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between">
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={user.avatar ?? ''} alt={user.full_name} />
+                              <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={(e) => handleBookmarkToggle(user.id, e)}
+                              disabled={isBookmarkLoading}
+                            >
+                              {isBookmarkLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Bookmark 
+                                  className={`h-4 w-4 ${bookmarkedUsers.includes(user.id) ? "fill-primary" : ""}`} 
+                                />
+                              )}
+                              <span className="sr-only">Bookmark user</span>
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pb-2">
+                          <div className="mb-2">
+                            <h3 className="font-semibold text-lg">{user.full_name}</h3>
+                            {user.is_texas_am_affiliate && (
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <GraduationCap className="h-3 w-3" />
+                                <span>Texas A&M Affiliate</span>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-muted-foreground line-clamp-3 mb-4">{user.bio}</p>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {user.industry?.map((ind) => (
+                              <Badge key={ind} variant="secondary" className="text-xs">
+                                {ind}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                        <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
+                          {user.skills?.slice(0, 4).map((skill) => (
+                            <Badge key={skill} variant="outline" className="text-xs">
+                              {skill}
+                            </Badge>
+                          ))}
+                          {user.skills?.length > 4 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{user.skills.length - 4}
+                            </Badge>
+                          )}
+                        </CardFooter>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </>
           )}
-        </TabsContent>
-
-        <TabsContent value="builders" className="mt-0">
-          {/* Same content as "all" tab but filtered for builders */}
-        </TabsContent>
-
-        <TabsContent value="funders" className="mt-0">
-          {/* Same content as "all" tab but filtered for funders */}
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   )
 }

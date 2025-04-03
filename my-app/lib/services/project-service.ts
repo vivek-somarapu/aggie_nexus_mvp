@@ -24,6 +24,7 @@ export interface ProjectSearchParams {
   search?: string;
   skill?: string;
   tamu?: boolean;
+  is_idea?: boolean;
 }
 
 export const projectService = {
@@ -36,6 +37,7 @@ export const projectService = {
       if (params.search) searchParams.append('search', params.search);
       if (params.skill) searchParams.append('skill', params.skill);
       if (params.tamu !== undefined) searchParams.append('tamu', params.tamu.toString());
+      if (params.is_idea !== undefined) searchParams.append('is_idea', params.is_idea.toString());
       
       if (searchParams.toString()) {
         url += `?${searchParams.toString()}`;

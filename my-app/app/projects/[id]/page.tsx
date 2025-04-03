@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams, notFound } from "next/navigation"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -16,24 +16,114 @@ import {
   Eye,
   Flag,
   Globe,
+  Loader2,
   Mail,
   MapPin,
   MessageSquare,
   Share2,
   User,
 } from "lucide-react"
-import { mockProjects, mockUsers, formatDate } from "@/lib/utils"
+import { formatDate } from "@/lib/utils"
+import { projectService, Project } from "@/lib/services/project-service"
+import { userService } from "@/lib/services/user-service"
+import { User as UserType } from "@/lib/models/users"
+import { bookmarkService } from "@/lib/services/bookmark-service"
+import { useAuth } from "@/lib"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ProjectPage() {
-  const { id } = useParams()
-  const project = mockProjects.find((p) => p.id === id)
+  const { id } = useParams() as { id: string }
+  const { user: currentUser } = useAuth()
+  
+  const [project, setProject] = useState<Project | null>(null)
+  const [owner, setOwner] = useState<UserType | null>(null)
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [similarProjects, setSimilarProjects] = useState<Project[]>([])
 
-  if (!project) {
-    notFound()
+  // Fetch project data
+  useEffect(() => {
+    const fetchProjectData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        
+        // Fetch project
+        const fetchedProject = await projectService.getProject(id)
+        if (!fetchedProject) {
+          notFound()
+        }
+        setProject(fetchedProject)
+        
+        // Fetch project owner
+        if (fetchedProject.owner_id) {
+          const fetchedOwner = await userService.getUser(fetchedProject.owner_id)
+          setOwner(fetchedOwner)
+        }
+        
+        // Fetch similar projects
+        const allProjects = await projectService.getProjects()
+        const similar = allProjects
+          .filter(p => 
+            p.id !== id && 
+            p.industry.some(i => fetchedProject.industry.includes(i))
+          )
+          .slice(0, 3)
+        setSimilarProjects(similar)
+        
+        // Check if project is bookmarked
+        if (currentUser) {
+          const bookmarks = await bookmarkService.getProjectBookmarks(currentUser.id)
+          const isProjectBookmarked = bookmarks.some(b => b.project_id === id)
+          setIsBookmarked(isProjectBookmarked)
+        }
+      } catch (err) {
+        console.error("Error fetching project:", err)
+        setError("Failed to load project details. Please try again later.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    fetchProjectData()
+  }, [id, currentUser])
+  
+  const handleBookmarkToggle = async () => {
+    if (!currentUser || !project) return
+    
+    try {
+      setIsBookmarkLoading(true)
+      const result = await bookmarkService.toggleProjectBookmark(currentUser.id, project.id)
+      setIsBookmarked(result.action === 'added')
+    } catch (err) {
+      console.error("Error toggling bookmark:", err)
+    } finally {
+      setIsBookmarkLoading(false)
+    }
   }
 
-  const owner = mockUsers.find((u) => u.id === project.owner_id)
-  const [isBookmarked, setIsBookmarked] = useState(false)
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-32">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <span className="ml-2">Loading project details...</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive" className="my-6">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    )
+  }
+
+  if (!project) {
+    return notFound()
+  }
 
   return (
     <div className="space-y-6">
@@ -75,8 +165,17 @@ export default function ProjectPage() {
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon" onClick={() => setIsBookmarked(!isBookmarked)}>
-                    <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-primary" : ""}`} />
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={handleBookmarkToggle}
+                    disabled={isBookmarkLoading || !currentUser}
+                  >
+                    {isBookmarkLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-primary" : ""}`} />
+                    )}
                     <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Bookmark project"}</span>
                   </Button>
                   <Button variant="outline" size="icon">
@@ -140,12 +239,14 @@ export default function ProjectPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t pt-6 flex justify-between">
-              <Button variant="outline" asChild>
-                <Link href={`/users/${owner?.id}`}>
-                  <User className="h-4 w-4 mr-2" />
-                  View Owner Profile
-                </Link>
-              </Button>
+              {owner && (
+                <Button variant="outline" asChild>
+                  <Link href={`/users/${owner.id}`}>
+                    <User className="h-4 w-4 mr-2" />
+                    View Owner Profile
+                  </Link>
+                </Button>
+              )}
               <Button>
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Contact Owner
@@ -160,14 +261,17 @@ export default function ProjectPage() {
               <CardTitle className="text-lg">Project Owner</CardTitle>
             </CardHeader>
             <CardContent>
-              {owner && (
+              {owner ? (
                 <div className="flex flex-col items-center text-center">
                   <Avatar className="h-20 w-20 mb-4">
-                    <AvatarImage src={owner.avatar} alt={owner.full_name} />
+                    <AvatarImage src={owner.avatar ?? ''} alt={owner.full_name} />
                     <AvatarFallback>{owner.full_name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <h3 className="font-semibold text-lg">{owner.full_name}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{owner.bio.substring(0, 100)}...</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {owner.bio && owner.bio.substring(0, 100)}
+                    {owner.bio && owner.bio.length > 100 ? '...' : ''}
+                  </p>
                   <div className="flex gap-2 mb-4">
                     {owner.is_texas_am_affiliate && <Badge variant="secondary">Texas A&M Affiliate</Badge>}
                   </div>
@@ -175,6 +279,8 @@ export default function ProjectPage() {
                     <Link href={`/users/${owner.id}`}>View Full Profile</Link>
                   </Button>
                 </div>
+              ) : (
+                <p className="text-muted-foreground text-center">Owner information not available</p>
               )}
             </CardContent>
           </Card>
@@ -206,17 +312,18 @@ export default function ProjectPage() {
               <CardTitle className="text-lg">Similar Projects</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {mockProjects
-                .filter((p) => p.id !== project.id && p.industry.some((i) => project.industry.includes(i)))
-                .slice(0, 3)
-                .map((p) => (
+              {similarProjects.length > 0 ? (
+                similarProjects.map((p) => (
                   <div key={p.id} className="border-b pb-4 last:border-0 last:pb-0">
                     <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
                       {p.title}
                     </Link>
                     <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{p.description}</p>
                   </div>
-                ))}
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center">No similar projects found</p>
+              )}
             </CardContent>
           </Card>
         </div>

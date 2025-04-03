@@ -1,4 +1,4 @@
-import { query, withTransaction } from '../db';
+import { supabase } from '../db';
 
 export type User = {
   id: string;
@@ -22,190 +22,194 @@ export type User = {
 
 // CREATE
 export async function createUser(userData: Omit<User, 'id' | 'views' | 'created_at' | 'updated_at'>): Promise<User> {
-  const {
-    full_name,
-    email,
-    bio,
-    industry,
-    skills,
-    linkedin_url,
-    website_url,
-    resume_url,
-    additional_links,
-    contact,
-    graduation_year,
-    is_texas_am_affiliate,
-    avatar,
-  } = userData;
-
-  const result = await query(
-    `INSERT INTO users (
-      full_name, email, bio, industry, skills, linkedin_url, website_url, 
-      resume_url, additional_links, contact, graduation_year, is_texas_am_affiliate, avatar
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
-    RETURNING *`,
-    [
-      full_name,
-      email,
-      bio,
-      industry,
-      skills,
-      linkedin_url,
-      website_url,
-      resume_url,
-      JSON.stringify(additional_links || []),
-      JSON.stringify(contact || {}),
-      graduation_year,
-      is_texas_am_affiliate,
-      avatar,
-    ]
-  );
-
-  return result.rows[0];
+  const { data, error } = await supabase
+    .from('users')
+    .insert({
+      full_name: userData.full_name,
+      email: userData.email,
+      bio: userData.bio,
+      industry: userData.industry,
+      skills: userData.skills,
+      linkedin_url: userData.linkedin_url,
+      website_url: userData.website_url,
+      resume_url: userData.resume_url,
+      additional_links: userData.additional_links || [],
+      contact: userData.contact || {},
+      graduation_year: userData.graduation_year,
+      is_texas_am_affiliate: userData.is_texas_am_affiliate,
+      avatar: userData.avatar
+    })
+    .select('*')
+    .single();
+    
+  if (error) {
+    console.error('Error creating user:', error);
+    throw new Error('Failed to create user');
+  }
+  
+  return data;
 }
 
 // READ
 export async function getAllUsers(): Promise<User[]> {
-  const result = await query('SELECT * FROM users ORDER BY full_name');
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .order('full_name');
   
-  return result.rows.map(row => ({
-    ...row,
-    additional_links: row.additional_links || [],
-    contact: row.contact || {}
+  if (error) {
+    console.error('Error fetching all users:', error);
+    throw new Error('Failed to fetch users');
+  }
+  
+  return (data || []).map(user => ({
+    ...user,
+    additional_links: user.additional_links || [],
+    contact: user.contact || {}
   }));
 }
 
 export async function getUserById(id: string): Promise<User | null> {
-  const result = await query('SELECT * FROM users WHERE id = $1', [id]);
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .single();
   
-  if (result.rows.length === 0) {
-    return null;
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // Not found error
+      return null;
+    }
+    console.error('Error fetching user by ID:', error);
+    throw new Error('Failed to fetch user');
   }
   
-  const user = result.rows[0];
   return {
-    ...user,
-    additional_links: user.additional_links || [],
-    contact: user.contact || {}
+    ...data,
+    additional_links: data.additional_links || [],
+    contact: data.contact || {}
   };
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .single();
   
-  if (result.rows.length === 0) {
-    return null;
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // Not found error
+      return null;
+    }
+    console.error('Error fetching user by email:', error);
+    throw new Error('Failed to fetch user by email');
   }
   
-  const user = result.rows[0];
   return {
-    ...user,
-    additional_links: user.additional_links || [],
-    contact: user.contact || {}
+    ...data,
+    additional_links: data.additional_links || [],
+    contact: data.contact || {}
   };
 }
 
 export async function searchUsers(searchTerm: string): Promise<User[]> {
-  const result = await query(
-    `SELECT * FROM users 
-     WHERE deleted != true 
-     AND (full_name ILIKE $1 OR email ILIKE $1 OR bio ILIKE $1)
-     ORDER BY full_name`,
-    [`%${searchTerm}%`]
-  );
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,bio.ilike.%${searchTerm}%`)
+    .order('full_name');
   
-  return result.rows.map(row => ({
-    ...row,
-    additional_links: row.additional_links || [],
-    contact: row.contact || {}
+  if (error) {
+    console.error('Error searching users:', error);
+    throw new Error('Failed to search users');
+  }
+  
+  return (data || []).map(user => ({
+    ...user,
+    additional_links: user.additional_links || [],
+    contact: user.contact || {}
   }));
 }
 
 export async function filterUsersBySkill(skill: string): Promise<User[]> {
-  const result = await query(
-    'SELECT * FROM users WHERE $1 = ANY(skills) ORDER BY full_name',
-    [skill]
-  );
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .contains('skills', [skill])
+    .order('full_name');
   
-  return result.rows.map(row => ({
-    ...row,
-    additional_links: row.additional_links || [],
-    contact: row.contact || {}
+  if (error) {
+    console.error('Error filtering users by skill:', error);
+    throw new Error('Failed to filter users by skill');
+  }
+  
+  return (data || []).map(user => ({
+    ...user,
+    additional_links: user.additional_links || [],
+    contact: user.contact || {}
   }));
 }
 
 // UPDATE
 export async function updateUser(id: string, userData: Partial<User>): Promise<User | null> {
-  // Build query dynamically based on provided fields
-  const fields: string[] = [];
-  const values: any[] = [];
-  let paramIndex = 1;
+  const { data, error } = await supabase
+    .from('users')
+    .update(userData)
+    .eq('id', id)
+    .select('*')
+    .single();
   
-  Object.entries(userData).forEach(([key, value]) => {
-    // Skip id, views, created_at, updated_at
-    if (['id', 'views', 'created_at', 'updated_at'].includes(key)) {
-      return;
-    }
-    
-    // Handle special cases for JSON fields
-    if (key === 'additional_links' || key === 'contact') {
-      fields.push(`${key} = $${paramIndex}`);
-      values.push(JSON.stringify(value || {}));
-      paramIndex++;
-      return;
-    }
-    
-    fields.push(`${key} = $${paramIndex}`);
-    values.push(value);
-    paramIndex++;
-  });
-  
-  if (fields.length === 0) {
-    // Nothing to update
-    return getUserById(id);
-  }
-  
-  values.push(id); // Add id as the last parameter
-  
-  const result = await query(
-    `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
-    values
-  );
-  
-  if (result.rows.length === 0) {
+  if (error) {
+    console.error('Error updating user:', error);
     return null;
   }
   
-  const user = result.rows[0];
   return {
-    ...user,
-    additional_links: user.additional_links || [],
-    contact: user.contact || {}
+    ...data,
+    additional_links: data.additional_links || [],
+    contact: data.contact || {}
   };
 }
 
 export async function incrementUserViews(id: string): Promise<void> {
-  await query('UPDATE users SET views = views + 1 WHERE id = $1', [id]);
+  const { data: userData, error: fetchError } = await supabase
+    .from('users')
+    .select('views')
+    .eq('id', id)
+    .single();
+  
+  if (fetchError) {
+    console.error('Error fetching user views:', fetchError);
+    throw new Error('Failed to fetch user views');
+  }
+  
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ views: (userData.views || 0) + 1 })
+    .eq('id', id);
+  
+  if (updateError) {
+    console.error('Error incrementing user views:', updateError);
+    throw new Error('Failed to increment user views');
+  }
 }
 
 // DELETE
 export async function deleteUser(id: string): Promise<boolean> {
-  // Use a transaction to delete user and their associated data
-  return withTransaction(async (client) => {
-    // Delete user bookmarks
-    await client.query('DELETE FROM user_bookmarks WHERE user_id = $1 OR bookmarked_user_id = $1', [id]);
-    
-    // Delete project bookmarks
-    await client.query('DELETE FROM project_bookmarks WHERE user_id = $1', [id]);
-    
-    // Delete user's projects or reassign them
-    await client.query('DELETE FROM projects WHERE owner_id = $1', [id]);
-    
-    // Finally delete the user
-    const result = await client.query('DELETE FROM users WHERE id = $1', [id]);
-    
-    return result.rowCount > 0;
-  });
+  const { data, error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error deleting user:', error);
+    throw new Error('Failed to delete user');
+  }
+  
+  return true; // If no error occurred, we can assume successful deletion
 }
 
 // Add more functions as needed for searching, filtering, etc. 
