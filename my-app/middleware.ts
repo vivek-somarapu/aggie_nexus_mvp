@@ -7,6 +7,9 @@ const protectedRoutes = [
   '/projects/new',
   '/projects/edit',
   '/bookmarks',
+  '/users',
+  '/projects',
+  '/calendar',
 ];
 
 // List of routes that should be redirected to home if already authenticated
@@ -20,36 +23,18 @@ const authRoutes = [
 // List of public routes that don't require authentication
 const publicRoutes = [
   '/',
-  '/projects',
-  '/users',
-  '/calendar',
-];
-
-// Skip middleware for callback route to avoid conflicts with client-side auth
-const bypassMiddleware = [
-  '/auth/callback',
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Skip auth checks for specific routes to avoid conflicts
-  if (bypassMiddleware.some(route => pathname.startsWith(route))) {
-    console.log(`Middleware: Bypassing auth checks for ${pathname}`);
-    return NextResponse.next();
-  }
-  
   // Create supabase client with response
   const { supabase, response } = createClient(request);
   
   // Get session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   
-  // Log session state and errors for debugging
-  if (sessionError) {
-    console.error(`Middleware: Session error for ${pathname}:`, sessionError);
-  }
-  
+  // Log session state for debugging
   console.log(`Middleware: Path ${pathname}, Session ${session ? 'exists' : 'does not exist'}`);
   
   // Check if the path is a public route
@@ -58,7 +43,6 @@ export async function middleware(request: NextRequest) {
   );
   
   if (isPublicRoute) {
-    console.log(`Middleware: Allowing public route ${pathname}`);
     return response;
   }
   
@@ -68,11 +52,9 @@ export async function middleware(request: NextRequest) {
   );
 
   if (isProtectedRoute && !session) {
-    console.log(`Middleware: Redirecting unauthenticated user from ${pathname} to login`);
-    // Redirect unauthenticated users to login
-    const redirectUrl = new URL('/auth/login', request.url);
-    redirectUrl.searchParams.set('redirect', encodeURIComponent(pathname));
-    return NextResponse.redirect(redirectUrl);
+    console.log(`Middleware: Redirecting unauthenticated user from ${pathname} to landing page`);
+    // Redirect unauthenticated users to landing page (not login)
+    return NextResponse.redirect(new URL('/', request.url));
   }
   
   // Check if the path is an auth route and user is authenticated

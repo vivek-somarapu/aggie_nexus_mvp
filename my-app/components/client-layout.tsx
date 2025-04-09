@@ -8,23 +8,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading, error } = useAuth()
-  const [layoutReady, setLayoutReady] = useState(false)
   
-  // Use a more robust approach to track auth state
-  useEffect(() => {
-    // Skip the redirect-loop fix - always mark as ready when auth state has loaded
-    if (!authLoading) {
-      console.log("Layout auth state loaded:", user ? "user exists" : "no user");
-      
-      // Immediately mark layout as ready once auth loading is done
-      setLayoutReady(true);
-      console.log("Layout marked as ready with user state:", user ? "logged in" : "not logged in");
-      
-      // No delay timer needed - this was causing the login loop
-    }
-  }, [authLoading, user]);
-
-  // Show simplified loading indicator only during initial auth check
+  // During initial auth check show loading state
   if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -37,17 +22,41 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     )
   }
 
-  // Show error state if authentication failed
-  if (error) {
+  // Even if there's an error with full profile loading, we can still show the UI
+  // as long as we have the minimal user data
+  const hasMinimalUserData = !!user && !!user.id && !!user.email;
+
+  // Show error message only if it's a critical auth error (not just profile fetch issues)
+  // and we don't have minimal user data
+  if (error && !hasMinimalUserData) {
     console.error("Auth error in layout:", error);
+    // Return fallback UI for critical auth errors
+    return (
+      <div className="min-h-screen flex flex-col">
+        <LandingNavbar />
+        <div className="flex-1 container mx-auto py-6 px-4">
+          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
+            <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">Authentication Error</h2>
+            <p className="text-red-600 dark:text-red-400">{error}</p>
+            <a href="/" className="text-primary hover:underline block mt-2">Return to home page</a>
+          </div>
+          {children}
+        </div>
+      </div>
+    )
   }
 
-  // After auth state is available, render appropriate layout regardless of layoutReady state
+  // After auth state is resolved, render appropriate layout
   return (
     <div className="min-h-screen flex flex-col">
-      {user ? (
+      {hasMinimalUserData ? (
         <>
           <Navbar />
+          {error && (
+            <div className="container mx-auto mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 text-sm rounded">
+              <p>Notice: {error}</p>
+            </div>
+          )}
           <main className="flex-1 container mx-auto py-6 px-4">{children}</main>
         </>
       ) : (
