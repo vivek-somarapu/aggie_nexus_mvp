@@ -190,9 +190,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           setIsLoading(false);
           
-          // Ensure we don't reuse sessions after logout
-          localStorage.removeItem('supabase.auth.token');
-          sessionStorage.removeItem('supabase.auth.token');
+          // Clear any local Supabase tokens
+          window.localStorage.clear();
+          window.sessionStorage.clear();
           
           return; // Exit early to prevent any profile fetches
         }
@@ -314,34 +314,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign out the user
   const signOut = async () => {
     try {
-      // Set user to null FIRST before calling signOut
-      // This prevents any fetch operations from continuing
+      // Clear user state immediately
       setUser(null);
-      
-      // Clear any errors
       setError(null);
       console.log('AuthProvider: Attempting signOut...');
       
-      // Use the scope option to completely remove ALL local session data
-      const { error } = await supabase.auth.signOut({ 
-        scope: 'global' // This clears all sessions, not just the current tab
-      });
-      
+      // Call supabase signOut
+      const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('AuthProvider: signOut error:', error.message);
         setError(`Logout failed: ${error.message}`);
         throw error;
       }
       
-      console.log('AuthProvider: signOut successful.');
+      console.log('AuthProvider: signOut successful. Clearing storage and cookies.');
       
-      // Force redirect to landing page (not login page)
+      // Remove any lingering Supabase tokens from storage
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+      
+      // Clear all cookies (including SSR session cookies)
+      document.cookie.split(';').forEach((cookie) => {
+        const [name] = cookie.split('=');
+        document.cookie = `${name.trim()}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+      });
+      
+      // Redirect to landing page
       router.push('/');
-      
-      // Force a hard refresh to clear any client-side caches
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
     } catch (err: unknown) {
       console.error('AuthProvider: signOut exception:', err);
       setError(`Logout failed unexpectedly.`);
