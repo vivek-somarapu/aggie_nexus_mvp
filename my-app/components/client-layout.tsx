@@ -61,8 +61,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </>
       ) : (
         <>
-          <LandingNavbar />
-          <main className="flex-1 container mx-auto py-6 px-4">{children}</main>
+          <main className="flex-1">{children}</main>
         </>
       )}
       <ThemeToggle />

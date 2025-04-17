@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import LandingPage from "./landing/page"
 
 export default function Home() {
   const { user, isLoading } = useAuth()
@@ -32,57 +33,9 @@ export default function Home() {
   // Not logged in - show temporary landing page
   if (!user) {
     return (
-      <div className="relative min-h-screen flex flex-col pt-24">
-        {/* Hero Background with solid color that works in both modes */}
-        <div className="absolute inset-0 bg-background dark:bg-black -z-10" />
-
-        {/* Auth Error Message */}
-        {showError && (
-          <div className="container mx-auto mt-2">
-            <div className="bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-md">
-              <p>Authentication error occurred. Please try again.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Hero Content */}
-        <div className="container flex-1 flex flex-col items-center justify-center py-24 text-center">
-          <div className="space-y-6 max-w-3xl">
-            <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl dark:text-white text-primary">
-              THE CENTER OF INNOVATION FOR AGGIES
-            </h1>
-            <p className="mx-auto max-w-[700px] dark:text-white/80 text-muted-foreground md:text-xl">
-              Join a community of builders, funders, and innovators bringing ideas to life at Texas A&M and beyond.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-4 mt-8">
-            <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-              <Link href="/auth/signup">
-                Sign Up
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="border-primary text-primary hover:bg-primary/10 dark:bg-gray-800 dark:text-white dark:border-white/40 dark:hover:bg-gray-700"
-              asChild
-            >
-              <Link href="/auth/login">
-                Log In
-                <ArrowUpRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="container py-8 text-center dark:text-white/60 text-muted-foreground">
-          <p>© 2025 Aggie Nexus. All rights reserved.</p>
-        </div>
-      </div>
+      <LandingPage />
     )
+      
   }
 
   // Logged in - show dashboard
