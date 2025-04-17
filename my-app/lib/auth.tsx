@@ -4,6 +4,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { fetchUserProfile } from './supabase-client';
 
 // Define a simplified User type for auth purposes
 export type User = {
@@ -29,13 +30,13 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  signup: (email: string, password: string, userData: Partial<User>) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  signInWithGitHub: () => Promise<void>;
+  signup: (email: string, password: string, userData: Partial<User>) => Promise<boolean>;
+  signIn: (email: string, password: string) => Promise<boolean>;
+  signUp: (email: string, password: string, fullName: string) => Promise<boolean>;
+  signInWithGoogle: () => Promise<boolean>;
+  signInWithGitHub: () => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (password: string) => Promise<void>;
 }
@@ -45,13 +46,13 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   error: null,
-  login: async () => {},
+  login: async () => false,
   logout: async () => {},
-  signup: async () => {},
-  signIn: async () => {},
-  signUp: async () => {},
-  signInWithGoogle: async () => {},
-  signInWithGitHub: async () => {},
+  signup: async () => false,
+  signIn: async () => false,
+  signUp: async () => false,
+  signInWithGoogle: async () => false,
+  signInWithGitHub: async () => false,
   requestPasswordReset: async () => {},
   resetPassword: async () => {},
 });
@@ -84,96 +85,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true); // Start in loading state
 
     const getUserData = async (userId: string): Promise<User | null> => {
-      // Select only essential columns initially to reduce data payload
-      const essentialColumns = 'id, full_name, email, avatar, is_texas_am_affiliate, graduation_year';
+      console.log(`AuthProvider: Attempting to fetch profile for user ID: ${userId}`);
       
-      const MAX_RETRIES = 2; // Increased retries from 1 to 2
-      const FETCH_TIMEOUT = 15000; // Increased from 10 to 15 seconds
+      const MAX_RETRIES = 2;
+      const RETRY_DELAY = 1000; // milliseconds
       
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        console.log(`AuthProvider: Attempt ${attempt + 1} to fetch profile for user ID: ${userId}`);
-        let profileData: User | null = null;
-        let fetchError: any = null;
-        let timedOut = false;
-        
         try {
-          const fetchPromise = supabase
-            .from('users')
-            .select(essentialColumns) // Use only essential columns for quicker response
-            .eq('id', userId)
-            .single();
+          console.log(`AuthProvider: Attempt ${attempt + 1} to fetch profile for user ID: ${userId}`);
+          
+          // Use our new function to fetch user profile
+          const profileData = await fetchUserProfile(userId);
+          
+          if (profileData) {
+            console.log(`AuthProvider: Profile data successfully fetched for user ${userId}.`);
             
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error(`Profile fetch attempt ${attempt + 1} timed out`)), FETCH_TIMEOUT)
-          );
-  
-          // Race the fetch against the timeout
-          const result = await Promise.race([fetchPromise, timeoutPromise]) as { data: User | null; error: any };
-  
-          if (result.error) {
-             fetchError = result.error;
-             console.error(`AuthProvider: Attempt ${attempt + 1} - Error fetching profile for user ${userId}:`, fetchError.message);
-             if (fetchError.code === 'PGRST116') { 
-               console.warn(`AuthProvider: Profile not found for user ${userId}.`);
-               // No point retrying if profile not found
-               return null; 
-             }
-          } else if (result.data) {
-             profileData = result.data as User;
-             console.log(`AuthProvider: Attempt ${attempt + 1} - Essential profile data successfully fetched for user ${userId}.`);
-             
-             // Fill in missing fields with empty/default values to ensure type safety
-             const fullUser: User = {
-                ...profileData,
-                bio: profileData.bio || undefined,
-                industry: profileData.industry || [],
-                skills: profileData.skills || [],
-                linkedin_url: profileData.linkedin_url || undefined,
-                website_url: profileData.website_url || undefined,
-                resume_url: profileData.resume_url || undefined,
-                additional_links: profileData.additional_links || [],
-                contact: profileData.contact || { email: profileData.email },
-                views: profileData.views || 0
-             };
-             
-             return fullUser;
-          } else {
-             console.warn(`AuthProvider: Attempt ${attempt + 1} - No profile data returned for user ${userId}, though no explicit error occurred.`);
-             fetchError = new Error('No profile data returned despite success status.');
-          }
-  
-        } catch (err: any) { 
-          fetchError = err;
-          if (err.message?.includes('timed out')) {
-              timedOut = true;
-              console.warn(`AuthProvider: Attempt ${attempt + 1} - ${err.message}`);
-          } else {
-              console.error(`AuthProvider: Attempt ${attempt + 1} - Exception during profile fetch for user ${userId}:`, err.message || err);
-          }
-        }
-        
-        // If we are on the last attempt and it failed/timed out, log final failure but return minimal user
-        if (attempt === MAX_RETRIES) {
-            console.error(`AuthProvider: Final attempt failed. Could not fetch full profile for ${userId}. Creating minimal user object.`);
-            // Return minimal user instead of null to ensure UI works even with database issues
-            return {
+            // Fill in missing fields with empty/default values to ensure type safety
+            const fullUser: User = {
+              ...profileData,
               id: userId,
-              email: '', // This might be available from auth session if needed
-              full_name: 'User',
-              industry: [],
-              skills: [],
-              views: 0,
-            } as User;
-        }
-
-        // If timed out, wait a short moment before retrying (optional)
-        if (timedOut) {
-            console.log('AuthProvider: Waiting briefly before retry...');
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second (increased from 500ms)
+              email: profileData.email || '',
+              full_name: profileData.full_name || 'User',
+              bio: profileData.bio || undefined,
+              industry: Array.isArray(profileData.industry) ? profileData.industry : [],
+              skills: Array.isArray(profileData.skills) ? profileData.skills : [],
+              linkedin_url: profileData.linkedin_url || undefined,
+              website_url: profileData.website_url || undefined,
+              resume_url: profileData.resume_url || undefined,
+              additional_links: Array.isArray(profileData.additional_links) ? profileData.additional_links : [],
+              contact: profileData.contact || { email: profileData.email || '' },
+              views: profileData.views || 0,
+              is_texas_am_affiliate: !!profileData.is_texas_am_affiliate,
+              graduation_year: profileData.graduation_year || undefined,
+              avatar: profileData.avatar || undefined
+            };
+            
+            return fullUser;
+          } else {
+            console.warn(`AuthProvider: Attempt ${attempt + 1} - No profile data found for user ${userId}`);
+            
+            if (attempt < MAX_RETRIES) {
+              console.log(`AuthProvider: Waiting ${RETRY_DELAY}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            }
+          }
+        } catch (err: any) {
+          console.error(`AuthProvider: Attempt ${attempt + 1} - Error fetching profile for user ${userId}:`, 
+            err.message || err);
+            
+          if (attempt < MAX_RETRIES) {
+            console.log(`AuthProvider: Waiting ${RETRY_DELAY}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          }
         }
       }
       
-      return null;
+      // If we reached this point, all attempts failed
+      console.error(`AuthProvider: Final attempt failed. Could not fetch profile for ${userId}. Creating minimal user object.`);
+      
+      // Return minimal user instead of null to ensure UI works even with database issues
+      return {
+        id: userId,
+        email: '',
+        full_name: 'User',
+        industry: [],
+        skills: [],
+        contact: { email: '' },
+        views: 0,
+        is_texas_am_affiliate: false,
+      } as User;
     };
     
     console.log("AuthProvider: Setting up onAuthStateChange listener...");
@@ -292,21 +272,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('AuthProvider: Attempting signInWithPassword for', email);
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
       if (error) {
-        console.error('AuthProvider: signIn error:', error.message);
-        setError(`Login failed: ${error.message}`); // Provide specific error
-        throw error;
+        console.error('Auth error during login:', error.message);
+        setError(error.message);
+        return false;
       }
-      console.log('AuthProvider: signIn successful. Session:', data.session ? 'valid' : 'invalid');
-      // Let onAuthStateChange handle user state update and redirection
-    } catch (err: unknown) {
-      // Error already logged, ensure isLoading is false
-      // setError is already set in the 'if (error)' block
+      
+      console.log('Login successful');
+      return true;
+    } catch (error: any) {
+      console.error('Exception during login:', error.message || error);
+      setError(error.message || "An error occurred during login");
+      return false;
     } finally {
-      // Delay setting isLoading to false slightly AFTER signIn completes? Maybe not needed.
-       console.log("AuthProvider: signIn finished, setting isLoading to false.");
       setIsLoading(false);
     }
   };
@@ -353,59 +337,130 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('AuthProvider: Attempting signUp for', email);
-      const { data, error: authError } = await supabase.auth.signUp({
+      
+      // Validate input
+      if (!email || !password) {
+        setError("Email and password are required");
+        return false;
+      }
+
+      // Sign up with Supabase
+      console.log('Initiating signup with email:', email);
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName } }
+        options: {
+          data: {
+            full_name: fullName,
+          },
+          // Use window.location.origin to ensure proper redirects
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-
-      if (authError) {
-        console.error('AuthProvider: signUp auth error:', authError.message);
-        setError(`Signup failed: ${authError.message}`);
-        throw authError;
+      
+      if (error) {
+        console.error('Error during signup:', error.message);
+        setError(error.message);
+        return false;
       }
 
-      // Important: Supabase signUp might require email verification by default.
-      // The user object might exist but session might be null until verification.
-      if (data.user) {
-        console.log(`AuthProvider: Auth account created (User ID: ${data.user.id}). Creating profile...`);
+      if (data?.user) {
+        console.log('Signup successful. User created with ID:', data.user.id);
         
-        // Check if a session is immediately available (might not be if email verification is needed)
-         console.log('AuthProvider: Session after signUp:', data.session ? 'Exists' : 'Null (Email verification likely required)');
-
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            email,
-            full_name: fullName,
-            contact: { email } 
-          });
-
-        if (profileError) {
-          console.error('AuthProvider: User profile creation error:', profileError.message);
-          // Potentially try to clean up the auth user if profile creation fails? Complex.
-          setError(`Signup succeeded, but profile creation failed: ${profileError.message}`);
-          throw profileError;
+        // Store email in localStorage for potential resend verification needs
+        localStorage.setItem("lastSignupEmail", email);
+        
+        // Create initial profile in the users table
+        let profileCreated = false;
+        
+        try {
+          // First check if profile already exists
+          console.log('Checking if user profile already exists in database');
+          const { data: existingUser, error: checkError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', data.user.id)
+            .single();
+            
+          if (checkError && checkError.code !== 'PGRST116') {
+            console.error('Error checking for existing user:', checkError);
+            console.error('Error code:', checkError.code);
+            console.error('Error details:', checkError.details);
+          }
+            
+          if (!existingUser) {
+            // Create the user profile with required fields
+            console.log('No existing profile found, creating new profile');
+            const initialProfile = {
+              id: data.user.id,
+              email: email,
+              full_name: fullName,
+              contact: { email: email },
+              industry: [],
+              skills: [],
+              views: 0,
+              is_texas_am_affiliate: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              deleted: false
+            };
+              
+            console.log('Attempting to insert user profile:', initialProfile);
+              
+            const { error: profileError } = await supabase
+              .from('users')
+              .insert([initialProfile]);
+                
+            if (profileError) {
+              console.error('Failed to create initial profile:', profileError);
+              // Log detailed error information for debugging
+              console.error('Error code:', profileError.code);
+              console.error('Error details:', profileError.details);
+              console.error('Error hint:', profileError.hint);
+              
+              // Set a more specific error message for database errors
+              if (profileError.code?.startsWith('23') || profileError.code?.startsWith('42')) {
+                // These are common Postgres constraint/schema errors
+                setError(`Database error creating profile: ${profileError.message}. You can continue and complete your profile later.`);
+              } else {
+                setError(`Note: ${profileError.message}. You may need to complete your profile later.`);
+              }
+            } else {
+              console.log('User profile created successfully');
+              profileCreated = true;
+            }
+          } else {
+            console.log('User profile already exists');
+            profileCreated = true;
+          }
+        } catch (profileError: any) {
+          console.error('Exception during profile creation:', profileError);
+          console.error('Error stack:', profileError.stack);
+          // Continue anyway since auth was successful
+          setError(`Note: ${profileError.message}. You may need to complete your profile later.`);
         }
         
-        console.log('AuthProvider: Profile created successfully.');
-        // Redirect to login, inform user to check email if verification is enabled
-         setError(null); // Clear previous error
-         alert('Signup successful! Please check your email to verify your account before logging in.'); // Simple alert
-         router.push('/auth/login'); // Redirect to login after signup
-
+        // For email confirmation flows, we won't have a session yet
+        console.log('Checking if session exists:', !!data.session);
+        console.log('User needs to verify email:', !data.session);
+        
+        // Always redirect to waiting page after signup
+        // The waiting page will handle both verification and profile completion flows
+        router.push('/auth/waiting');
+        
+        // Return true to indicate signup was successful (even if verification is pending)
+        return true;
       } else {
-         // This case might occur if user creation failed silently or if email verification is mandatory and user object isn't returned immediately.
-         console.warn('AuthProvider: signUp completed but data.user is null. Check Supabase email verification settings.');
-         setError('Signup process did not complete as expected. Please try again or contact support.');
+        console.error('Signup completed but user object is null');
+        setError("An unexpected error occurred during signup.");
+        return false;
       }
-    } catch (err: unknown) {
-       // Errors should be logged and set in the specific catch blocks above
-       console.error("AuthProvider: Overall signUp catch block:", err);
+    } catch (error: any) {
+      console.error('Exception during signup:', error.message || error);
+      console.error('Error stack:', error.stack);
+      setError(error.message || "An error occurred during sign up");
+      return false;
     } finally {
-       console.log("AuthProvider: signUp finished, setting isLoading to false.");
       setIsLoading(false);
     }
   };
@@ -413,48 +468,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign in with Google OAuth
   const signInWithGoogle = async () => {
     try {
-      // setIsLoading(true); // Maybe set loading later after redirect potentially starts?
+      setIsLoading(true);
       setError(null);
-      console.log('AuthProvider: Initiating Google signInWithOAuth...');
-      const { error } = await supabase.auth.signInWithOAuth({
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/auth/callback` }
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
+      
       if (error) {
-        console.error('AuthProvider: Google signInWithOAuth error:', error.message);
-        setError(`Google login failed: ${error.message}`);
-        throw error;
+        console.error('Error during Google sign in:', error.message);
+        setError(error.message);
+        return false;
       }
-      // Browser will redirect, loading state might not be relevant here until callback
-      console.log('AuthProvider: Redirecting to Google...');
-    } catch (err: unknown) {
-      console.error('AuthProvider: Google signInWithOAuth exception:', err);
-      setError('Failed to start Google login.');
-      // setIsLoading(false); // Ensure loading is false if redirect fails
-    } 
-    // No finally block for setIsLoading(false) because of redirect
+      
+      // This is usually not reached immediately because of the redirect
+      return true;
+    } catch (error: any) {
+      console.error('Exception during Google sign in:', error.message || error);
+      setError(error.message || "An error occurred during sign in with Google");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Sign in with GitHub OAuth
   const signInWithGitHub = async () => {
-     try {
-      // setIsLoading(true);
+    try {
+      setIsLoading(true);
       setError(null);
-      console.log('AuthProvider: Initiating GitHub signInWithOAuth...');
-      const { error } = await supabase.auth.signInWithOAuth({
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
-        options: { redirectTo: `${window.location.origin}/auth/callback` }
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
+      
       if (error) {
-        console.error('AuthProvider: GitHub signInWithOAuth error:', error.message);
-        setError(`GitHub login failed: ${error.message}`);
-        throw error;
+        console.error('Error during GitHub sign in:', error.message);
+        setError(error.message);
+        return false;
       }
-       console.log('AuthProvider: Redirecting to GitHub...');
-    } catch (err: unknown) {
-      console.error('AuthProvider: GitHub signInWithOAuth exception:', err);
-      setError('Failed to start GitHub login.');
-      // setIsLoading(false);
+      
+      // This is usually not reached immediately because of the redirect
+      return true;
+    } catch (error: any) {
+      console.error('Exception during GitHub sign in:', error.message || error);
+      setError(error.message || "An error occurred during sign in with GitHub");
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -508,11 +575,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Legacy methods - keep them pointing to new methods
-  const login = signIn;
-  const logout = signOut;
-  const signup = (email: string, password: string, userData: Partial<User>) => {
-     // Ensure full_name is passed correctly if userData has it
-    return signUp(email, password, userData.full_name || ''); 
+  const login = async (email: string, password: string) => {
+    return await signIn(email, password);
+  };
+
+  const signup = async (email: string, password: string, userData: Partial<User>) => {
+    return await signUp(email, password, userData.full_name || '');
   };
 
   return (
@@ -522,7 +590,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         login,
-        logout,
+        logout: signOut,
         signup,
         signIn,
         signUp,

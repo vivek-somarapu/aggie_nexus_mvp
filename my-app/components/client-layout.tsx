@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth"
 import { useEffect, useState } from "react"
 import Navbar from "@/components/navbar"
 import { ThemeToggle } from "@/components/theme-toggle"
+import AuthRedirect from "@/components/auth-redirect"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading, error } = useAuth()
@@ -47,6 +48,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   // After auth state is resolved, render appropriate layout
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Include the AuthRedirect component to check profile status */}
+      {hasMinimalUserData && <AuthRedirect />}
+      
       {hasMinimalUserData ? (
         <>
           <Navbar />

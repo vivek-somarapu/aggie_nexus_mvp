@@ -5,16 +5,24 @@ import { AuthForm } from "@/components/auth-form"
 import { useAuth } from "@/lib/auth"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function SignupPage() {
   const { signUp, signInWithGoogle, signInWithGitHub, isLoading, error } = useAuth()
+  const router = useRouter()
+  const [localError, setLocalError] = useState<string | null>(null)
 
   const handleSubmit = async (data: { fullName: string; email: string; password: string }) => {
     try {
+      // Store email in localStorage for potential resend functionality
+      localStorage.setItem("lastSignupEmail", data.email)
+      
       await signUp(data.email, data.password, data.fullName)
-    } catch (err) {
-      // Most errors are handled by the auth context
+      // Redirect to waiting page after signup attempt
+      router.push("/auth/waiting")
+    } catch (err: any) {
       console.error("Signup error:", err)
+      setLocalError(err.message || "An error occurred during signup")
     }
   }
 
@@ -25,9 +33,10 @@ export default function SignupPage() {
       } else {
         await signInWithGitHub()
       }
-    } catch (err) {
-      // Error is handled by the auth context
+      // For OAuth, we'll redirect in the callback route
+    } catch (err: any) {
       console.error(`${provider} signup error:`, err)
+      setLocalError(err.message || `An error occurred during ${provider} signup`)
     }
   }
 
@@ -36,10 +45,10 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         <h1 className="text-3xl font-bold text-center mb-6">Join Aggie Nexus</h1>
 
-        {error && (
+        {(error || localError) && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{error || localError}</AlertDescription>
           </Alert>
         )}
 
@@ -47,7 +56,7 @@ export default function SignupPage() {
           type="signup"
           onSubmit={handleSubmit}
           loading={isLoading}
-          error={error}
+          error={error || localError}
           onOAuthLogin={handleOAuthLogin}
         />
       </div>

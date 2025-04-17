@@ -1,4 +1,5 @@
 import { User } from "@/lib/models/users";
+import { supabase } from "@/lib/db";
 
 export interface UserSearchParams {
   search?: string;
@@ -97,20 +98,20 @@ export const userService = {
   // Update an existing user
   updateUser: async (id: string, userData: Partial<User>): Promise<User | null> => {
     try {
+      // Simplified version that works with current middleware
       const response = await fetchWithRetry(`/api/users/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
+        // Important: Include credentials to send cookies
+        credentials: 'include',
         body: JSON.stringify(userData),
       });
       
-      if (response.status === 404) {
-        return null;
-      }
-      
       if (!response.ok) {
-        throw new Error(`Failed to update user: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `Failed to update user: ${response.statusText}`);
       }
       
       return response.json();
