@@ -49,15 +49,17 @@ export default function LandingPage() {
         </div>
 
         {/* Big logo SVG on Bottom Right */}
-        <div className="absolute bottom-[0px] right-[0px] z-10 lg:block hidden">
-            <Image
-                src="/circles-right.svg"
-                alt="decorative"
-                width={500}
-                height={500}
-                className="opacity-80"
-            />
+        {/* Big logo SVG inside Hero */}
+        <div className="absolute top-1/2 right-0 transform translate-y-[-50%] translate-x-[30%] z-[-1]">
+        <Image
+            src="/circles-right.svg"
+            alt="decorative"
+            width={450}
+            height={450}
+            className="opacity-80"
+        />
         </div>
+
       </motion.section>
 
       {/* Industry Section */}
