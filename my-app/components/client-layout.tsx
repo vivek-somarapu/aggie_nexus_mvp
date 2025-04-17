@@ -3,7 +3,6 @@
 import { useAuth } from "@/lib/auth"
 import { useEffect, useState } from "react"
 import Navbar from "@/components/navbar"
-import LandingNavbar from "@/components/landing-navbar"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -33,7 +32,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     // Return fallback UI for critical auth errors
     return (
       <div className="min-h-screen flex flex-col">
-        <LandingNavbar />
         <div className="flex-1 container mx-auto py-6 px-4">
           <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
             <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">Authentication Error</h2>
@@ -61,7 +59,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </>
       ) : (
         <>
-          <LandingNavbar />
           <main className="flex-1 container mx-auto py-6 px-4">{children}</main>
         </>
       )}
