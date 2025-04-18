@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { AuthForm } from "@/components/auth-form"
 import { useAuth } from "@/lib/auth"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -9,16 +8,15 @@ import { AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
   const { signIn, signInWithGoogle, signInWithGitHub, isLoading, error } = useAuth()
-  const router = useRouter()
   const [localError, setLocalError] = useState<string | null>(null)
 
   const handleSubmit = async (data: { email: string; password: string }) => {
     try {
-      await signIn(data.email, data.password)
-      // Redirect to waiting page after login attempt
-      router.push("/auth/waiting")
+      const success = await signIn(data.email, data.password)
+      if (!success && !localError) {
+        setLocalError("Login failed. Please check your credentials.")
+      }
     } catch (err: any) {
-      console.error("Login error:", err)
       setLocalError(err.message || "An error occurred during login")
     }
   }
@@ -30,9 +28,7 @@ export default function LoginPage() {
       } else {
         await signInWithGitHub()
       }
-      // For OAuth, we'll redirect in the callback route
     } catch (err: any) {
-      console.error(`${provider} login error:`, err)
       setLocalError(err.message || `An error occurred during ${provider} login`)
     }
   }

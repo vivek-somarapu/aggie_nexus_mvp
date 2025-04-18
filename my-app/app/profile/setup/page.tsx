@@ -189,9 +189,11 @@ export default function ProfileSetupPage() {
       setIsSubmitting(true)
       setError(null)
       
-      // Format the data for API
+      // Format the data for API with validation
       const userData = {
         ...formData,
+        // Ensure full_name is never empty - use email prefix if empty
+        full_name: formData.full_name || (formData.email?.split('@')[0] || 'User'),
         industry: selectedIndustries,
         skills: selectedSkills,
         graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : null

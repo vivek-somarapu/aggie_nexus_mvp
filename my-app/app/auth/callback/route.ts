@@ -1,41 +1,102 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+/**
+ * Auth callback handler for OAuth and email verification redirects
+ * Processes Supabase authentication code to establish a session
+ */
 export async function GET(request: NextRequest) {
+  // Get the authorization code from the URL
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   
-  console.log("Auth callback triggered with URL:", request.url)
-  console.log("Code parameter present:", !!code)
-  
-  // If no code provided, redirect to home
+  // If no code provided, redirect to home page
   if (!code) {
-    console.error("Auth callback - missing code parameter")
-    return NextResponse.redirect(new URL('/auth/login?error=Missing+verification+code', requestUrl.origin))
+    return NextResponse.redirect(new URL('/', requestUrl.origin))
   }
 
-  const cookieStore = cookies()
-  const supabase = await createClient(cookieStore)
-  
-  // Exchange the code for a session
   try {
-    console.log("Attempting to exchange code for session")
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    const supabase = createClient()
     
-    if (error) {
-      console.error('Error exchanging code for session:', error.message)
+    // Exchange the code for a session 
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (exchangeError) {
+      console.error('Auth callback error:', exchangeError)
       return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(error.message)}`, requestUrl.origin)
+        new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, requestUrl.origin)
+      )
+    }
+
+    // Retrieve the new session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session) {
+      console.error('Session retrieval error:', sessionError)
+      return NextResponse.redirect(
+        new URL('/auth/login?error=Session+creation+failed', requestUrl.origin)
       )
     }
     
-    console.log("Successfully exchanged code for session, user logged in:", !!data.session)
-    
-    // Redirect to waiting page to check authentication and profile status
-    return NextResponse.redirect(new URL('/auth/waiting', requestUrl.origin))
+    // After OAuth login, we need to check if the user has a complete profile
+    // and perform any necessary data operations
+    try {
+      // Check if the user exists in the users table
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('id, bio, skills')
+        .eq('id', session.user.id)
+        .single()
+        
+      if (userError && userError.code !== 'PGRST116') {
+        // Log the error but continue - we'll create a user if needed
+        console.error('Error checking existing user:', userError)
+      }
+        
+      // If the user exists, check if the profile is complete
+      if (existingUser) {
+        // If bio or skills are missing, redirect to profile setup
+        if (!existingUser.bio || !existingUser.skills || existingUser.skills.length === 0) {
+          return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
+        }
+        
+        // If profile is complete, redirect to home page
+        return NextResponse.redirect(new URL('/', requestUrl.origin))
+      } else {
+        // The user doesn't exist in the users table yet, we'll need to create them
+        // Get user data from the session
+        const { full_name, email } = session.user.user_metadata || {}
+        const userEmail = email || session.user.email || ''
+        
+        // Create a new user entry
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: session.user.id,
+            full_name: full_name || userEmail.split('@')[0] || 'New User',
+            email: userEmail,
+            industry: [],
+            skills: [],
+            contact: { email: userEmail },
+            views: 0,
+            is_texas_am_affiliate: false,
+            deleted: false,
+          })
+          
+        if (insertError) {
+          console.error('Error creating user record:', insertError)
+        }
+        
+        // Redirect to profile setup to complete the profile
+        return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
+      }
+    } catch (err) {
+      console.error('Error in user profile check:', err)
+      // On error, default to redirecting to the home page
+      return NextResponse.redirect(new URL('/', requestUrl.origin))
+    }
   } catch (err) {
-    console.error("Unexpected error in auth callback:", err)
+    console.error('Auth callback exception:', err)
     return NextResponse.redirect(
       new URL('/auth/login?error=Authentication+failed', requestUrl.origin)
     )

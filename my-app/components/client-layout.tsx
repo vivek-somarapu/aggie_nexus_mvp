@@ -8,9 +8,24 @@ import AuthRedirect from "@/components/auth-redirect"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading, error } = useAuth()
+  const [showLoadingUI, setShowLoadingUI] = useState(true)
   
-  // During initial auth check show loading state
-  if (authLoading) {
+  // Only show loading UI for up to 3 seconds to prevent infinite loading state
+  useEffect(() => {
+    if (!authLoading) {
+      setShowLoadingUI(false)
+      return
+    }
+    
+    const timeout = setTimeout(() => {
+      setShowLoadingUI(false)
+    }, 3000)
+    
+    return () => clearTimeout(timeout)
+  }, [authLoading])
+  
+  // During initial auth check show loading state, but only for a limited time
+  if (authLoading && showLoadingUI) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
@@ -28,7 +43,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   // Show error message only if it's a critical auth error (not just profile fetch issues)
   // and we don't have minimal user data
-  if (error && !hasMinimalUserData) {
+  if (error && !hasMinimalUserData && !authLoading) {
     console.error("Auth error in layout:", error);
     // Return fallback UI for critical auth errors
     return (

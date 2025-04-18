@@ -1,5 +1,6 @@
 import { User } from "@/lib/models/users";
 import { supabase } from "@/lib/db";
+import { createClient } from '@/lib/supabase/client';
 
 export interface UserSearchParams {
   search?: string;
@@ -97,28 +98,31 @@ export const userService = {
 
   // Update an existing user
   updateUser: async (id: string, userData: Partial<User>): Promise<User | null> => {
-    try {
-      // Simplified version that works with current middleware
-      const response = await fetchWithRetry(`/api/users/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // Important: Include credentials to send cookies
-        credentials: 'include',
-        body: JSON.stringify(userData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(errorData.error || `Failed to update user: ${response.statusText}`);
-      }
-      
-      return response.json();
-    } catch (error) {
-      console.error(`Error updating user ${id}:`, error);
-      throw error;
+    // Get the session token
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    
+    if (!token) {
+      throw new Error('Not authenticated');
     }
+    
+    // Include the token in the request
+    const response = await fetch(`/api/users/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(userData)
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update user');
+    }
+    
+    return response.json();
   },
 
   // Delete a user

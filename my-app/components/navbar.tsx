@@ -20,12 +20,12 @@ import { useAuth } from "@/lib/auth"
 export default function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user, profile, signOut } = useAuth()
 
   const handleLogout = async () => {
     try {
-      await logout()
-      router.push('/')
+      await signOut()
+      // No need to add a router.push as the signOut function already handles navigation
     } catch (error) {
       console.error("Error logging out:", error)
     }
@@ -118,9 +118,9 @@ export default function Navbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar || ""} alt={user.full_name} />
+                  <AvatarImage src={profile?.avatar || ""} alt={profile?.full_name || ""} />
                   <AvatarFallback>
-                    {user.full_name ? user.full_name.charAt(0) : <User className="h-4 w-4" />}
+                    {profile?.full_name ? profile.full_name.charAt(0) : <User className="h-4 w-4" />}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -128,8 +128,8 @@ export default function Navbar() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user.full_name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  <p className="text-sm font-medium leading-none">{profile?.full_name || ""}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

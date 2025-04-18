@@ -78,7 +78,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
+    const { id } = await Promise.resolve(params); // Properly await dynamic params
     const body = await request.json();
     
     // Verify the requesting user is authorized
@@ -137,143 +137,71 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
     
     let userData = null;
-    let updateError = null;
-    
-    // NEW: Simplified approach - focus on ensuring the users table is updated correctly
-    // Instead of trying both profiles and users tables which might cause conflicts
     
     try {
-      // Check if user exists in users table
-      const { data: existingUser, error: checkError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', id)
-        .single();
-        
-      if (checkError) {
-        console.log(`User check error (code: ${checkError.code}):`, checkError);
-        // Only treat PGRST116 (not found) as non-error
-        if (checkError.code !== 'PGRST116') {
-          console.error('Error checking if user exists:', checkError);
-        }
-      }
+      // Check if user exists in users table - using auth token directly
+      const adminAuthClient = supabase.auth.admin;
       
-      if (existingUser) {
-        // User exists, update it
-        console.log(`User ${id} found in users table, updating...`);
+      // Use rpc to directly perform the update with auth.uid() correctly set
+      const { data, error } = await supabase.rpc('update_user_profile', {
+        user_id: id,
+        user_data: dataWithTimestamp
+      });
+      
+      if (error) {
+        console.error('Error in RPC update_user_profile:', error);
         
-        // For debugging, print exactly what we're sending to the database
-        console.log('Update payload:', JSON.stringify(dataWithTimestamp, null, 2));
-        
-        const { data, error } = await supabase
+        // Fallback approach - try direct update with auth token
+        const { data: updateData, error: updateError } = await supabase
           .from('users')
           .update(dataWithTimestamp)
           .eq('id', id)
-          .select()
-          .single();
+          .select('*');
           
-        userData = data;
-        updateError = error;
-        
-        if (error) {
-          console.error('Error updating users table:', error);
-          console.error('Error details:', error.details, 'Error hint:', error.hint);
-        } else {
-          console.log('Successfully updated users table');
+        if (updateError) {
+          console.error('Error updating users table:', updateError);
+          if (updateError.code === 'PGRST116') {
+            console.log('No rows were returned after update');
+          }
+          return NextResponse.json({ 
+            error: `Failed to update user: ${updateError.message}` 
+          }, { status: 500 });
         }
+        
+        if (!updateData || updateData.length === 0) {
+          // The update may have succeeded but returned no rows
+          // Get the latest user data
+          const { data: latestUser, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+          if (!fetchError && latestUser) {
+            return NextResponse.json(latestUser);
+          }
+          
+          return NextResponse.json({ 
+            error: 'User not found or no changes were made - auth.uid() may not match' 
+          }, { status: 404 });
+        }
+        
+        userData = updateData[0];
       } else {
-        // User doesn't exist, insert it
-        console.log(`User ${id} not found in users table, creating new entry...`);
-        
-        // Add required fields
-        const completeUserData = {
-          ...dataWithTimestamp,
-          id: id,
-          views: 0,
-          deleted: false,
-          created_at: new Date().toISOString()
-        };
-        
-        // For debugging, print exactly what we're sending to the database
-        console.log('Insert payload:', JSON.stringify(completeUserData, null, 2));
-        
-        const { data, error } = await supabase
-          .from('users')
-          .insert([completeUserData])
-          .select()
-          .single();
-          
         userData = data;
-        updateError = error;
-        
-        if (error) {
-          console.error('Error inserting into users table:', error);
-          console.error('Error details:', error.details, 'Error hint:', error.hint);
-        } else {
-          console.log('Successfully inserted into users table');
-        }
       }
+      
+      return NextResponse.json(userData);
     } catch (e) {
       console.error('Exception updating users table:', e);
-      updateError = e;
-    }
-    
-    // If we have user data, return it
-    if (userData) {
-      return NextResponse.json(userData);
-    }
-    
-    // If we got here with an error, something went wrong
-    if (updateError) {
-      // Enhanced error details for debugging
-      let errorMessage = 'Unknown error';
-      if (typeof updateError === 'object' && updateError !== null) {
-        if ('message' in updateError) {
-          errorMessage = (updateError as any).message;
-        }
-        if ('details' in updateError) {
-          errorMessage += ` - Details: ${(updateError as any).details}`;
-        }
-      }
-      
-      console.error(`Error updating user with detailed message: ${errorMessage}`);
-      
       return NextResponse.json({ 
-        error: `Failed to update user: ${errorMessage}` 
+        error: `Failed to update user: ${e instanceof Error ? e.message : 'Unknown error'}` 
       }, { status: 500 });
     }
-    
-    // If we got here without user data or error, try to fetch current user
-    console.log('No data returned from update operations, fetching current user data...');
-    
-    // Try users table first
-    const { data: currentUser, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
-      
-    if (!fetchError && currentUser) {
-      return NextResponse.json(currentUser);
-    }
-    
-    // If we still don't have data, return what was submitted
-    return NextResponse.json({
-      ...dataWithTimestamp,
-      id: id
-    });
-    
   } catch (error: any) {
     console.error('Exception during user update:', error);
-    let errorMessage = 'Unknown error';
-    
-    if (error && typeof error === 'object') {
-      if ('message' in error) errorMessage = error.message;
-      if ('stack' in error) console.error('Stack trace:', error.stack);
-    }
-    
     return NextResponse.json({ 
-      error: `Failed to update user: ${errorMessage}` 
+      error: `Failed to update user: ${error.message || 'Unknown error'}` 
     }, { status: 500 });
   }
 }
