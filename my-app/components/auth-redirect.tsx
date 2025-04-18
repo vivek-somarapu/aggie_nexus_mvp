@@ -1,79 +1,62 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth"
+import { hasJustLoggedIn } from "@/lib/profile-utils"
 
 /**
- * Component that automatically handles auth redirects
- * This should be used in layouts that need to check profile status
- * and redirect accordingly
+ * Component that handles auth-related redirects
+ * Including directing users to complete profile setup if needed
  */
 export default function AuthRedirect() {
-  const { user, profile, isLoading, refreshProfile } = useAuth()
+  const { user } = useAuth()
   const router = useRouter()
-  const [isChecking, setIsChecking] = useState(false)
-  const [checkAttempts, setCheckAttempts] = useState(0)
-
+  const pathname = usePathname()
+  const [isChecking, setIsChecking] = useState(true)
+  
   useEffect(() => {
-    // Skip if not authenticated, still loading, or already checking
-    if (!user || isLoading || isChecking) {
-      return
-    }
-    
-    // Prevent infinite loops - only try checking profile status 3 times
-    if (checkAttempts >= 3) {
-      console.error("Max profile check attempts reached, stopping to prevent infinite loop")
+    // Skip checks if no user or already on setup page
+    if (!user || pathname === '/profile/setup' || pathname.startsWith('/auth/')) {
+      setIsChecking(false)
       return
     }
     
     const checkProfileStatus = async () => {
       try {
-        setIsChecking(true)
+        // Check if user just logged in - this is critical for determining if we should show
+        // the profile setup page again for users who previously skipped it
+        const justLoggedIn = hasJustLoggedIn(user);
         
-        // If we have the profile data in context, use it
-        if (profile) {
-          // Check if profile needs setup
-          if (!profile.bio || !profile.skills || profile.skills.length === 0) {
-            router.push("/profile/setup")
-            return
-          }
-          return
-        }
-        
-        // Try refreshing the profile if we don't have it
-        if (!profile) {
-          await refreshProfile()
-          setCheckAttempts(prev => prev + 1)
-          return
-        }
-        
-        // Fallback: Call API to check profile status if profile not in context
-        const response = await fetch("/api/auth/profile-status")
+        // Add cache-busting parameter to avoid stale data
+        const timestamp = new Date().getTime()
+        const response = await fetch(`/api/auth/profile-status?_t=${timestamp}&just_logged_in=${justLoggedIn}`, {
+          headers: { 'Cache-Control': 'no-cache' },
+        })
         
         if (!response.ok) {
-          console.error("Error fetching profile status:", await response.text())
+          console.error('Failed to check profile status:', response.statusText)
+          setIsChecking(false)
           return
         }
         
         const data = await response.json()
         
-        if (data.shouldSetupProfile) {
-          router.push("/profile/setup")
+        // If user should setup profile, redirect them unless already on setup page
+        if (data.shouldSetupProfile && pathname !== '/profile/setup') {
+          router.push('/profile/setup')
+        } else {
+          setIsChecking(false)
         }
-      } catch (error) {
-        console.error("Error checking profile status:", error)
-      } finally {
+      } catch (err) {
+        console.error('Error checking profile status:', err)
         setIsChecking(false)
       }
     }
     
-    // Set timeout to prevent blocking the UI
-    const timeoutId = setTimeout(checkProfileStatus, 100)
-    
-    return () => clearTimeout(timeoutId)
-  }, [user, profile, router, isLoading, isChecking, refreshProfile, checkAttempts])
+    checkProfileStatus()
+  }, [user, pathname, router])
   
-  // This component doesn't render anything visible
+  // Return null - this component is just for handling redirects
   return null
 } 

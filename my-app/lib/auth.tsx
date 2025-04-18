@@ -3,7 +3,30 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "./supabase/client";
-import { User, Session, AuthError } from "@supabase/supabase-js";
+import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
+
+// Update the User type to include all profile fields used in the app
+export type User = {
+  id: string;
+  email: string;
+  full_name?: string;
+  avatar?: string;
+  bio?: string;
+  linkedin_url?: string;
+  website_url?: string;
+  industry?: string[];
+  skills?: string[];
+  graduation_year?: number;
+  is_texas_am_affiliate?: boolean;
+  contact?: {
+    email?: string;
+    phone?: string;
+  };
+  profile_setup_skipped?: boolean;
+  profile_setup_completed?: boolean;
+  profile_setup_skipped_at?: string;
+  last_login_at?: string;
+};
 
 // Define user profile type based on your users table
 export type Profile = {
@@ -95,6 +118,17 @@ async function fetchUserProfile(userId: string): Promise<Profile | null> {
 }
 
 /**
+ * Map a Supabase User to our application User type
+ */
+function mapSupabaseUser(supabaseUser: SupabaseUser): User {
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    // Other fields will be populated from profile data
+  };
+}
+
+/**
  * AuthProvider component that manages authentication state
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -130,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("AUTH: Session check complete", !!session);
       
       if (session) {
-        setUser(session.user);
+        setUser(mapSupabaseUser(session.user));
         try {
           console.log("AUTH: Fetching user profile for", session.user.id);
           const userProfile = await fetchUserProfile(session.user.id);
@@ -155,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           
           if (session) {
-            setUser(session.user);
+            setUser(mapSupabaseUser(session.user));
             
             // Only fetch profile for certain events
             if (['SIGNED_IN', 'USER_UPDATED', 'TOKEN_REFRESHED'].includes(event)) {
@@ -208,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Fetch user profile after successful sign-in
       if (data.user) {
+        setUser(mapSupabaseUser(data.user));
         const userProfile = await fetchUserProfile(data.user.id);
         setProfile(userProfile);
       }
@@ -229,7 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
   
   /**
-   * Sign up with email, password, and full name
+   * Sign up with email and password
    */
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
@@ -237,14 +272,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       
       const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       
@@ -253,11 +287,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       
-      // Store email for reference on waiting page
-      localStorage.setItem("lastSignupEmail", email);
+      if (data.user) {
+        setUser(mapSupabaseUser(data.user));
+        
+        // Initialize user profile (minimal details from signup)
+        try {
+          // Set initial profile values in database
+          await supabase.from('users').upsert({
+            id: data.user.id,
+            email,
+            full_name: fullName,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          
+          // Fetch the created profile
+          const userProfile = await fetchUserProfile(data.user.id);
+          setProfile(userProfile);
+        } catch (profileErr) {
+          console.error("Error creating initial profile:", profileErr);
+        }
+      }
       
-      // Redirect to waiting page
-      router.push('/auth/waiting');
       return true;
     } catch (err: any) {
       setError(err.message || 'Failed to sign up');

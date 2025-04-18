@@ -18,9 +18,12 @@ import { bookmarkService } from "@/lib/services/bookmark-service"
 import { User as UserType } from "@/lib/models/users"
 import { Project } from "@/lib/services/project-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useRouter } from "next/navigation"
+import { hasJustLoggedIn } from "@/lib/profile-utils"
 
 export default function ProfilePage() {
   const { user: currentUser } = useAuth()
+  const router = useRouter()
   
   const [isLoading, setIsLoading] = useState(true)
   const [bookmarksLoading, setBookmarksLoading] = useState(true)
@@ -28,6 +31,7 @@ export default function ProfilePage() {
   const [bookmarkedUsers, setBookmarkedUsers] = useState<UserType[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showCompletionBanner, setShowCompletionBanner] = useState(false)
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -37,6 +41,27 @@ export default function ProfilePage() {
     graduation_year: 0,
     is_texas_am_affiliate: false,
   })
+
+  // Check if profile needs completion
+  useEffect(() => {
+    if (currentUser) {
+      // Check if the profile is incomplete
+      const isIncomplete = !currentUser.bio || 
+                          !currentUser.skills || 
+                          (currentUser.skills && currentUser.skills.length === 0);
+      
+      const wasSkipped = currentUser.profile_setup_skipped;
+      const wasCompleted = currentUser.profile_setup_completed;
+      
+      // Show banner if:
+      // 1. Profile is incomplete and wasn't explicitly marked as completed
+      // 2. Or if user just logged in and had previously skipped
+      setShowCompletionBanner(
+        (isIncomplete && !wasCompleted) || 
+        (isIncomplete && wasSkipped && hasJustLoggedIn(currentUser))
+      );
+    }
+  }, [currentUser]);
 
   // Load user data into form
   useEffect(() => {
@@ -115,6 +140,25 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
+      {/* Profile Completion Banner - only shown if needed */}
+      {showCompletionBanner && (
+        <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+          <AlertDescription className="flex justify-between items-center">
+            <div className="flex-1">
+              <p className="font-medium text-blue-800 dark:text-blue-300">Your profile is incomplete</p>
+              <p className="text-sm text-blue-600 dark:text-blue-400">Complete your profile to connect with others and showcase your skills.</p>
+            </div>
+            <Button 
+              size="sm" 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => router.push('/profile/setup')}
+            >
+              Complete Profile
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>

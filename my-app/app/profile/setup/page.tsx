@@ -196,7 +196,10 @@ export default function ProfileSetupPage() {
         full_name: formData.full_name || (formData.email?.split('@')[0] || 'User'),
         industry: selectedIndustries,
         skills: selectedSkills,
-        graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : null
+        graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : null,
+        // Explicitly mark profile as completed
+        profile_setup_completed: true,
+        profile_setup_skipped: false
       }
       
       // Update user via API
@@ -216,8 +219,22 @@ export default function ProfileSetupPage() {
     }
   }
 
-  const skipToHome = () => {
-    router.push("/")
+  const skipToHome = async () => {
+    try {
+      // Record that the user has chosen to skip profile setup
+      if (user) {
+        await userService.updateUser(user.id, {
+          profile_setup_skipped: true,
+          // Add a timestamp to record when setup was skipped
+          profile_setup_skipped_at: new Date().toISOString()
+        });
+      }
+      router.push("/")
+    } catch (err) {
+      console.error("Error recording skip preference:", err);
+      // Continue to home page even if there's an error
+      router.push("/")
+    }
   }
 
   if (authLoading) {
