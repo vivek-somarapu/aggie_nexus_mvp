@@ -254,14 +254,16 @@ export default function NewProjectPage() {
 
   return (
     <div className="container py-8">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" asChild className="mr-4">
-          <Link href="/projects">
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Projects
-          </Link>
-        </Button>
-        <h1 className="text-3xl font-bold">Create New Project</h1>
+      <div className="flex flex-col items-center mb-8">
+        <div className="w-full flex justify-start mb-2">
+          <Button variant="ghost" asChild>
+            <Link href="/projects">
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Back to Projects
+            </Link>
+          </Button>
+        </div>
+        <h1 className="text-3xl font-bold text-center">Create New Project</h1>
       </div>
 
       {error && (

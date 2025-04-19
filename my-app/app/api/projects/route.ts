@@ -98,6 +98,30 @@ export async function POST(request: NextRequest) {
         owner_id: userId
       };
       
+      // Ensure contact_info is properly formatted
+      let contact_info = projectData.contact_info || {};
+      
+      // If contact_info is a string (from older form submissions)
+      if (typeof contact_info === 'string') {
+        try {
+          contact_info = JSON.parse(contact_info);
+        } catch (e) {
+          contact_info = { email: contact_info };
+        }
+      }
+      
+      // Always ensure the object has required properties
+      if (!contact_info.email) {
+        // Get user email as fallback
+        const { data: userData } = await supabase
+          .from('users')
+          .select('email')
+          .eq('id', userId)
+          .single();
+          
+        contact_info.email = userData?.email || '';
+      }
+      
       const { data, error } = await supabase
         .from('projects')
         .insert({
@@ -111,21 +135,23 @@ export async function POST(request: NextRequest) {
           location_type: projectData.location_type || "Remote",
           estimated_start: projectData.estimated_start || null,
           estimated_end: projectData.estimated_end || null,
-          contact_info: projectData.contact_info || {},
-          project_status: projectData.project_status || "Not Started"
+          contact_info: contact_info,
+          project_status: projectData.project_status || "Not Started",
+          views: 0,
+          deleted: false
         })
         .select()
         .single();
       
       if (error) {
         console.error('Error creating project in Supabase:', error);
-        return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to create project: ' + error.message }, { status: 500 });
       }
       
       return NextResponse.json(data, { status: 201 });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating project:', error);
-      return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create project: ' + error.message }, { status: 500 });
     }
   });
 } 

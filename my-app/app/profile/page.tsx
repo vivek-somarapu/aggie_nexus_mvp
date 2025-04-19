@@ -12,14 +12,14 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Bookmark, ExternalLink, GraduationCap, Linkedin, Loader2, Pencil, Save, User } from "lucide-react"
-import { useAuth } from "@/lib"
+import { useAuth } from "@/lib/auth"
 import { userService } from "@/lib/services/user-service"
 import { bookmarkService } from "@/lib/services/bookmark-service"
 import { User as UserType } from "@/lib/models/users"
 import { Project } from "@/lib/services/project-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
-import { hasJustLoggedIn } from "@/lib/profile-utils"
+import { hasJustLoggedIn, profileSetupStatus } from "@/lib/profile-utils"
 
 export default function ProfilePage() {
   const { user: currentUser } = useAuth()
@@ -40,40 +40,31 @@ export default function ProfilePage() {
     website_url: '',
     graduation_year: 0,
     is_texas_am_affiliate: false,
+    avatar: '',
+    skills: [] as string[],
   })
 
   // Check if profile needs completion
   useEffect(() => {
-    if (currentUser) {
-      // Check if the profile is incomplete
-      const isIncomplete = !currentUser.bio || 
-                          !currentUser.skills || 
-                          (currentUser.skills && currentUser.skills.length === 0);
-      
-      const wasSkipped = currentUser.profile_setup_skipped;
-      const wasCompleted = currentUser.profile_setup_completed;
-      
-      // Show banner if:
-      // 1. Profile is incomplete and wasn't explicitly marked as completed
-      // 2. Or if user just logged in and had previously skipped
-      setShowCompletionBanner(
-        (isIncomplete && !wasCompleted) || 
-        (isIncomplete && wasSkipped && hasJustLoggedIn(currentUser))
-      );
-    }
+    if (!currentUser) return;
+    
+    const status = profileSetupStatus(currentUser);
+    setShowCompletionBanner(status.shouldSetupProfile);
   }, [currentUser]);
 
   // Load user data into form
   useEffect(() => {
     if (currentUser) {
       setFormData({
-        full_name: currentUser.full_name,
+        full_name: currentUser.full_name || '',
         email: currentUser.email,
         bio: currentUser.bio || '',
         linkedin_url: currentUser.linkedin_url || '',
         website_url: currentUser.website_url || '',
         graduation_year: currentUser.graduation_year || 0,
         is_texas_am_affiliate: currentUser.is_texas_am_affiliate || false,
+        avatar: currentUser.avatar || '',
+        skills: currentUser.skills || [],
       })
       setIsLoading(false)
     }
@@ -212,10 +203,13 @@ export default function ProfilePage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="flex flex-col items-center gap-4">
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={currentUser.avatar || undefined} alt={currentUser.full_name} />
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage 
+                        src={currentUser?.avatar || ""} 
+                        className="object-cover"
+                      />
                       <AvatarFallback>
-                        <User className="h-12 w-12" />
+                        {currentUser?.full_name ? currentUser.full_name.charAt(0) : <User />}
                       </AvatarFallback>
                     </Avatar>
                     {isEditing && (

@@ -292,11 +292,11 @@ export default function ProjectsPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2">
                         {project.is_idea ? (
-                          <Badge variant="outline" className="bg-yellow-100">
+                          <Badge variant="outline" className="bg-yellow-100 text-black">
                             Idea
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-green-100">
+                          <Badge variant="outline" className="bg-green-100 text-black">
                             Project
                           </Badge>
                         )}

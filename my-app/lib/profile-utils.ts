@@ -49,14 +49,20 @@ export function profileSetupStatus(user: User | null, justLoggedIn = false) {
 /**
  * Checks if a user has just logged in (within the last minute)
  */
-export function hasJustLoggedIn(user: User | null) {
+export function hasJustLoggedIn(user: User | null): boolean {
   if (!user || !user.last_login_at) {
     return false;
   }
 
-  const loginTime = new Date(user.last_login_at).getTime();
-  const now = new Date().getTime();
-  
-  // Consider "just logged in" if within the last minute
-  return now - loginTime < 60000;
+  try {
+    const loginTime = new Date(user.last_login_at).getTime();
+    const now = new Date().getTime();
+    
+    // Consider "just logged in" if within the last minute
+    return now - loginTime < 60000;
+  } catch (err) {
+    // If there's any error parsing the date, return false
+    console.error("Error checking login time:", err);
+    return false;
+  }
 }

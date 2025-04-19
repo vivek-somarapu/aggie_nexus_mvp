@@ -9,7 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bookmark, GraduationCap, Loader2 } from "lucide-react"
+import { Bookmark, GraduationCap, Loader2, Info } from "lucide-react"
 import { User } from "@/lib/models/users"
 import { userService, UserSearchParams } from "@/lib/services/user-service"
 import { bookmarkService } from "@/lib/services/bookmark-service"
@@ -208,6 +208,13 @@ export default function UsersPage() {
         </div>
       </div>
       
+      <Alert variant="info" className="mb-6 bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800">
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          Note: Only users with complete profiles (including bio and skills) are displayed here.
+        </AlertDescription>
+      </Alert>
+      
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -292,7 +299,7 @@ export default function UsersPage() {
                       <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">
                           <div className="flex justify-between">
-                            <Avatar className="h-12 w-12">
+                            <Avatar className={`h-12 w-12 ${user.is_texas_am_affiliate ? "ring-4 ring-[#500000]" : ""}`}>
                               <AvatarImage src={user.avatar ?? ''} alt={user.full_name} />
                               <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
                             </Avatar>
