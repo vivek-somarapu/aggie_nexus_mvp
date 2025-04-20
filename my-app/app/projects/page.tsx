@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,17 @@ import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ProjectsPage() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isLoading: authLoading } = useAuth()
+  const router = useRouter()
+  
+  // Client-side authentication check
+  useEffect(() => {
+    // Wait until auth is no longer loading to make a decision
+    if (!authLoading && !currentUser) {
+      console.log("No authenticated user found, redirecting to login")
+      router.push('/auth/login?redirect=' + encodeURIComponent('/projects'))
+    }
+  }, [currentUser, authLoading, router])
   
   const [projects, setProjects] = useState<Project[]>([])
   const [bookmarkedProjects, setBookmarkedProjects] = useState<string[]>([])
@@ -30,8 +41,11 @@ export default function ProjectsPage() {
   const [tamuFilter, setTamuFilter] = useState("all")
   const [projectTypeFilter, setProjectTypeFilter] = useState("all")
   
-  // Fetch projects
+  // Fetch projects only when user is authenticated
   useEffect(() => {
+    // Skip if auth is still loading or user is not authenticated
+    if (authLoading || !currentUser) return
+    
     const fetchProjects = async () => {
       try {
         setIsLoading(true)
@@ -74,7 +88,20 @@ export default function ProjectsPage() {
     }
     
     fetchProjects()
-  }, [searchQuery, tamuFilter, projectTypeFilter])
+  }, [searchQuery, tamuFilter, projectTypeFilter, currentUser, authLoading])
+  
+  // If auth is still loading or user is not authenticated, show loading state
+  if (authLoading || !currentUser) {
+    return (
+      <div className="flex flex-col justify-center items-center py-12 space-y-4">
+        <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        <div className="text-center">
+          <p className="text-lg font-medium">Checking authentication...</p>
+          <p className="text-sm text-muted-foreground">Please wait</p>
+        </div>
+      </div>
+    )
+  }
   
   // Fetch bookmarked projects if user is logged in
   useEffect(() => {
@@ -265,11 +292,11 @@ export default function ProjectsPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2">
                         {project.is_idea ? (
-                          <Badge variant="outline" className="bg-yellow-100">
+                          <Badge variant="outline" className="bg-yellow-100 text-black">
                             Idea
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-green-100">
+                          <Badge variant="outline" className="bg-green-100 text-black">
                             Project
                           </Badge>
                         )}

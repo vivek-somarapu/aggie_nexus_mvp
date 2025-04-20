@@ -12,15 +12,18 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Bookmark, ExternalLink, GraduationCap, Linkedin, Loader2, Pencil, Save, User } from "lucide-react"
-import { useAuth } from "@/lib"
+import { useAuth } from "@/lib/auth"
 import { userService } from "@/lib/services/user-service"
 import { bookmarkService } from "@/lib/services/bookmark-service"
 import { User as UserType } from "@/lib/models/users"
 import { Project } from "@/lib/services/project-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useRouter } from "next/navigation"
+import { hasJustLoggedIn, profileSetupStatus } from "@/lib/profile-utils"
 
 export default function ProfilePage() {
   const { user: currentUser } = useAuth()
+  const router = useRouter()
   
   const [isLoading, setIsLoading] = useState(true)
   const [bookmarksLoading, setBookmarksLoading] = useState(true)
@@ -28,6 +31,7 @@ export default function ProfilePage() {
   const [bookmarkedUsers, setBookmarkedUsers] = useState<UserType[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showCompletionBanner, setShowCompletionBanner] = useState(false)
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -36,19 +40,31 @@ export default function ProfilePage() {
     website_url: '',
     graduation_year: 0,
     is_texas_am_affiliate: false,
+    avatar: '',
+    skills: [] as string[],
   })
+
+  // Check if profile needs completion
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const status = profileSetupStatus(currentUser);
+    setShowCompletionBanner(status.shouldSetupProfile);
+  }, [currentUser]);
 
   // Load user data into form
   useEffect(() => {
     if (currentUser) {
       setFormData({
-        full_name: currentUser.full_name,
+        full_name: currentUser.full_name || '',
         email: currentUser.email,
         bio: currentUser.bio || '',
         linkedin_url: currentUser.linkedin_url || '',
         website_url: currentUser.website_url || '',
         graduation_year: currentUser.graduation_year || 0,
         is_texas_am_affiliate: currentUser.is_texas_am_affiliate || false,
+        avatar: currentUser.avatar || '',
+        skills: currentUser.skills || [],
       })
       setIsLoading(false)
     }
@@ -115,6 +131,25 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
+      {/* Profile Completion Banner - only shown if needed */}
+      {showCompletionBanner && (
+        <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+          <AlertDescription className="flex justify-between items-center">
+            <div className="flex-1">
+              <p className="font-medium text-blue-800 dark:text-blue-300">Your profile is incomplete</p>
+              <p className="text-sm text-blue-600 dark:text-blue-400">Complete your profile to connect with others and showcase your skills.</p>
+            </div>
+            <Button 
+              size="sm" 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => router.push('/profile/setup')}
+            >
+              Complete Profile
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
@@ -168,10 +203,13 @@ export default function ProfilePage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="flex flex-col items-center gap-4">
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={currentUser.avatar || undefined} alt={currentUser.full_name} />
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage 
+                        src={currentUser?.avatar || ""} 
+                        className="object-cover"
+                      />
                       <AvatarFallback>
-                        <User className="h-12 w-12" />
+                        {currentUser?.full_name ? currentUser.full_name.charAt(0) : <User />}
                       </AvatarFallback>
                     </Avatar>
                     {isEditing && (

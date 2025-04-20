@@ -1,4 +1,6 @@
 import { User } from "@/lib/models/users";
+import { supabase } from "@/lib/db";
+import { createClient } from '@/lib/supabase/client';
 
 export interface UserSearchParams {
   search?: string;
@@ -57,19 +59,18 @@ export const userService = {
   // Get a single user by ID
   getUser: async (id: string): Promise<User | null> => {
     try {
-      const response = await fetchWithRetry(`/api/users/${id}`);
+      const supabase = createClient();
       
-      if (response.status === 404) {
-        return null;
-      }
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch user: ${response.statusText}`);
-      }
-      
-      return response.json();
+      if (error) throw error;
+      return data;
     } catch (error) {
-      console.error(`Error fetching user ${id}:`, error);
+      console.error('Error fetching user:', error);
       throw error;
     }
   },
@@ -97,25 +98,38 @@ export const userService = {
   // Update an existing user
   updateUser: async (id: string, userData: Partial<User>): Promise<User | null> => {
     try {
-      const response = await fetchWithRetry(`/api/users/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
+      const supabase = createClient();
       
-      if (response.status === 404) {
-        return null;
+      // First, get the current user data to validate fields
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
       }
       
-      if (!response.ok) {
-        throw new Error(`Failed to update user: ${response.statusText}`);
+      // Update fields including profile_setup_skipped and profile_setup_completed
+      const { data, error } = await supabase
+        .from('users')
+        .update({
+          ...userData,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error updating user:', error);
+        throw error;
       }
       
-      return response.json();
+      return data;
     } catch (error) {
-      console.error(`Error updating user ${id}:`, error);
+      console.error('Error updating user:', error);
       throw error;
     }
   },

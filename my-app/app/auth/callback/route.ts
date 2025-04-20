@@ -1,64 +1,149 @@
-import { createClient } from '@/utils/supabase/server';
-import { NextResponse } from 'next/server';
-import { type NextRequest } from 'next/server';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
 
+/**
+ * Auth callback handler for OAuth and email verification redirects
+ * Processes Supabase authentication code to establish a session
+ */
 export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
-  const redirectTo = requestUrl.searchParams.get('redirect') || '/';
+  // Get the authorization code from the URL
+  const requestUrl = new URL(request.url)
+  const code = requestUrl.searchParams.get('code')
   
-  console.log('Auth callback triggered:', { hasCode: !!code });
-  
-  if (code) {
+  // If no code provided, redirect to home page
+  if (!code) {
+    return NextResponse.redirect(new URL('/', requestUrl.origin))
+  }
+
+  try {
+    const supabase = createClient()
+    
+    // Exchange the code for a session 
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (exchangeError) {
+      console.error('Auth callback error:', exchangeError)
+      return NextResponse.redirect(
+        new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, requestUrl.origin)
+      )
+    }
+
+    // Retrieve the new session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session) {
+      console.error('Session retrieval error:', sessionError)
+      return NextResponse.redirect(
+        new URL('/auth/login?error=Session+creation+failed', requestUrl.origin)
+      )
+    }
+    
+    // After OAuth login, we need to check if the user has a complete profile
+    // and perform any necessary data operations
     try {
-      console.log('Exchanging auth code for session');
-      const cookieStore = cookies();
-      const supabase = await createClient(cookieStore);
-      
-      // Exchange the auth code for a session
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-      
-      if (error) {
-        console.error('Error exchanging code for session:', error);
-        return NextResponse.redirect(`${requestUrl.origin}?auth_error=${encodeURIComponent(error.message)}`);
-      }
-      
-      if (data.session) {
-        console.log('Session established successfully');
+      // Check if the user exists in the users table
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('id, bio, skills, profile_setup_skipped, profile_setup_completed')
+        .eq('id', session.user.id)
+        .single()
         
-        // Check if we need to create a new user profile
-        if (data.user && data.user.app_metadata.provider !== 'email') {
-          // For OAuth providers, we might need to create a user profile
-          const { data: existingUser } = await supabase
+      if (userError && userError.code !== 'PGRST116') {
+        // Log the error but continue - we'll create a user if needed
+        console.error('Error checking existing user:', userError)
+      }
+        
+      // Update the last login timestamp ALWAYS when a user logs in
+      // This is critical for the "just logged in" detection
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ 
+          last_login_at: new Date().toISOString() 
+        })
+        .eq('id', session.user.id);
+        
+      if (updateError) {
+        console.error('Error updating last login time:', updateError);
+      }
+
+      // If the user exists, check if the profile is complete
+      if (existingUser) {
+        // If the user has explicitly completed their profile, go to home page
+        if (existingUser.profile_setup_completed) {
+          return NextResponse.redirect(new URL('/', requestUrl.origin))
+        }
+        
+        // If the user previously skipped setup, but it's a new login session,
+        // give them another chance to complete their profile
+        if (existingUser.profile_setup_skipped) {
+          // But only if they haven't completed the minimum profile requirements
+          if (!existingUser.bio || !existingUser.skills || existingUser.skills.length === 0) {
+            return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
+          }
+          return NextResponse.redirect(new URL('/', requestUrl.origin))
+        }
+        
+        // If bio or skills are missing and user hasn't explicitly skipped,
+        // redirect to profile setup
+        if (!existingUser.bio || !existingUser.skills || existingUser.skills.length === 0) {
+          return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
+        }
+        
+        // If profile has all required fields but isn't explicitly marked as completed,
+        // mark it as completed now
+        if (!existingUser.profile_setup_completed) {
+          const { error: completeError } = await supabase
             .from('users')
-            .select('id')
-            .eq('id', data.user.id)
-            .single();
+            .update({ profile_setup_completed: true })
+            .eq('id', session.user.id);
             
-          if (!existingUser) {
-            console.log('Creating new user profile for OAuth user');
-            // Create a user profile for this OAuth user
-            await supabase.from('users').insert({
-              id: data.user.id,
-              email: data.user.email,
-              full_name: data.user.user_metadata.full_name || data.user.email?.split('@')[0] || 'User',
-              contact: { email: data.user.email }
-            });
+          if (completeError) {
+            console.error('Error marking profile as completed:', completeError);
           }
         }
         
-        // Add cache-busting query param to ensure the page reloads with the new auth state
-        const timestamp = new Date().getTime();
-        return NextResponse.redirect(`${requestUrl.origin}${redirectTo}?auth_success=true&t=${timestamp}`);
+        // If profile is complete, redirect to home page
+        return NextResponse.redirect(new URL('/', requestUrl.origin))
+      } else {
+        // The user doesn't exist in the users table yet, we'll need to create them
+        // Get user data from the session
+        const { full_name, email } = session.user.user_metadata || {}
+        const userEmail = email || session.user.email || ''
+        
+        // Create a new user entry
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: session.user.id,
+            full_name: full_name || userEmail.split('@')[0] || 'New User',
+            email: userEmail,
+            industry: [],
+            skills: [],
+            contact: { email: userEmail },
+            views: 0,
+            is_texas_am_affiliate: false,
+            deleted: false,
+            last_login_at: new Date().toISOString(),
+            profile_setup_completed: false,
+            profile_setup_skipped: false
+          })
+          
+        if (insertError) {
+          console.error('Error creating user record:', insertError)
+        }
+        
+        // Redirect to profile setup to complete the profile
+        return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
       }
-    } catch (error) {
-      console.error('Unexpected error in auth callback:', error);
-      return NextResponse.redirect(`${requestUrl.origin}?auth_error=unexpected_error`);
+    } catch (err) {
+      console.error('Error in user profile check:', err)
+      // On error, default to redirecting to the home page
+      return NextResponse.redirect(new URL('/', requestUrl.origin))
     }
+  } catch (err) {
+    console.error('Auth callback exception:', err)
+    return NextResponse.redirect(
+      new URL('/auth/login?error=Authentication+failed', requestUrl.origin)
+    )
   }
-
-  // If no code or other issues, redirect to home
-  console.log('No auth code found, redirecting to home');
-  return NextResponse.redirect(requestUrl.origin);
 } 

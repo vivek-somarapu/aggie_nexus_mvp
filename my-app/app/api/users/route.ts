@@ -56,6 +56,13 @@ export async function GET(request: NextRequest) {
     // Exclude deleted users
     query = query.eq('deleted', false);
     
+    // Only show users with complete profiles
+    // A complete profile has a bio and at least one skill
+    query = query.not('bio', 'is', null)
+                .not('bio', 'eq', '')
+                .not('skills', 'is', null)
+                .not('skills', 'eq', '{}');
+    
     const { data: users, error } = await query;
     
     if (error) {

@@ -3,14 +3,29 @@
 import { useAuth } from "@/lib/auth"
 import { useEffect, useState } from "react"
 import Navbar from "@/components/navbar"
-import LandingNavbar from "@/components/landing-navbar"
 import { ThemeToggle } from "@/components/theme-toggle"
+import AuthRedirect from "@/components/auth-redirect"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading, error } = useAuth()
+  const [showLoadingUI, setShowLoadingUI] = useState(true)
   
-  // During initial auth check show loading state
-  if (authLoading) {
+  // Only show loading UI for up to 3 seconds to prevent infinite loading state
+  useEffect(() => {
+    if (!authLoading) {
+      setShowLoadingUI(false)
+      return
+    }
+    
+    const timeout = setTimeout(() => {
+      setShowLoadingUI(false)
+    }, 3000)
+    
+    return () => clearTimeout(timeout)
+  }, [authLoading])
+  
+  // During initial auth check show loading state, but only for a limited time
+  if (authLoading && showLoadingUI) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
@@ -28,12 +43,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   // Show error message only if it's a critical auth error (not just profile fetch issues)
   // and we don't have minimal user data
-  if (error && !hasMinimalUserData) {
+  if (error && !hasMinimalUserData && !authLoading) {
     console.error("Auth error in layout:", error);
     // Return fallback UI for critical auth errors
     return (
       <div className="min-h-screen flex flex-col">
-        <LandingNavbar />
         <div className="flex-1 container mx-auto py-6 px-4">
           <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
             <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">Authentication Error</h2>
@@ -49,6 +63,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   // After auth state is resolved, render appropriate layout
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Include the AuthRedirect component to check profile status */}
+      {hasMinimalUserData && <AuthRedirect />}
+      
       {hasMinimalUserData ? (
         <>
           <Navbar />
@@ -61,7 +78,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </>
       ) : (
         <>
-          <main className="flex-1">{children}</main>
+          <main className="flex-1 container mx-auto py-6 px-4">{children}</main>
         </>
       )}
       <ThemeToggle />
