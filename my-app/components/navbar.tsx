@@ -65,8 +65,8 @@ export default function Navbar() {
             </SheetTrigger>
             <SheetContent side="left" className="pr-0">
               <nav className="grid gap-6 text-lg font-medium">
-                <Link href="/" className="flex items-center gap-2 text-lg font-semibold">
-                  <span>Aggie Nexus</span>
+                <Link href="/" className="flex items-center gap-2">
+                  <img src="/images/logo1.svg" alt="Aggie Nexus" width="140" height="35" className="object-contain" />
                 </Link>
                 {routes.map((route) => (
                   <Link
@@ -82,8 +82,8 @@ export default function Navbar() {
           </Sheet>
 
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="font-semibold">Aggie Nexus</span>
+          <Link href="/" className="flex items-center">
+            <img src="/images/logo1.svg" alt="Aggie Nexus" width="160" height="40" className="object-contain" />
           </Link>
         </div>
 

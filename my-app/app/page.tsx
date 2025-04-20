@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import Image from "next/image"
 import { ArrowRight, Users, Lightbulb, Building, ArrowUpRight, ChevronRight, CheckCircle2, Star, BarChart, Award, MessageCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -12,6 +13,28 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { motion } from "framer-motion"
+
+// Animation variants
+const fadeIn = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.6 } }
+}
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.8 } }
+}
+
+const stagger = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
 
 export default function Home() {
   const { user, isLoading } = useAuth()
@@ -50,36 +73,65 @@ export default function Home() {
         )}
 
         {/* Hero Content */}
-        <div className="container flex-1 flex flex-col items-center justify-center py-24 text-center">
+        <motion.div 
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="container flex-1 flex flex-col items-center justify-center py-24 text-center"
+        >
           <div className="space-y-6 max-w-3xl">
-            <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl dark:text-white text-primary">
+            <motion.h1 
+              variants={fadeIn}
+              className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl dark:text-white text-primary"
+            >
               THE CENTER OF INNOVATION FOR AGGIES
-            </h1>
-            <p className="mx-auto max-w-[700px] dark:text-white/80 text-muted-foreground md:text-xl">
+            </motion.h1>
+            <motion.p 
+              variants={fadeIn}
+              className="mx-auto max-w-[700px] dark:text-white/80 text-muted-foreground md:text-xl"
+            >
               Join a community of builders, funders, and innovators bringing ideas to life at Texas A&M and beyond.
-            </p>
+            </motion.p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4 mt-8">
-            <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-              <Link href="/auth/signup">
-                Sign Up
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="border-primary text-primary hover:bg-primary/10 dark:bg-gray-800 dark:text-white dark:border-white/40 dark:hover:bg-gray-700"
-              asChild
-            >
-              <Link href="/auth/login">
-                Log In
-                <ArrowUpRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+          <motion.div 
+            variants={stagger}
+            className="flex flex-wrap justify-center gap-4 mt-8"
+          >
+            <motion.div variants={fadeUp}>
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
+                <Link href="/auth/signup">
+                  Sign Up
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.div>
+            <motion.div variants={fadeUp}>
+              <Button
+                variant="outline"
+                size="lg"
+                className="border-primary text-primary hover:bg-primary/10 dark:bg-gray-800 dark:text-white dark:border-white/40 dark:hover:bg-gray-700"
+                asChild
+              >
+                <Link href="/auth/login">
+                  Log In
+                  <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.div>
+          </motion.div>
+          
+          {/* Side Logo */}
+          <div className="absolute bottom-0 right-0 z-10 hidden lg:block">
+            <Image
+              src="/images/circles-right.svg"
+              alt="decorative logo"
+              width={450} 
+              height={450}
+              className="opacity-80"
+            />
           </div>
-        </div>
+        </motion.div>
 
         {/* Footer */}
         <div className="container py-8 text-center dark:text-white/60 text-muted-foreground">
@@ -97,40 +149,72 @@ export default function Home() {
         <div className="absolute inset-0 bg-background/5 to-transparent -z-10" />
 
         {/* Hero Section */}
-        <section className="container flex-1 flex flex-col items-center justify-center py-16 md:py-24 text-center">
+        <motion.section 
+          initial="hidden" 
+          animate="visible" 
+          variants={fadeUp}
+          className="container flex-1 flex flex-col items-center justify-center py-16 md:py-24 text-center relative"
+        >
           <div className="space-y-6 max-w-3xl">
             <Badge className="bg-primary text-primary-foreground hover:bg-primary/90 border-none px-4 py-2 text-sm mb-4">
               Connecting Innovators at Texas A&M and Beyond
             </Badge>
-            <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
-              Where Ideas Find Their Team
-            </h1>
-            <p className="mx-auto max-w-[800px] text-muted-foreground md:text-xl">
+            <motion.h1 
+              variants={fadeIn}
+              className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl"
+            >
+              THE CENTRAL HUB<br />FOR AGGIE INNOVATION
+            </motion.h1>
+            <motion.p 
+              variants={fadeIn}
+              className="mx-auto max-w-[800px] text-muted-foreground md:text-xl"
+            >
               Aggie Nexus is the premier platform connecting entrepreneurs, builders, and investors to transform innovative ideas into successful ventures.
-            </p>
+            </motion.p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4 mt-8">
-            <Button size="lg" asChild>
-              <Link href="/projects">
-                Explore Projects
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              asChild
-            >
-              <Link href="/projects/new">
-                Start a Project
-                <ArrowUpRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+          <motion.div 
+            variants={stagger}
+            className="flex flex-wrap justify-center gap-4 mt-8"
+          >
+            <motion.div variants={fadeUp}>
+              <Button size="lg" asChild>
+                <Link href="/projects">
+                  Explore Projects
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.div>
+            <motion.div variants={fadeUp}>
+              <Button
+                variant="outline"
+                size="lg"
+                asChild
+              >
+                <Link href="/projects/new">
+                  Start a Project
+                  <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.div>
+          </motion.div>
+          
+          {/* Side Logo */}
+          <div className="absolute bottom-0 right-0 z-10 hidden lg:block">
+            <Image
+              src="/images/circles-right.svg"
+              alt="decorative logo"
+              width={450} 
+              height={450}
+              className="opacity-80"
+            />
           </div>
           
           {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 mt-16 w-full max-w-4xl">
+          <motion.div 
+            variants={fadeUp}
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 mt-16 w-full max-w-4xl"
+          >
             <div className="flex flex-col items-center space-y-1 p-4">
               <div className="text-3xl md:text-4xl font-bold">500+</div>
               <div className="text-sm text-muted-foreground">Active Projects</div>
@@ -147,8 +231,140 @@ export default function Home() {
               <div className="text-3xl md:text-4xl font-bold">$2.4M</div>
               <div className="text-sm text-muted-foreground">Investment Secured</div>
             </div>
+          </motion.div>
+        </motion.section>
+        
+        {/* Fostering Growth Section with Lab Image */}
+        <motion.section 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUp}
+          className="relative py-20"
+        >
+          <div className="absolute inset-0 z-0">
+            <Image 
+              src="/images/lab1.jpg" 
+              alt="Laboratory environment" 
+              fill 
+              className="object-cover opacity-25"
+            />
+            <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
           </div>
-        </section>
+          
+          <div className="container relative z-10">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <motion.div variants={fadeUp} className="space-y-4">
+                <h2 className="text-3xl font-bold tracking-tight md:text-4xl">FOSTERING GROWTH</h2>
+                <p className="text-xl text-muted-foreground">In every industry</p>
+                <p className="text-muted-foreground">
+                  Our platform provides the tools, connections, and resources needed for innovative ideas to flourish across all sectors—from technology and engineering to arts and agriculture.
+                </p>
+                <Button variant="outline" asChild>
+                  <Link href="/projects">
+                    Browse Industries
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </motion.div>
+              
+              <motion.div 
+                variants={fadeUp}
+                className="bg-muted/50 p-6 rounded-lg shadow-lg"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Technology</h3>
+                    <p className="text-sm text-muted-foreground">Software, hardware, and digital innovation</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Engineering</h3>
+                    <p className="text-sm text-muted-foreground">Civil, mechanical, aerospace projects</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Agriculture</h3>
+                    <p className="text-sm text-muted-foreground">Sustainable farming and food tech</p>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Health</h3>
+                    <p className="text-sm text-muted-foreground">Medical devices and healthcare solutions</p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </motion.section>
+        
+        {/* Connecting with Investors Section with Garage Image */}
+        <motion.section 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUp}
+          className="relative py-20 bg-muted/50"
+        >
+          <div className="absolute inset-0 z-0 right-0 md:right-0 md:w-1/2">
+            <Image 
+              src="/images/garage.jpg" 
+              alt="Innovation garage" 
+              fill 
+              className="object-cover opacity-30 md:opacity-50"
+            />
+            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] md:bg-gradient-to-l md:from-background/10 md:to-background/95" />
+          </div>
+          
+          <div className="container relative z-10">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <motion.div variants={fadeUp} className="space-y-4 md:order-2">
+                <h2 className="text-3xl font-bold tracking-tight md:text-4xl">CONNECTING WITH</h2>
+                <p className="text-xl text-muted-foreground">Innovators across the world</p>
+                <p className="text-muted-foreground">
+                  Access a vibrant network of angel investors, venture capitalists, and industry partners looking to fund and accelerate the next big ideas coming out of Texas A&M.
+                </p>
+                <Button asChild>
+                  <Link href="/users">
+                    Find Partners
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </motion.div>
+              
+              <motion.div variants={fadeUp} className="md:order-1">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Investment Opportunities</CardTitle>
+                    <CardDescription>Connect with funders ready to invest</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-4">
+                      <li className="flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">Angel Investors</p>
+                          <p className="text-sm text-muted-foreground">Early-stage funding for promising startups</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">Venture Capital</p>
+                          <p className="text-sm text-muted-foreground">Series funding for growth-stage companies</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">Grant Opportunities</p>
+                          <p className="text-sm text-muted-foreground">Non-dilutive funding for research projects</p>
+                        </div>
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+          </div>
+        </motion.section>
         
         {/* How It Works Section */}
         <section className="bg-muted/50 py-20">
