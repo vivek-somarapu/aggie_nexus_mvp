@@ -95,7 +95,7 @@ export const projectService = {
   },
 
   // Create a new project
-  createProject: async (projectData: Omit<Project, "id" | "views" | "created_at" | "last_updated" | "deleted">): Promise<Project> => {
+  createProject: async (projectData: Omit<Project, "id" | "views" | "created_at" | "last_updated" | "deleted" | "owner_id"> & { owner_id?: string }): Promise<Project> => {
     const response = await fetch('/api/projects', {
       method: 'POST',
       headers: {
@@ -105,7 +105,15 @@ export const projectService = {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to create project: ${response.statusText}`);
+      // Try to get the detailed error message from the response
+      let errorMessage;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || response.statusText;
+      } catch (e) {
+        errorMessage = response.statusText;
+      }
+      throw new Error(`Failed to create project: ${errorMessage}`);
     }
     
     return response.json();

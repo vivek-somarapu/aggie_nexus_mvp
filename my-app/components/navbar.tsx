@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -66,7 +67,20 @@ export default function Navbar() {
             <SheetContent side="left" className="pr-0">
               <nav className="grid gap-6 text-lg font-medium">
                 <Link href="/" className="flex items-center gap-2">
-                  <img src="/images/logo1.svg" alt="Aggie Nexus" width="140" height="35" className="object-contain" />
+                  <img 
+                    src="/images/logo_png_white.png" 
+                    alt="Aggie Nexus" 
+                    width="110" 
+                    height="28" 
+                    className="object-contain dark:block hidden" 
+                  />
+                  <img 
+                    src="/images/AggieNexus_LogoHorizontal.png" 
+                    alt="Aggie Nexus" 
+                    width="110" 
+                    height="28" 
+                    className="object-contain dark:hidden block" 
+                  />
                 </Link>
                 {routes.map((route) => (
                   <Link
@@ -83,7 +97,20 @@ export default function Navbar() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <img src="/images/logo1.svg" alt="Aggie Nexus" width="160" height="40" className="object-contain" />
+            <img 
+              src="/images/logo_png_white.png" 
+              alt="Aggie Nexus" 
+              width="120" 
+              height="30" 
+              className="object-contain dark:block hidden" 
+            />
+            <img 
+              src="/images/AggieNexus_LogoHorizontal.png" 
+              alt="Aggie Nexus" 
+              width="120" 
+              height="30" 
+              className="object-contain dark:hidden block" 
+            />
           </Link>
         </div>
 

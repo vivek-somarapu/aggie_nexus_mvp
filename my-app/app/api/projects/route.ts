@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth-middleware";
-import { createClient } from '@supabase/supabase-js';
-
-// Create a Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from '@/lib/supabase/server';
 
 // GET /api/projects - List all projects
 export async function GET(request: NextRequest) {
   try {
+    // Create Supabase client inside the function, not at module level
+    const supabase = createClient();
     console.log('Fetching projects from API');
     const searchParams = request.nextUrl.searchParams;
     const searchTerm = searchParams.get('search');
@@ -59,7 +55,7 @@ export async function GET(request: NextRequest) {
     
     if (error) {
       console.error('Supabase query error:', error);
-      return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch projects: ' + error.message }, { status: 500 });
     }
     
     // Process projects to ensure consistent format
@@ -72,9 +68,9 @@ export async function GET(request: NextRequest) {
     
     console.log(`Fetched ${processedProjects.length} projects successfully`);
     return NextResponse.json(processedProjects);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching projects:', error);
-    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch projects: ' + (error.message || 'Unknown error') }, { status: 500 });
   }
 }
 
@@ -82,6 +78,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return withAuth(request, async (userId, req) => {
     try {
+      const supabase = createClient();
       const body = await req.json();
       
       // Validate required fields

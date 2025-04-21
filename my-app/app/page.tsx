@@ -122,14 +122,16 @@ export default function Home() {
           </motion.div>
           
           {/* Side Logo */}
-          <div className="absolute bottom-0 right-0 z-10 hidden lg:block">
-            <Image
-              src="/images/circles-right.svg"
-              alt="decorative logo"
-              width={450} 
-              height={450}
-              className="opacity-80"
-            />
+          <div className="absolute bottom-0 right-0 z-0 hidden lg:block">
+            <div className="relative">
+              <Image
+                src="/images/circles-logo.png"
+                alt="decorative logo"
+                width={450} 
+                height={450}
+                className="opacity-80 dark:opacity-100"
+              />
+            </div>
           </div>
         </motion.div>
 
@@ -200,14 +202,16 @@ export default function Home() {
           </motion.div>
           
           {/* Side Logo */}
-          <div className="absolute bottom-0 right-0 z-10 hidden lg:block">
-            <Image
-              src="/images/circles-right.svg"
-              alt="decorative logo"
-              width={450} 
-              height={450}
-              className="opacity-80"
-            />
+          <div className="absolute bottom-0 right-0 z-0 hidden lg:block">
+            <div className="relative">
+              <Image
+                src="/images/circles-logo.png"
+                alt="decorative logo"
+                width={450} 
+                height={450}
+                className="opacity-80 dark:opacity-100"
+              />
+            </div>
           </div>
           
           {/* Stats Section */}
@@ -240,21 +244,21 @@ export default function Home() {
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUp}
-          className="relative py-20"
+          className="relative py-24 md:py-32 w-full overflow-hidden mx-auto my-8 rounded-xl"
         >
           <div className="absolute inset-0 z-0">
             <Image 
               src="/images/lab1.jpg" 
               alt="Laboratory environment" 
               fill 
-              className="object-cover opacity-25"
+              className="object-cover opacity-40 rounded-xl"
             />
-            <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-xl" />
           </div>
           
-          <div className="container relative z-10">
+          <div className="container relative z-10 px-6 md:px-8">
             <div className="grid md:grid-cols-2 gap-12 items-center">
-              <motion.div variants={fadeUp} className="space-y-4">
+              <motion.div variants={fadeUp} className="space-y-6">
                 <h2 className="text-3xl font-bold tracking-tight md:text-4xl">FOSTERING GROWTH</h2>
                 <p className="text-xl text-muted-foreground">In every industry</p>
                 <p className="text-muted-foreground">
@@ -270,22 +274,22 @@ export default function Home() {
               
               <motion.div 
                 variants={fadeUp}
-                className="bg-muted/50 p-6 rounded-lg shadow-lg"
+                className="bg-muted/50 p-6 md:p-8 rounded-lg shadow-lg"
               >
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
                     <h3 className="font-medium">Technology</h3>
                     <p className="text-sm text-muted-foreground">Software, hardware, and digital innovation</p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <h3 className="font-medium">Engineering</h3>
                     <p className="text-sm text-muted-foreground">Civil, mechanical, aerospace projects</p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <h3 className="font-medium">Agriculture</h3>
                     <p className="text-sm text-muted-foreground">Sustainable farming and food tech</p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <h3 className="font-medium">Health</h3>
                     <p className="text-sm text-muted-foreground">Medical devices and healthcare solutions</p>
                   </div>
@@ -295,27 +299,30 @@ export default function Home() {
           </div>
         </motion.section>
         
+        {/* Spacing between sections */}
+        <div className="h-10 md:h-16"></div>
+        
         {/* Connecting with Investors Section with Garage Image */}
         <motion.section 
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUp}
-          className="relative py-20 bg-muted/50"
+          className="relative py-24 md:py-32 w-full overflow-hidden mx-auto my-8 rounded-xl"
         >
-          <div className="absolute inset-0 z-0 right-0 md:right-0 md:w-1/2">
+          <div className="absolute inset-0 z-0">
             <Image 
               src="/images/garage.jpg" 
               alt="Innovation garage" 
               fill 
-              className="object-cover opacity-30 md:opacity-50"
+              className="object-cover opacity-40 rounded-xl"
             />
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] md:bg-gradient-to-l md:from-background/10 md:to-background/95" />
+            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-xl" />
           </div>
           
-          <div className="container relative z-10">
+          <div className="container relative z-10 px-6 md:px-8">
             <div className="grid md:grid-cols-2 gap-12 items-center">
-              <motion.div variants={fadeUp} className="space-y-4 md:order-2">
+              <motion.div variants={fadeUp} className="space-y-6 md:order-2">
                 <h2 className="text-3xl font-bold tracking-tight md:text-4xl">CONNECTING WITH</h2>
                 <p className="text-xl text-muted-foreground">Innovators across the world</p>
                 <p className="text-muted-foreground">
@@ -330,28 +337,28 @@ export default function Home() {
               </motion.div>
               
               <motion.div variants={fadeUp} className="md:order-1">
-                <Card>
-                  <CardHeader>
+                <Card className="bg-background/90 backdrop-blur-sm shadow-lg">
+                  <CardHeader className="pb-4">
                     <CardTitle>Investment Opportunities</CardTitle>
                     <CardDescription>Connect with funders ready to invest</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ul className="space-y-4">
-                      <li className="flex items-start gap-3">
+                    <ul className="space-y-6">
+                      <li className="flex items-start gap-4">
                         <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
                         <div>
                           <p className="font-medium">Angel Investors</p>
                           <p className="text-sm text-muted-foreground">Early-stage funding for promising startups</p>
                         </div>
                       </li>
-                      <li className="flex items-start gap-3">
+                      <li className="flex items-start gap-4">
                         <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
                         <div>
                           <p className="font-medium">Venture Capital</p>
                           <p className="text-sm text-muted-foreground">Series funding for growth-stage companies</p>
                         </div>
                       </li>
-                      <li className="flex items-start gap-3">
+                      <li className="flex items-start gap-4">
                         <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
                         <div>
                           <p className="font-medium">Grant Opportunities</p>
@@ -367,66 +374,154 @@ export default function Home() {
         </motion.section>
         
         {/* How It Works Section */}
-        <section className="bg-muted/50 py-20">
-          <div className="container">
-            <div className="text-center max-w-3xl mx-auto mb-12">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">How Aggie Nexus Works</h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Our platform streamlines the journey from concept to creation, connecting the right people at the right time.
+        <div className="h-10 md:h-16"></div>
+        
+        <section className="bg-muted/50 py-24 md:py-32 my-8 rounded-xl container mx-auto overflow-hidden">
+          <div className="max-w-3xl mx-auto mb-12 px-6 md:px-8">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">How Aggie Nexus Works</h2>
+            <p className="mt-4 text-lg text-muted-foreground text-center">
+              Our platform streamlines the journey from concept to creation, connecting the right people at the right time.
+            </p>
+          </div>
+            
+          <div className="grid md:grid-cols-3 gap-8 px-6 md:px-8">
+            <div className="flex flex-col items-center text-center p-6 bg-background/80 rounded-lg shadow-md">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Lightbulb className="h-6 w-6" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Post Your Project</h3>
+              <p className="text-muted-foreground">
+                Share your vision, specify what resources you need, and set clear goals to attract the right collaborators.
               </p>
             </div>
-            
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="flex flex-col items-center text-center p-6">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                  <Lightbulb className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Post Your Project</h3>
-                <p className="text-muted-foreground">
-                  Share your vision, specify what resources you need, and set clear goals to attract the right collaborators.
-                </p>
-              </div>
               
-              <div className="flex flex-col items-center text-center p-6">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                  <Users className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Build Your Team</h3>
-                <p className="text-muted-foreground">
-                  Connect with developers, designers, marketers, and investors who align with your project's needs and vision.
-                </p>
+            <div className="flex flex-col items-center text-center p-6 bg-background/80 rounded-lg shadow-md">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Users className="h-6 w-6" />
               </div>
+              <h3 className="text-xl font-semibold mb-2">Build Your Team</h3>
+              <p className="text-muted-foreground">
+                Connect with developers, designers, marketers, and investors who align with your project's needs and vision.
+              </p>
+            </div>
               
-              <div className="flex flex-col items-center text-center p-6">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                  <BarChart className="h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Grow Together</h3>
-                <p className="text-muted-foreground">
-                  Track progress, share updates, and celebrate milestones as your project develops from concept to reality.
-                </p>
+            <div className="flex flex-col items-center text-center p-6 bg-background/80 rounded-lg shadow-md">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <BarChart className="h-6 w-6" />
               </div>
+              <h3 className="text-xl font-semibold mb-2">Grow Together</h3>
+              <p className="text-muted-foreground">
+                Track progress, share updates, and celebrate milestones as your project develops from concept to reality.
+              </p>
             </div>
           </div>
         </section>
         
+        {/* Testimonials Section */}
+        <div className="h-10 md:h-16"></div>
+        
+        <section className="bg-muted/50 py-24 md:py-32 my-8 rounded-xl container mx-auto overflow-hidden">
+          <div className="max-w-3xl mx-auto mb-12 px-6 md:px-8">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">Success Stories</h2>
+            <p className="mt-4 text-lg text-muted-foreground text-center">
+              Hear from entrepreneurs who've achieved their goals through Aggie Nexus
+            </p>
+          </div>
+            
+          <div className="grid md:grid-cols-3 gap-8 px-6 md:px-8">
+            <Card className="bg-background shadow-lg">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback>JD</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">James Donovan</p>
+                    <p className="text-sm text-muted-foreground">CEO, TechFlow</p>
+                  </div>
+                </div>
+                <div className="flex mb-4">
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                </div>
+                <p className="text-muted-foreground">
+                  "Aggie Nexus connected me with the technical co-founder I needed to turn my idea into reality. Six months later, we closed our first funding round and are now serving clients across three states."
+                </p>
+              </CardContent>
+            </Card>
+              
+            <Card className="bg-background shadow-lg">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback>ML</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">Maria Liang</p>
+                    <p className="text-sm text-muted-foreground">Founder, EcoSolutions</p>
+                  </div>
+                </div>
+                <div className="flex mb-4">
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                </div>
+                <p className="text-muted-foreground">
+                  "As a student entrepreneur, I found it challenging to build a team outside my immediate circle. Aggie Nexus helped me find talented partners who shared my vision for sustainable business practices."
+                </p>
+              </CardContent>
+            </Card>
+              
+            <Card className="bg-background shadow-lg">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback>KJ</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">Kevin Johnson</p>
+                    <p className="text-sm text-muted-foreground">Angel Investor</p>
+                  </div>
+                </div>
+                <div className="flex mb-4">
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="h-4 w-4 text-primary" />
+                  <Star className="opacity-30 h-4 w-4" />
+                </div>
+                <p className="text-muted-foreground">
+                  "I've invested in three startups I discovered through Aggie Nexus. The platform's quality filtering saves me time by connecting me with serious founders who have well-thought-out business plans."
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+        
         {/* Feature Preview Section */}
-        <section className="py-20 container">
-          <div className="text-center max-w-3xl mx-auto mb-12">
+        <div className="h-10 md:h-16"></div>
+        
+        <section className="py-24 md:py-32 my-8 container mx-auto overflow-hidden">
+          <div className="text-center max-w-3xl mx-auto mb-12 px-6 md:px-8">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Platform Features</h2>
             <p className="mt-4 text-lg text-muted-foreground">
               Designed to facilitate every stage of your entrepreneurial journey
             </p>
           </div>
           
-          <Tabs defaultValue="projects" className="w-full max-w-4xl mx-auto">
+          <Tabs defaultValue="projects" className="w-full max-w-4xl mx-auto px-6 md:px-8">
             <TabsList className="grid grid-cols-3 mb-8">
               <TabsTrigger value="projects">Projects</TabsTrigger>
               <TabsTrigger value="networking">Networking</TabsTrigger>
               <TabsTrigger value="resources">Resources</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="projects" className="border rounded-lg p-6">
+            <TabsContent value="projects" className="border rounded-lg p-6 bg-background/90 shadow-md">
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <h3 className="text-2xl font-semibold mb-4">Project Management</h3>
@@ -486,7 +581,7 @@ export default function Home() {
               </div>
             </TabsContent>
             
-            <TabsContent value="networking" className="border rounded-lg p-6">
+            <TabsContent value="networking" className="border rounded-lg p-6 bg-background/90 shadow-md">
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <h3 className="text-2xl font-semibold mb-4">Connection & Collaboration</h3>
@@ -546,7 +641,7 @@ export default function Home() {
               </div>
             </TabsContent>
             
-            <TabsContent value="resources" className="border rounded-lg p-6">
+            <TabsContent value="resources" className="border rounded-lg p-6 bg-background/90 shadow-md">
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <h3 className="text-2xl font-semibold mb-4">Startup Resources</h3>
@@ -609,95 +704,11 @@ export default function Home() {
           </Tabs>
         </section>
         
-        {/* Testimonials Section */}
-        <section className="bg-muted/50 py-20">
-          <div className="container">
-            <div className="text-center max-w-3xl mx-auto mb-12">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Success Stories</h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Hear from entrepreneurs who've achieved their goals through Aggie Nexus
-              </p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-8">
-              <Card className="bg-background">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback>JD</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">James Donovan</p>
-                      <p className="text-sm text-muted-foreground">CEO, TechFlow</p>
-                    </div>
-                  </div>
-                  <div className="flex mb-4">
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                  </div>
-                  <p className="text-muted-foreground">
-                    "Aggie Nexus connected me with the technical co-founder I needed to turn my idea into reality. Six months later, we closed our first funding round and are now serving clients across three states."
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-background">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback>ML</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">Maria Liang</p>
-                      <p className="text-sm text-muted-foreground">Founder, EcoSolutions</p>
-                    </div>
-                  </div>
-                  <div className="flex mb-4">
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                  </div>
-                  <p className="text-muted-foreground">
-                    "As a student entrepreneur, I found it challenging to build a team outside my immediate circle. Aggie Nexus helped me find talented partners who shared my vision for sustainable business practices."
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-background">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback>KJ</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">Kevin Johnson</p>
-                      <p className="text-sm text-muted-foreground">Angel Investor</p>
-                    </div>
-                  </div>
-                  <div className="flex mb-4">
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="h-4 w-4" />
-                    <Star className="opacity-30 h-4 w-4" />
-                  </div>
-                  <p className="text-muted-foreground">
-                    "I've invested in three startups I discovered through Aggie Nexus. The platform's quality filtering saves me time by connecting me with serious founders who have well-thought-out business plans."
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-        
         {/* CTA Section */}
-        <section className="container py-20">
-          <div className="relative rounded-2xl bg-card text-foreground border px-6 py-16">
+        <div className="h-10 md:h-16"></div>
+        
+        <section className="container py-24 md:py-32 my-8">
+          <div className="relative rounded-xl bg-card text-foreground border px-6 py-16 shadow-lg">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Ready to bring your idea to life?</h2>
               <p className="mt-4 text-lg text-muted-foreground">

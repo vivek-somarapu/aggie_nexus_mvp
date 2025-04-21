@@ -211,8 +211,8 @@ export default function NewProjectPage() {
       const projectData = {
         ...formData,
         industry: selectedIndustries,
-        required_skills: selectedSkills,
-        owner_id: user.id
+        required_skills: selectedSkills
+        // owner_id is handled by the server via auth middleware
       }
       
       const newProject = await projectService.createProject(projectData)
