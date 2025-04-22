@@ -16,6 +16,44 @@ import { bookmarkService } from "@/lib/services/bookmark-service"
 import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+
+// Animation variants
+const pageVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.5 }
+  },
+  exit: { 
+    opacity: 0,
+    transition: { duration: 0.3 } 
+  }
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05
+    }
+  }
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      type: "spring", 
+      damping: 15, 
+      stiffness: 100
+    } 
+  }
+}
 
 export default function UsersPage() {
   const { user: currentUser, isLoading: authLoading } = useAuth()
@@ -200,28 +238,55 @@ export default function UsersPage() {
   }, [filteredUsers, users, userTypeFilter, tamuFilter, industryFilter, skillFilter, dataFetched]);
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-6"
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.4 }}
+        >
           <h1 className="text-3xl font-bold tracking-tight">Users</h1>
           <p className="text-muted-foreground">Find collaborators, builders, and funders for your projects</p>
-        </div>
+        </motion.div>
       </div>
       
-      <Alert variant="info" className="mb-6 bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800">
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          Note: Only users with complete profiles (including bio and skills) are displayed here.
-        </AlertDescription>
-      </Alert>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+      >
+        <Alert variant="info" className="mb-6 bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Note: Only users with complete profiles (including bio and skills) are displayed here.
+          </AlertDescription>
+        </Alert>
+      </motion.div>
       
       {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+        >
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </motion.div>
       )}
 
-      <div className="space-y-4">
+      <motion.div 
+        className="space-y-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
         <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
           <Tabs value={userTypeFilter} onValueChange={setUserTypeFilter}>
             <TabsList className="mb-4 md:mb-0">
@@ -242,7 +307,12 @@ export default function UsersPage() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <motion.div 
+          className="flex flex-col md:flex-row gap-4 mb-6"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+        >
           <div className="flex-1">
             <Input
               placeholder="Search users..."
@@ -277,91 +347,126 @@ export default function UsersPage() {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </motion.div>
 
         <div className="mt-0">
-          {isLoading || authLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <span className="ml-2">Loading users...</span>
-            </div>
-          ) : (
-            <>
-              {filteredUsers.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-lg font-medium">No users found</p>
-                  <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
-                </div>
-              ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredUsers.map((user: User) => (
-                    <Link href={`/users/${user.id}`} key={user.id}>
-                      <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
-                        <CardHeader className="pb-2">
-                          <div className="flex justify-between">
-                            <Avatar className={`h-12 w-12 ${user.is_texas_am_affiliate ? "ring-4 ring-[#500000]" : ""}`}>
-                              <AvatarImage src={user.avatar ?? ''} alt={user.full_name} />
-                              <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={(e) => handleBookmarkToggle(user.id, e)}
-                              disabled={isBookmarkLoading}
-                            >
-                              {isBookmarkLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Bookmark 
-                                  className={`h-4 w-4 ${bookmarkedUsers.includes(user.id) ? "fill-primary" : ""}`} 
-                                />
-                              )}
-                              <span className="sr-only">Bookmark user</span>
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pb-2">
-                          <div className="mb-2">
-                            <h3 className="font-semibold text-lg">{user.full_name}</h3>
-                            {user.is_texas_am_affiliate && (
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <GraduationCap className="h-3 w-3" />
-                                <span>Texas A&M Affiliate</span>
+          <AnimatePresence mode="wait">
+            {isLoading || authLoading ? (
+              <motion.div 
+                key="loading"
+                className="flex justify-center items-center py-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <span className="ml-2">Loading users...</span>
+              </motion.div>
+            ) : (
+              <>
+                {filteredUsers.length === 0 ? (
+                  <motion.div 
+                    key="empty"
+                    className="text-center py-12"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <p className="text-lg font-medium">No users found</p>
+                    <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    key="users"
+                    className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    {filteredUsers.map((user: User, index: number) => (
+                      <motion.div 
+                        key={user.id}
+                        variants={cardVariants}
+                        custom={index}
+                        whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                      >
+                        <Link href={`/users/${user.id}`}>
+                          <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
+                            <CardHeader className="pb-2">
+                              <div className="flex justify-between">
+                                <motion.div 
+                                  whileHover={{ scale: 1.05 }}
+                                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                                >
+                                  <Avatar className={`h-12 w-12 ${user.is_texas_am_affiliate ? "ring-4 ring-[#500000]" : ""}`}>
+                                    <AvatarImage src={user.avatar ?? ''} alt={user.full_name} />
+                                    <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                </motion.div>
+                                <motion.div whileTap={{ scale: 0.95 }}>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8"
+                                    onClick={(e) => handleBookmarkToggle(user.id, e)}
+                                    disabled={isBookmarkLoading}
+                                  >
+                                    {isBookmarkLoading ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Bookmark 
+                                        className={`h-4 w-4 ${bookmarkedUsers.includes(user.id) ? "fill-primary" : ""}`} 
+                                      />
+                                    )}
+                                    <span className="sr-only">Bookmark user</span>
+                                  </Button>
+                                </motion.div>
                               </div>
-                            )}
-                          </div>
-                          <p className="text-muted-foreground line-clamp-3 mb-4">{user.bio}</p>
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {user.industry?.map((ind) => (
-                              <Badge key={ind} variant="secondary" className="text-xs">
-                                {ind}
-                              </Badge>
-                            ))}
-                          </div>
-                        </CardContent>
-                        <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                          {user.skills?.slice(0, 4).map((skill) => (
-                            <Badge key={skill} variant="outline" className="text-xs">
-                              {skill}
-                            </Badge>
-                          ))}
-                          {user.skills?.length > 4 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{user.skills.length - 4}
-                            </Badge>
-                          )}
-                        </CardFooter>
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+                            </CardHeader>
+                            <CardContent className="pb-2">
+                              <div className="mb-2">
+                                <h3 className="font-semibold text-lg">{user.full_name}</h3>
+                                {user.is_texas_am_affiliate && (
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <GraduationCap className="h-3 w-3" />
+                                    <span>Texas A&M Affiliate</span>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-muted-foreground line-clamp-3 mb-4">{user.bio}</p>
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {user.industry?.map((ind) => (
+                                  <Badge key={ind} variant="secondary" className="text-xs">
+                                    {ind}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </CardContent>
+                            <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
+                              {user.skills?.slice(0, 4).map((skill) => (
+                                <Badge key={skill} variant="outline" className="text-xs">
+                                  {skill}
+                                </Badge>
+                              ))}
+                              {user.skills?.length > 4 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{user.skills.length - 4}
+                                </Badge>
+                              )}
+                            </CardFooter>
+                          </Card>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 

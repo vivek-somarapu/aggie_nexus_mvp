@@ -15,6 +15,49 @@ import { projectService, Project, ProjectSearchParams } from "@/lib/services/pro
 import { bookmarkService } from "@/lib/services/bookmark-service"
 import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { motion, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
+
+// Animation variants
+const pageVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.5 }
+  },
+  exit: { 
+    opacity: 0,
+    transition: { duration: 0.3 } 
+  }
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.07
+    }
+  }
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      type: "spring", 
+      damping: 15, 
+      stiffness: 100
+    } 
+  }
+}
+
+const buttonVariants = {
+  tap: { scale: 0.98 }
+}
 
 export default function ProjectsPage() {
   const { user: currentUser, isLoading: authLoading } = useAuth()
@@ -93,13 +136,18 @@ export default function ProjectsPage() {
   // If auth is still loading or user is not authenticated, show loading state
   if (authLoading || !currentUser) {
     return (
-      <div className="flex flex-col justify-center items-center py-12 space-y-4">
+      <motion.div 
+        className="flex flex-col justify-center items-center py-12 space-y-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
         <Loader2 className="h-12 w-12 text-primary animate-spin" />
         <div className="text-center">
           <p className="text-lg font-medium">Checking authentication...</p>
           <p className="text-sm text-muted-foreground">Please wait</p>
         </div>
-      </div>
+      </motion.div>
     )
   }
   
@@ -163,24 +211,61 @@ export default function ProjectsPage() {
   }, [filteredProjects, projects, projectTypeFilter, tamuFilter, industryFilter, statusFilter])
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-6"
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">Browse through ideas and projects or find collaborators</p>
+          <motion.h1 
+            className="text-3xl font-bold tracking-tight"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+          >
+            Projects
+          </motion.h1>
+          <motion.p 
+            className="text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            Browse through ideas and projects or find collaborators
+          </motion.p>
         </div>
-        <Button asChild>
-          <Link href="/projects/new">Create New Project</Link>
-        </Button>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+        >
+          <Button asChild>
+            <Link href="/projects/new">Create New Project</Link>
+          </Button>
+        </motion.div>
       </div>
       
       {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+        >
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </motion.div>
       )}
 
-      <div className="space-y-4">
+      <motion.div 
+        className="space-y-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2, duration: 0.5 }}
+      >
         <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
           <Tabs value={projectTypeFilter} onValueChange={setProjectTypeFilter}>
             <TabsList className="mb-4 md:mb-0">
@@ -201,7 +286,12 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <motion.div 
+          className="flex flex-col md:flex-row gap-4 mb-6"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+        >
           <div className="flex-1">
             <Input
               placeholder="Search projects..."
@@ -235,114 +325,155 @@ export default function ProjectsPage() {
               <SelectItem value="Completed">Completed</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </motion.div>
 
         <div className="mt-0">
-          {isLoading ? (
-            <div className="flex flex-col justify-center items-center py-12 space-y-4">
-              <Loader2 className="h-12 w-12 text-primary animate-spin" />
-              <div className="text-center">
-                <p className="text-lg font-medium">Loading projects...</p>
-                <p className="text-sm text-muted-foreground">This may take a moment</p>
-              </div>
-            </div>
-          ) : error ? (
-            <Alert variant="destructive" className="my-8">
-              <AlertDescription className="flex items-center">
-                <span className="font-medium">{error}</span>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="ml-auto"
-                  onClick={() => window.location.reload()}
-                >
-                  Retry
-                </Button>
-              </AlertDescription>
-            </Alert>
-          ) : filteredProjects.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-lg font-medium">No projects found</p>
-              <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
-            </div>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredProjects.map((project: Project) => (
-                <Link href={`/projects/${project.id}`} key={project.id}>
-                  <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="line-clamp-1">{project.title}</CardTitle>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={(e) => handleBookmarkToggle(project.id, e)}
-                          disabled={isBookmarkLoading}
-                        >
-                          {isBookmarkLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Bookmark 
-                              className={`h-4 w-4 ${bookmarkedProjects.includes(project.id) ? "fill-primary" : ""}`} 
-                            />
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div 
+                key="loading"
+                className="flex flex-col justify-center items-center py-12 space-y-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                <div className="text-center">
+                  <p className="text-lg font-medium">Loading projects...</p>
+                  <p className="text-sm text-muted-foreground">This may take a moment</p>
+                </div>
+              </motion.div>
+            ) : error ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Alert variant="destructive" className="my-8">
+                  <AlertDescription className="flex items-center">
+                    <span className="font-medium">{error}</span>
+                    <motion.div whileTap={{ scale: 0.95 }}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="ml-auto"
+                        onClick={() => window.location.reload()}
+                      >
+                        Retry
+                      </Button>
+                    </motion.div>
+                  </AlertDescription>
+                </Alert>
+              </motion.div>
+            ) : filteredProjects.length === 0 ? (
+              <motion.div 
+                key="empty"
+                className="text-center py-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <p className="text-lg font-medium">No projects found</p>
+                <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="projects"
+                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {filteredProjects.map((project: Project, index: number) => (
+                  <motion.div 
+                    key={project.id}
+                    variants={cardVariants}
+                    custom={index}
+                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  >
+                    <Link href={`/projects/${project.id}`}>
+                      <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between items-start">
+                            <CardTitle className="line-clamp-1">{project.title}</CardTitle>
+                            <motion.div 
+                              whileTap={buttonVariants.tap}
+                              onClick={(e) => handleBookmarkToggle(project.id, e)}
+                            >
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                disabled={isBookmarkLoading}
+                              >
+                                {isBookmarkLoading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Bookmark 
+                                    className={`h-4 w-4 ${bookmarkedProjects.includes(project.id) ? "fill-primary" : ""}`} 
+                                  />
+                                )}
+                                <span className="sr-only">Bookmark project</span>
+                              </Button>
+                            </motion.div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {project.is_idea ? (
+                              <Badge variant="outline" className="bg-yellow-100 text-black">
+                                Idea
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-green-100 text-black">
+                                Project
+                              </Badge>
+                            )}
+                            <Badge variant="outline">{project.project_status}</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-muted-foreground line-clamp-3 mb-4">{project.description}</p>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span>{project.location_type}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              <span>{formatDate(project.estimated_start)}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Users className="h-3 w-3" />
+                              <span>{project.recruitment_status}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Eye className="h-3 w-3" />
+                              <span>{project.views} views</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                        <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
+                          {project.industry.slice(0, 3).map((ind: string) => (
+                            <Badge key={ind} variant="secondary" className="text-xs">
+                              {ind}
+                            </Badge>
+                          ))}
+                          {project.industry.length > 3 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{project.industry.length - 3}
+                            </Badge>
                           )}
-                          <span className="sr-only">Bookmark project</span>
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {project.is_idea ? (
-                          <Badge variant="outline" className="bg-yellow-100 text-black">
-                            Idea
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-green-100 text-black">
-                            Project
-                          </Badge>
-                        )}
-                        <Badge variant="outline">{project.project_status}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground line-clamp-3 mb-4">{project.description}</p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          <span>{project.location_type}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Calendar className="h-3 w-3" />
-                          <span>{formatDate(project.estimated_start)}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Users className="h-3 w-3" />
-                          <span>{project.recruitment_status}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Eye className="h-3 w-3" />
-                          <span>{project.views} views</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                      {project.industry.slice(0, 3).map((ind: string) => (
-                        <Badge key={ind} variant="secondary" className="text-xs">
-                          {ind}
-                        </Badge>
-                      ))}
-                      {project.industry.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{project.industry.length - 3}
-                        </Badge>
-                      )}
-                    </CardFooter>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
+                        </CardFooter>
+                      </Card>
+                    </Link>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
