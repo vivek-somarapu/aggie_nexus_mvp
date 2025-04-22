@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowRight, Users, Lightbulb, Building, ArrowUpRight, ChevronRight, CheckCircle2, Star, BarChart, Award, MessageCircle } from "lucide-react"
+import { ArrowRight, Users, Lightbulb, Building, ArrowUpRight, ChevronRight, CheckCircle2, Star, BarChart, Award, MessageCircle, CalendarIcon } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useEffect, useState } from "react"
@@ -36,6 +36,59 @@ const stagger = {
   }
 }
 
+// Guest Navigation Bar
+const GuestNavbar = () => {
+  return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex h-14 w-full items-center px-4">
+        <div className="flex flex-1 items-center justify-between md:justify-start">
+          {/* Logo */}
+          <Link href="/" className="flex items-center">
+            <img 
+              src="/images/logo_png_white.png" 
+              alt="Aggie Nexus" 
+              width="120" 
+              height="30" 
+              className="object-contain dark:block hidden" 
+            />
+            <img 
+              src="/images/AggieNexus_LogoHorizontal.png" 
+              alt="Aggie Nexus" 
+              width="120" 
+              height="30" 
+              className="object-contain dark:hidden block" 
+            />
+          </Link>
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav className="flex flex-1 items-center justify-center">
+          <ul className="flex items-center space-x-1">
+            <li>
+              <Link
+                href="/calendar"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                Calendar
+              </Link>
+            </li>
+          </ul>
+        </nav>
+
+        {/* Right Side Actions */}
+        <div className="flex flex-1 items-center justify-end space-x-4">
+          <Button variant="ghost" size="sm" asChild className="hidden md:inline-flex">
+            <Link href="/auth/login">Login</Link>
+          </Button>
+          <Button variant="default" size="sm" asChild>
+            <Link href="/auth/signup">Sign Up</Link>
+          </Button>
+        </div>
+      </div>
+    </header>
+  )
+}
+
 export default function Home() {
   const { user, isLoading } = useAuth()
   const searchParams = useSearchParams()
@@ -56,108 +109,32 @@ export default function Home() {
     return <Skeleton className="h-[400px] w-full rounded-xl" />
   }
 
-  // Not logged in - show original simple landing page
-  if (!user) {
-    return (
-      <div className="relative min-h-screen flex flex-col pt-24">
-        {/* Hero Background with solid color that works in both modes */}
-        <div className="absolute inset-0 bg-background dark:bg-black -z-10" />
+  return (
+    <div className="relative overflow-hidden">
+      {/* Display guest navbar if user is not logged in */}
+      {!user && <GuestNavbar />}
+      
+      <section className="relative">
+        {/* Hero Background */}
+        <div className="absolute inset-0 bg-background/5 to-transparent -z-10" />
 
         {/* Auth Error Message */}
         {showError && (
-          <div className="container mx-auto mt-2">
+          <div className="container mx-auto mt-24">
             <div className="bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-md">
               <p>Authentication error occurred. Please try again.</p>
             </div>
           </div>
         )}
 
-        {/* Hero Content */}
-        <motion.div 
-          initial="hidden"
-          animate="visible"
-          variants={fadeUp}
-          className="container flex-1 flex flex-col items-center justify-center py-24 text-center"
-        >
-          <div className="space-y-6 max-w-3xl">
-            <motion.h1 
-              variants={fadeIn}
-              className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl dark:text-white text-primary"
-            >
-              THE CENTER OF INNOVATION FOR AGGIES
-            </motion.h1>
-            <motion.p 
-              variants={fadeIn}
-              className="mx-auto max-w-[700px] dark:text-white/80 text-muted-foreground md:text-xl"
-            >
-              Join a community of builders, funders, and innovators bringing ideas to life at Texas A&M and beyond.
-            </motion.p>
-          </div>
-
-          <motion.div 
-            variants={stagger}
-            className="flex flex-wrap justify-center gap-4 mt-8"
-          >
-            <motion.div variants={fadeUp}>
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground" asChild>
-                <Link href="/auth/signup">
-                  Sign Up
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </motion.div>
-            <motion.div variants={fadeUp}>
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-primary text-primary hover:bg-primary/10 dark:bg-gray-800 dark:text-white dark:border-white/40 dark:hover:bg-gray-700"
-                asChild
-              >
-                <Link href="/auth/login">
-                  Log In
-                  <ArrowUpRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </motion.div>
-          </motion.div>
-          
-          {/* Side Logo */}
-          <div className="absolute bottom-0 right-0 z-0 hidden lg:block">
-            <div className="relative">
-              <Image
-                src="/images/circles-logo.png"
-                alt="decorative logo"
-                width={450} 
-                height={450}
-                className="opacity-80 dark:opacity-100"
-              />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Footer */}
-        <div className="container py-8 text-center dark:text-white/60 text-muted-foreground">
-          <p>© 2025 Aggie Nexus. All rights reserved.</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Logged in - show enhanced dashboard with the professional content
-  return (
-    <div>
-      <section className="relative">
-        {/* Hero Background */}
-        <div className="absolute inset-0 bg-background/5 to-transparent -z-10" />
-
         {/* Hero Section */}
         <motion.section 
           initial="hidden" 
           animate="visible" 
           variants={fadeUp}
-          className="container flex-1 flex flex-col items-center justify-center py-16 md:py-24 text-center relative"
+          className="container flex-1 flex flex-col items-center justify-center py-12 md:py-16 text-center relative"
         >
-          <div className="space-y-6 max-w-3xl">
+          <div className="space-y-6 max-w-3xl mt-16">
             <Badge className="bg-primary text-primary-foreground hover:bg-primary/90 border-none px-4 py-2 text-sm mb-4">
               Connecting Innovators at Texas A&M and Beyond
             </Badge>
@@ -193,45 +170,32 @@ export default function Home() {
                 size="lg"
                 asChild
               >
-                <Link href="/projects/new">
-                  Start a Project
+                <Link href={user ? "/projects/new" : "/auth/signup"}>
+                  {user ? "Start a Project" : "Sign Up"}
                   <ArrowUpRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </motion.div>
           </motion.div>
           
-          {/* Side Logo */}
-          <div className="absolute bottom-0 right-0 z-0 hidden lg:block">
-            <div className="relative">
-              <Image
-                src="/images/circles-logo.png"
-                alt="decorative logo"
-                width={450} 
-                height={450}
-                className="opacity-80 dark:opacity-100"
-              />
-            </div>
-          </div>
-          
           {/* Stats Section */}
           <motion.div 
             variants={fadeUp}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 mt-16 w-full max-w-4xl"
-          >
-            <div className="flex flex-col items-center space-y-1 p-4">
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 mt-16 w-full max-w-5xl mx-auto py-6 md:py-8 relative"
+          >            
+            <div className="flex flex-col items-center text-center relative z-10">
               <div className="text-3xl md:text-4xl font-bold">500+</div>
               <div className="text-sm text-muted-foreground">Active Projects</div>
             </div>
-            <div className="flex flex-col items-center space-y-1 p-4">
+            <div className="flex flex-col items-center text-center relative z-10">
               <div className="text-3xl md:text-4xl font-bold">2.5K</div>
               <div className="text-sm text-muted-foreground">Community Members</div>
             </div>
-            <div className="flex flex-col items-center space-y-1 p-4">
+            <div className="flex flex-col items-center text-center relative z-10">
               <div className="text-3xl md:text-4xl font-bold">150+</div>
               <div className="text-sm text-muted-foreground">Successful Ventures</div>
             </div>
-            <div className="flex flex-col items-center space-y-1 p-4">
+            <div className="flex flex-col items-center text-center relative z-10">
               <div className="text-3xl md:text-4xl font-bold">$2.4M</div>
               <div className="text-sm text-muted-foreground">Investment Secured</div>
             </div>
@@ -244,7 +208,7 @@ export default function Home() {
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUp}
-          className="relative py-24 md:py-32 w-full overflow-hidden mx-auto my-8 rounded-xl"
+          className="relative py-16 md:py-20 w-full overflow-hidden mx-auto my-6 rounded-xl"
         >
           <div className="absolute inset-0 z-0">
             <Image 
@@ -300,7 +264,7 @@ export default function Home() {
         </motion.section>
         
         {/* Spacing between sections */}
-        <div className="h-10 md:h-16"></div>
+        <div className="h-6 md:h-8"></div>
         
         {/* Connecting with Investors Section with Garage Image */}
         <motion.section 
@@ -308,7 +272,7 @@ export default function Home() {
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUp}
-          className="relative py-24 md:py-32 w-full overflow-hidden mx-auto my-8 rounded-xl"
+          className="relative py-16 md:py-20 w-full overflow-hidden mx-auto my-6 rounded-xl"
         >
           <div className="absolute inset-0 z-0">
             <Image 
@@ -374,10 +338,10 @@ export default function Home() {
         </motion.section>
         
         {/* How It Works Section */}
-        <div className="h-10 md:h-16"></div>
+        <div className="h-6 md:h-8"></div>
         
-        <section className="bg-muted/50 py-24 md:py-32 my-8 rounded-xl container mx-auto overflow-hidden">
-          <div className="max-w-3xl mx-auto mb-12 px-6 md:px-8">
+        <section className="bg-muted/50 py-16 md:py-20 my-6 rounded-xl container mx-auto overflow-hidden">
+          <div className="max-w-3xl mx-auto mb-8 px-6 md:px-8">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">How Aggie Nexus Works</h2>
             <p className="mt-4 text-lg text-muted-foreground text-center">
               Our platform streamlines the journey from concept to creation, connecting the right people at the right time.
@@ -418,10 +382,10 @@ export default function Home() {
         </section>
         
         {/* Testimonials Section */}
-        <div className="h-10 md:h-16"></div>
+        <div className="h-6 md:h-8"></div>
         
-        <section className="bg-muted/50 py-24 md:py-32 my-8 rounded-xl container mx-auto overflow-hidden">
-          <div className="max-w-3xl mx-auto mb-12 px-6 md:px-8">
+        <section className="bg-muted/50 py-16 md:py-20 my-6 rounded-xl container mx-auto overflow-hidden">
+          <div className="max-w-3xl mx-auto mb-8 px-6 md:px-8">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">Success Stories</h2>
             <p className="mt-4 text-lg text-muted-foreground text-center">
               Hear from entrepreneurs who've achieved their goals through Aggie Nexus
@@ -504,10 +468,10 @@ export default function Home() {
         </section>
         
         {/* Feature Preview Section */}
-        <div className="h-10 md:h-16"></div>
+        <div className="h-6 md:h-8"></div>
         
-        <section className="py-24 md:py-32 my-8 container mx-auto overflow-hidden">
-          <div className="text-center max-w-3xl mx-auto mb-12 px-6 md:px-8">
+        <section className="py-16 md:py-20 my-6 container mx-auto overflow-hidden">
+          <div className="text-center max-w-3xl mx-auto mb-8 px-6 md:px-8">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Platform Features</h2>
             <p className="mt-4 text-lg text-muted-foreground">
               Designed to facilitate every stage of your entrepreneurial journey
@@ -544,8 +508,8 @@ export default function Home() {
                     </li>
                   </ul>
                   <Button className="mt-6" asChild>
-                    <Link href="/projects/new">
-                      Start a Project
+                    <Link href={user ? "/projects/new" : "/auth/signup"}>
+                      {user ? "Start a Project" : "Sign Up to Start"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
@@ -604,8 +568,8 @@ export default function Home() {
                     </li>
                   </ul>
                   <Button className="mt-6" asChild>
-                    <Link href="/users">
-                      Connect Now
+                    <Link href={user ? "/users" : "/auth/signup"}>
+                      {user ? "Connect Now" : "Sign Up to Connect"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
@@ -664,8 +628,8 @@ export default function Home() {
                     </li>
                   </ul>
                   <Button className="mt-6" asChild>
-                    <Link href="/projects">
-                      Explore Resources
+                    <Link href={user ? "/projects" : "/auth/signup"}>
+                      {user ? "Explore Resources" : "Sign Up to Access"}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
@@ -705,10 +669,10 @@ export default function Home() {
         </section>
         
         {/* CTA Section */}
-        <div className="h-10 md:h-16"></div>
+        <div className="h-6 md:h-8"></div>
         
-        <section className="container py-24 md:py-32 my-8">
-          <div className="relative rounded-xl bg-card text-foreground border px-6 py-16 shadow-lg">
+        <section className="container py-16 md:py-20 my-6">
+          <div className="relative rounded-xl bg-card text-foreground border px-6 py-12 shadow-lg">
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Ready to bring your idea to life?</h2>
               <p className="mt-4 text-lg text-muted-foreground">
@@ -716,8 +680,8 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-4">
                 <Button size="lg" asChild>
-                  <Link href="/projects/new">
-                    Start a Project
+                  <Link href={user ? "/projects/new" : "/auth/signup"}>
+                    {user ? "Start a Project" : "Sign Up Now"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
