@@ -293,43 +293,41 @@ export default function CalendarPage() {
 
   return (
     <motion.div 
-      className="container mx-auto max-w-7xl p-4 space-y-6"
+      className="container max-w-7xl mx-auto p-4 space-y-4"
       variants={pageVariants}
       initial="hidden"
       animate="visible"
       exit="exit"
     >
-      <motion.div 
-        className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-        variants={itemVariants}
-      >
+      <motion.div variants={itemVariants} className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center mb-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#500000] dark:text-[#FF7373]">
-            Aggie Event Calendar
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight">Events Calendar</h1>
           <p className="text-muted-foreground">
-            Browse and manage events happening in the Aggie community
+            Discover upcoming events and opportunities
           </p>
         </div>
         
-        {user && (
-          <motion.div 
-            whileHover={{ scale: 1.05 }} 
-            whileTap={{ scale: 0.95 }}
+        <div className="flex space-x-2 mt-2 sm:mt-0">
+          <Tabs
+            value={view}
+            onValueChange={(v) => setView(v as "calendar" | "list")}
+            className="hidden sm:flex"
           >
-            <Button 
-              onClick={() => router.push('/calendar/new')}
-              className="bg-[#500000] hover:bg-[#400000] text-white"
-            >
-              <Plus className="mr-2 h-4 w-4" /> Add Event
-            </Button>
-          </motion.div>
-        )}
+            <TabsList className="grid w-[200px] grid-cols-2">
+              <TabsTrigger value="calendar">Calendar</TabsTrigger>
+              <TabsTrigger value="list">List</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button onClick={() => router.push('/calendar/new')} size="sm" className="flex items-center">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Event
+          </Button>
+        </div>
       </motion.div>
       
       {!user && !authLoading && (
         <motion.div variants={itemVariants}>
-          <Alert variant="info" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800">
+          <Alert variant="info" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800 mb-2">
             <Info className="h-4 w-4" />
             <AlertDescription>
               <span className="font-medium">Sign in to add personal events and get personalized notifications.</span>{" "}
@@ -342,23 +340,49 @@ export default function CalendarPage() {
       )}
 
       {error && (
-        <motion.div 
-          variants={itemVariants}
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-        >
-          <Alert variant="destructive">
+        <motion.div variants={itemVariants}>
+          <Alert variant="destructive" className="mb-2">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         </motion.div>
       )}
       
-      <motion.div className="flex flex-col md:flex-row gap-4 items-start" variants={itemVariants}>
-        <motion.div className="w-full md:w-auto md:min-w-[250px] space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
+        <Select
+          value={categoryFilter}
+          onValueChange={setCategoryFilter}
+        >
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="Filter by category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Events</SelectItem>
+            {Object.entries(categories).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Tabs
+          value={view}
+          onValueChange={(v) => setView(v as "calendar" | "list")}
+          className="sm:hidden w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            <TabsTrigger value="list">List</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </motion.div>
+      
+      <motion.div className="grid md:grid-cols-4 gap-4" variants={itemVariants}>
+        {/* Left Sidebar */}
+        <motion.div className="md:col-span-1 space-y-4">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
               <CardTitle>View Options</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -396,8 +420,8 @@ export default function CalendarPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card>
-                <CardHeader className="pb-3">
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
                   <CardTitle>
                     {format(date, "MMMM d, yyyy")}
                   </CardTitle>
@@ -406,7 +430,7 @@ export default function CalendarPage() {
                   <AnimatePresence mode="wait">
                     {eventsForSelectedDate.length > 0 ? (
                       <motion.div 
-                        className="space-y-3"
+                        className="space-y-2"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -423,19 +447,7 @@ export default function CalendarPage() {
                           >
                             <Badge 
                               variant="outline" 
-                              className={cn(
-                                "rounded-sm px-1 py-0 text-xs",
-                                {
-                                  "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300": event.event_type === "workshop",
-                                  "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300": event.event_type === "info_session",
-                                  "bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300": event.event_type === "networking",
-                                  "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300": event.event_type === "hackathon",
-                                  "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300": event.event_type === "deadline",
-                                  "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300": event.event_type === "meeting",
-                                  "bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-300": event.event_type === "personal",
-                                  "bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-300": event.event_type === "other",
-                                }
-                              )}
+                              className="rounded-sm px-1 py-0 text-xs"
                             >
                               {categories[event.event_type as EventType] || 'Event'}
                             </Badge>
@@ -465,18 +477,19 @@ export default function CalendarPage() {
           )}
         </motion.div>
         
-        <div className="flex-1 space-y-6">
+        {/* Main Calendar Area */}
+        <div className="md:col-span-3 space-y-4">
           <AnimatePresence mode="wait">
             {isLoading ? (
               <motion.div
                 key="loading"
-                className="flex justify-center items-center py-12"
+                className="flex justify-center items-center py-8"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <Loader2 className="h-8 w-8 animate-spin" />
                 <span className="ml-2">Loading events...</span>
               </motion.div>
             ) : (
@@ -488,48 +501,48 @@ export default function CalendarPage() {
                     variants={calendarVariants}
                     className="h-[calc(100vh-350px)] min-h-[500px]"
                   >
-                    <Card className="h-full">
+                    <Card className="h-full shadow-sm">
                       <Calendar events={calendarEvents} onEventClick={handleEventClick}>
                         <div className="h-full flex flex-col border rounded-lg overflow-hidden dark:border-border">
-          <div className="flex p-4 items-center gap-2 border-b dark:border-border">
-            <CalendarViewTrigger className="aria-[current=true]:bg-accent" view="day">
-              Day
-            </CalendarViewTrigger>
-            <CalendarViewTrigger view="week" className="aria-[current=true]:bg-accent">
-              Week
-            </CalendarViewTrigger>
-            <CalendarViewTrigger view="month" className="aria-[current=true]:bg-accent">
-              Month
-            </CalendarViewTrigger>
-            <CalendarViewTrigger view="year" className="aria-[current=true]:bg-accent">
-              Year
-            </CalendarViewTrigger>
+                          <div className="flex p-4 items-center gap-2 border-b dark:border-border">
+                            <CalendarViewTrigger className="aria-[current=true]:bg-accent" view="day">
+                              Day
+                            </CalendarViewTrigger>
+                            <CalendarViewTrigger view="week" className="aria-[current=true]:bg-accent">
+                              Week
+                            </CalendarViewTrigger>
+                            <CalendarViewTrigger view="month" className="aria-[current=true]:bg-accent">
+                              Month
+                            </CalendarViewTrigger>
+                            <CalendarViewTrigger view="year" className="aria-[current=true]:bg-accent">
+                              Year
+                            </CalendarViewTrigger>
 
-            <span className="flex-1" />
+                            <span className="flex-1" />
 
-            <CalendarCurrentDate />
+                            <CalendarCurrentDate />
 
-            <CalendarPrevTrigger>
-              <ChevronLeft size={16} />
-              <span className="sr-only">Previous</span>
-            </CalendarPrevTrigger>
+                            <CalendarPrevTrigger>
+                              <ChevronLeft size={16} />
+                              <span className="sr-only">Previous</span>
+                            </CalendarPrevTrigger>
 
-            <CalendarTodayTrigger>Today</CalendarTodayTrigger>
+                            <CalendarTodayTrigger>Today</CalendarTodayTrigger>
 
-            <CalendarNextTrigger>
-              <ChevronRight size={16} />
-              <span className="sr-only">Next</span>
-            </CalendarNextTrigger>
-          </div>
+                            <CalendarNextTrigger>
+                              <ChevronRight size={16} />
+                              <span className="sr-only">Next</span>
+                            </CalendarNextTrigger>
+                          </div>
 
-          <div className="flex-1 overflow-auto p-4 relative">
-                <CalendarDayView />
-                <CalendarWeekView />
-                <CalendarMonthView />
-                <CalendarYearView />
-          </div>
-        </div>
-      </Calendar>
+                          <div className="flex-1 overflow-auto p-4 relative">
+                            <CalendarDayView />
+                            <CalendarWeekView />
+                            <CalendarMonthView />
+                            <CalendarYearView />
+                          </div>
+                        </div>
+                      </Calendar>
                     </Card>
                   </motion.div>
                 ) : (
@@ -537,11 +550,11 @@ export default function CalendarPage() {
                     key="list"
                     className="space-y-4"
                     variants={itemVariants}
-              >
-                    <Card>
-                      <CardHeader>
+                  >
+                    <Card className="shadow-sm">
+                      <CardHeader className="pb-2">
                         <CardTitle>Upcoming Events</CardTitle>
-                  </CardHeader>
+                      </CardHeader>
                       <CardContent>
                         {sortedEvents.length === 0 ? (
                           <motion.p 
@@ -554,7 +567,7 @@ export default function CalendarPage() {
                           </motion.p>
                         ) : (
                           <motion.ul 
-                            className="space-y-4"
+                            className="space-y-3"
                             variants={containerVariants}
                             initial="hidden"
                             animate="visible"
@@ -590,19 +603,7 @@ export default function CalendarPage() {
                                         <div className="flex items-center gap-2 mb-1">
                                           <Badge 
                                             variant="outline" 
-                                            className={cn(
-                                              "rounded-sm px-1 py-0 text-xs",
-                                              {
-                                                "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300": event.event_type === "workshop",
-                                                "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300": event.event_type === "info_session",
-                                                "bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300": event.event_type === "networking",
-                                                "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300": event.event_type === "hackathon",
-                                                "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300": event.event_type === "deadline",
-                                                "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300": event.event_type === "meeting",
-                                                "bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-300": event.event_type === "personal",
-                                                "bg-gray-50 text-gray-700 dark:bg-gray-950 dark:text-gray-300": event.event_type === "other",
-                                              }
-                                            )}
+                                            className="rounded-sm px-1 py-0 text-xs"
                                           >
                                             {categories[event.event_type as EventType] || 'Event'}
                                           </Badge>
@@ -619,16 +620,16 @@ export default function CalendarPage() {
                                         {event.description && (
                                           <p className="text-sm line-clamp-2">{event.description}</p>
                                         )}
-                    </div>
+                                      </div>
                                       {event.organizer_id && (
                                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                           <UserCircle2 className="h-3 w-3" />
                                           <span className="truncate max-w-[100px]">{event.organizer_id}</span>
-                    </div>
+                                        </div>
                                       )}
-                    </div>
-                  </CardContent>
-                </Card>
+                                    </div>
+                                  </CardContent>
+                                </Card>
                               </motion.li>
                             ))}
                           </motion.ul>
@@ -638,41 +639,21 @@ export default function CalendarPage() {
                   </motion.div>
                 )}
                 
-                {/* Upcoming Events Section */}
-                <motion.div 
-                  variants={itemVariants}
-                  className="mt-6"
-                >
-                  <Card className="overflow-hidden border-t-4 border-t-[#500000]">
-                    <CardHeader className="bg-slate-50 dark:bg-slate-900 pb-3">
-                      <CardTitle className="flex items-center">
-                        <CalendarIcon className="mr-2 h-5 w-5 text-[#500000] dark:text-[#FF7373]" />
-                        <span>Upcoming Aggie Events</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      {upcomingEvents.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                          >
-                            <p className="mb-2">No upcoming events in the next 7 days</p>
-                            {user && (
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                onClick={() => router.push('/calendar/new')}
-                                className="mt-2"
-                              >
-                                <Plus className="mr-1 h-3 w-3" /> Add Your Event
-                              </Button>
-                            )}
-                          </motion.div>
-                        </div>
-                      ) : (
-                        <div className="space-y-6">
+                {/* Upcoming Events Section - Enhanced */}
+                {upcomingEvents.length > 0 && (
+                  <motion.div 
+                    variants={itemVariants}
+                    className="mt-4"
+                  >
+                    <Card className="shadow-sm border-t overflow-hidden">
+                      <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-transparent">
+                        <CardTitle className="flex items-center">
+                          <CalendarIcon className="mr-2 h-5 w-5 text-primary" />
+                          <span>Upcoming Aggie Events</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="divide-y">
                           {/* Group events by date */}
                           {Array.from(
                             upcomingEvents.reduce((acc, event) => {
@@ -691,6 +672,7 @@ export default function CalendarPage() {
                                 initial="hidden"
                                 animate="visible"
                                 custom={groupIndex}
+                                className="p-4"
                                 variants={{
                                   hidden: { opacity: 0 },
                                   visible: i => ({
@@ -699,16 +681,16 @@ export default function CalendarPage() {
                                   })
                                 }}
                               >
-                                <h4 className="text-sm font-medium mb-2 flex items-center text-[#500000] dark:text-[#FF7373]">
+                                <h4 className="text-sm font-medium mb-3 flex items-center bg-muted/30 p-2 rounded">
                                   <motion.div
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
                                     transition={{ delay: groupIndex * 0.1 + 0.2, type: "spring" }}
-                                    className="mr-2 h-1.5 w-1.5 rounded-full bg-[#500000] dark:bg-[#FF7373]"
+                                    className="mr-2 h-1.5 w-1.5 rounded-full bg-primary"
                                   />
                                   {format(date, "EEEE, MMMM d")}
                                 </h4>
-                                <div className="ml-4 space-y-3 border-l-2 border-slate-200 dark:border-slate-700 pl-4">
+                                <div className="ml-4 space-y-2 border-l-2 border-primary/20 pl-4">
                                   {dayEvents.map((event, eventIndex) => (
                                     <motion.div 
                                       key={event.id}
@@ -752,19 +734,7 @@ export default function CalendarPage() {
                                             </div>
                                             <Badge 
                                               variant="outline" 
-                                              className={cn(
-                                                "rounded-sm px-1 py-0 text-xs",
-                                                {
-                                                  "bg-blue-50 text-blue-700": event.event_type === "workshop",
-                                                  "bg-green-50 text-green-700": event.event_type === "info_session",
-                                                  "bg-yellow-50 text-yellow-700": event.event_type === "networking",
-                                                  "bg-purple-50 text-purple-700": event.event_type === "hackathon",
-                                                  "bg-red-50 text-red-700": event.event_type === "deadline",
-                                                  "bg-orange-50 text-orange-700": event.event_type === "meeting",
-                                                  "bg-pink-50 text-pink-700": event.event_type === "personal",
-                                                  "bg-gray-50 text-gray-700": event.event_type === "other",
-                                                }
-                                              )}
+                                              className="rounded-sm px-1 py-0 text-xs"
                                             >
                                               {categories[event.event_type as EventType] || 'Event'}
                                             </Badge>
@@ -778,14 +748,14 @@ export default function CalendarPage() {
                             );
                           })}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </motion.div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
               </>
             )}
           </AnimatePresence>
-      </div>
+        </div>
       </motion.div>
 
       {/* Event Detail Dialog */}
@@ -799,7 +769,7 @@ export default function CalendarPage() {
             className="p-6"
           >
             <DialogHeader>
-              <DialogTitle className="text-[#500000] dark:text-[#FF7373]">Event Details</DialogTitle>
+              <DialogTitle>Event Details</DialogTitle>
             </DialogHeader>
             {selectedEvent && (
               <div className="space-y-4">
@@ -836,7 +806,6 @@ export default function CalendarPage() {
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                     <Button 
                       onClick={() => router.push(`/calendar/${selectedEvent.id}`)}
-                      className="bg-[#500000] hover:bg-[#400000] text-white"
                     >
                       View Details
                     </Button>

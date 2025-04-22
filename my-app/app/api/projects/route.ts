@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const skill = searchParams.get('skill');
     const tamuParam = searchParams.get('tamu');
     const isIdeaParam = searchParams.get('is_idea');
+    const ownerIdParam = searchParams.get('owner_id');
     
     // Create a query builder
     let query = supabase.from('projects').select('*').eq('deleted', false);
@@ -24,6 +25,11 @@ export async function GET(request: NextRequest) {
     
     if (skill) {
       query = query.contains('required_skills', [skill]);
+    }
+    
+    // Filter by owner_id if provided
+    if (ownerIdParam) {
+      query = query.eq('owner_id', ownerIdParam);
     }
     
     // Filter by TAMU affiliation (we need to join with users table)

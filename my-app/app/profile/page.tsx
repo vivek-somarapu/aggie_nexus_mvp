@@ -3,35 +3,58 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Bookmark, ExternalLink, GraduationCap, Linkedin, Loader2, Pencil, Save, User } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Bookmark, ExternalLink, GraduationCap, Linkedin, Loader2, Pencil, Save, User, Plus, PenLine, MessageSquare, Clock, CalendarIcon, MapPin, Filter, Search, Trash2 } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { userService } from "@/lib/services/user-service"
 import { bookmarkService } from "@/lib/services/bookmark-service"
 import { User as UserType } from "@/lib/models/users"
-import { Project } from "@/lib/services/project-service"
+import { Project, projectService } from "@/lib/services/project-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
 import { hasJustLoggedIn, profileSetupStatus } from "@/lib/profile-utils"
+import { inquiryService, ProjectInquiry } from "@/lib/services/inquiry-service"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { formatDate } from "@/lib/utils"
 
 export default function ProfilePage() {
   const { user: currentUser } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
   
+  const [activeTab, setActiveTab] = useState('profile')
   const [isLoading, setIsLoading] = useState(true)
   const [bookmarksLoading, setBookmarksLoading] = useState(true)
+  const [projectsLoading, setProjectsLoading] = useState(true)
+  const [inquiriesLoading, setInquiriesLoading] = useState(true)
+  
   const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([])
   const [bookmarkedUsers, setBookmarkedUsers] = useState<UserType[]>([])
+  const [userProjects, setUserProjects] = useState<Project[]>([])
+  const [receivedInquiries, setReceivedInquiries] = useState<ProjectInquiry[]>([])
+  const [sentInquiries, setSentInquiries] = useState<ProjectInquiry[]>([])
+  
   const [isEditing, setIsEditing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showCompletionBanner, setShowCompletionBanner] = useState(false)
+  
+  // Filtering state for inquiries
+  const [inquiryType, setInquiryType] = useState<"received" | "sent">("received")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [searchQuery, setSearchQuery] = useState<string>("")
+  const [filteredInquiries, setFilteredInquiries] = useState<ProjectInquiry[]>([])
+  const [deleteInProgress, setDeleteInProgress] = useState<string | null>(null)
+  
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -43,6 +66,16 @@ export default function ProfilePage() {
     avatar: '',
     skills: [] as string[],
   })
+  
+  // Set active tab from URL if present
+  useEffect(() => {
+    if (tabFromUrl) {
+      const validTabs = ['profile', 'projects', 'inquiries', 'bookmarks']
+      if (validTabs.includes(tabFromUrl)) {
+        setActiveTab(tabFromUrl)
+      }
+    }
+  }, [tabFromUrl])
 
   // Check if profile needs completion
   useEffect(() => {
@@ -90,6 +123,74 @@ export default function ProfilePage() {
     
     fetchBookmarks()
   }, [currentUser])
+  
+  // Load user's projects
+  useEffect(() => {
+    const fetchUserProjects = async () => {
+      if (!currentUser) return
+      
+      try {
+        setProjectsLoading(true)
+        const projects = await projectService.getProjectsByOwnerId(currentUser.id)
+        setUserProjects(projects)
+      } catch (err) {
+        console.error("Error fetching user projects:", err)
+        setError("Failed to load your projects. Please try again later.")
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
+    
+    fetchUserProjects()
+  }, [currentUser])
+  
+  // Load inquiries
+  useEffect(() => {
+    const fetchInquiries = async () => {
+      if (!currentUser) return
+      
+      try {
+        setInquiriesLoading(true)
+        const [received, sent] = await Promise.all([
+          inquiryService.getReceivedInquiries(currentUser.id),
+          inquiryService.getSentInquiries(currentUser.id)
+        ])
+        
+        setReceivedInquiries(received)
+        setSentInquiries(sent)
+      } catch (err) {
+        console.error("Error fetching inquiries:", err)
+        setError("Failed to load inquiries. Please try again later.")
+      } finally {
+        setInquiriesLoading(false)
+      }
+    }
+    
+    fetchInquiries()
+  }, [currentUser])
+  
+  // Filter inquiries when inquiry type, status filter, or search query changes
+  useEffect(() => {
+    const inquiriesToFilter = inquiryType === "received" ? receivedInquiries : sentInquiries
+    let filtered = [...inquiriesToFilter]
+    
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(inquiry => inquiry.status === statusFilter)
+    }
+    
+    // Apply search filter (case insensitive)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(inquiry => 
+        inquiry.project_title.toLowerCase().includes(query) ||
+        (inquiryType === "received" && inquiry.applicant_name.toLowerCase().includes(query)) ||
+        inquiry.note.toLowerCase().includes(query)
+      )
+    }
+    
+    setFilteredInquiries(filtered)
+  }, [inquiryType, statusFilter, searchQuery, receivedInquiries, sentInquiries])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -118,6 +219,40 @@ export default function ProfilePage() {
       setError("Failed to update profile. Please try again.")
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  const handleDeleteInquiry = async (inquiryId: string) => {
+    if (!currentUser) return
+    
+    try {
+      setDeleteInProgress(inquiryId)
+      await inquiryService.deleteInquiry(inquiryId)
+      
+      // Update the inquiries lists
+      setReceivedInquiries(receivedInquiries.filter(inq => inq.id !== inquiryId))
+      setSentInquiries(sentInquiries.filter(inq => inq.id !== inquiryId))
+    } catch (err) {
+      console.error("Error deleting inquiry:", err)
+      setError("Failed to delete inquiry. Please try again.")
+    } finally {
+      setDeleteInProgress(null)
+    }
+  }
+  
+  const handleUpdateInquiryStatus = async (inquiryId: string, status: 'accepted' | 'rejected') => {
+    if (!currentUser) return
+    
+    try {
+      await inquiryService.updateInquiryStatus(inquiryId, status)
+      
+      // Update the received inquiries list
+      setReceivedInquiries(receivedInquiries.map(inq => 
+        inq.id === inquiryId ? {...inq, status} : inq
+      ))
+    } catch (err) {
+      console.error("Error updating inquiry status:", err)
+      setError("Failed to update inquiry status. Please try again.")
     }
   }
   
@@ -153,7 +288,7 @@ export default function ProfilePage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
-          <p className="text-muted-foreground">Manage your profile information and bookmarks</p>
+          <p className="text-muted-foreground">Manage your profile, projects, inquiries and bookmarks</p>
         </div>
       </div>
       
@@ -163,13 +298,15 @@ export default function ProfilePage() {
         </Alert>
       )}
 
-      <Tabs defaultValue="profile" className="w-full">
+      <Tabs defaultValue={activeTab} className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="projects">My Projects</TabsTrigger>
+          <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
           <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
-          <TabsTrigger value="messages">Messages</TabsTrigger>
         </TabsList>
 
+        {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardHeader>
@@ -251,192 +388,435 @@ export default function ProfilePage() {
                         value={formData.bio}
                         onChange={handleChange}
                         disabled={!isEditing || isLoading}
-                        rows={4}
                       />
                     </div>
                   </div>
                 </div>
 
-                <Separator />
-
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
-                        <Linkedin className="h-4 w-4" />
-                      </span>
-                      <Input
-                        id="linkedin_url"
-                        name="linkedin_url"
-                        value={formData.linkedin_url}
-                        onChange={handleChange}
-                        disabled={!isEditing || isLoading}
-                        className="rounded-l-none"
-                      />
-                    </div>
+                    <Input
+                      id="linkedin_url"
+                      name="linkedin_url"
+                      value={formData.linkedin_url}
+                      onChange={handleChange}
+                      disabled={!isEditing || isLoading}
+                    />
                   </div>
 
                   <div className="grid gap-2">
                     <Label htmlFor="website_url">Website URL</Label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
-                        <ExternalLink className="h-4 w-4" />
-                      </span>
-                      <Input
-                        id="website_url"
-                        name="website_url"
-                        value={formData.website_url}
-                        onChange={handleChange}
-                        disabled={!isEditing || isLoading}
-                        className="rounded-l-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="graduation_year">Graduation Year</Label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
-                        <GraduationCap className="h-4 w-4" />
-                      </span>
-                      <Input
-                        id="graduation_year"
-                        name="graduation_year"
-                        type="number"
-                        value={formData.graduation_year || ''}
-                        onChange={handleChange}
-                        disabled={!isEditing || isLoading}
-                        className="rounded-l-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2 pt-8">
-                    <input
-                      type="checkbox"
-                      id="is_texas_am_affiliate"
-                      name="is_texas_am_affiliate"
-                      checked={formData.is_texas_am_affiliate}
-                      onChange={handleCheckboxChange}
+                    <Input
+                      id="website_url"
+                      name="website_url"
+                      value={formData.website_url}
+                      onChange={handleChange}
                       disabled={!isEditing || isLoading}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
-                    <Label htmlFor="is_texas_am_affiliate" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      I am affiliated with Texas A&M University
-                    </Label>
                   </div>
+                  
+                  {/* Other profile fields can be added here */}
                 </div>
               </form>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="bookmarks" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Bookmarked Users</CardTitle>
-                <CardDescription>People you've bookmarked</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {bookmarksLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2">Loading bookmarks...</span>
-                  </div>
-                ) : bookmarkedUsers.length > 0 ? (
-                  <div className="space-y-4">
-                    {bookmarkedUsers.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={user.avatar || undefined} alt={user.full_name} />
-                            <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <Link href={`/users/${user.id}`} className="font-medium hover:underline">
-                              {user.full_name}
-                            </Link>
-                            <p className="text-xs text-muted-foreground">
-                              {user.skills?.slice(0, 2).join(", ")}
-                              {user.skills && user.skills.length > 2 ? "..." : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/users/${user.id}`}>View</Link>
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">You haven't bookmarked any users yet.</p>
-                    <Button variant="outline" size="sm" className="mt-4" asChild>
-                      <Link href="/users">
-                        Browse Users
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Bookmarked Projects</CardTitle>
-                <CardDescription>Projects you've bookmarked</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {bookmarksLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2">Loading bookmarks...</span>
-                  </div>
-                ) : bookmarkedProjects.length > 0 ? (
-                  <div className="space-y-4">
-                    {bookmarkedProjects.map((project) => (
-                      <div key={project.id} className="flex flex-col">
-                        <div className="flex justify-between items-start">
-                          <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
-                            {project.title}
-                          </Link>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/projects/${project.id}`}>View</Link>
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                          {project.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">You haven't bookmarked any projects yet.</p>
-                    <Button variant="outline" size="sm" className="mt-4" asChild>
-                      <Link href="/projects">
-                        Browse Projects
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        {/* My Projects Tab */}
+        <TabsContent value="projects" className="space-y-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">My Projects</h2>
+            <Button asChild>
+              <Link href="/projects/new">
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Project
+              </Link>
+            </Button>
           </div>
+
+          {projectsLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <span className="ml-2">Loading your projects...</span>
+            </div>
+          ) : userProjects.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                <h3 className="text-lg font-medium mb-2">No projects yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  You haven't created any projects yet. Get started by creating your first project.
+                </p>
+                <Button asChild>
+                  <Link href="/projects/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Project
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {userProjects.map((project) => (
+                <Card key={project.id} className="shadow-sm">
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {project.is_idea ? (
+                        <Badge variant="outline">Idea</Badge>
+                      ) : (
+                        <Badge variant="outline">Project</Badge>
+                      )}
+                      <Badge variant="outline">{project.project_status}</Badge>
+                      <Badge variant="outline">{project.recruitment_status}</Badge>
+                    </div>
+                    <CardTitle className="text-lg">{project.title}</CardTitle>
+                    <CardDescription>
+                      Created on {formatDate(project.created_at)}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                      {project.description}
+                    </p>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {project.industry.slice(0, 3).map((ind) => (
+                        <Badge key={ind} variant="secondary" className="text-xs">
+                          {ind}
+                        </Badge>
+                      ))}
+                      {project.industry.length > 3 && (
+                        <Badge variant="secondary" className="text-xs">
+                          +{project.industry.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter className="border-t pt-3 flex justify-between">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/projects/${project.id}`}>
+                        View Details
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/projects/edit/${project.id}`}>
+                        <PenLine className="h-3 w-3 mr-1" />
+                        Edit
+                      </Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="messages" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Messages</CardTitle>
-              <CardDescription>Manage your conversations</CardDescription>
-            </CardHeader>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">Message functionality coming soon!</p>
-            </CardContent>
-          </Card>
+        {/* Project Inquiries Tab */}
+        <TabsContent value="inquiries" className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">Project Inquiries</h2>
+              <p className="text-muted-foreground">Manage inquiries for your projects and track your applications</p>
+            </div>
+            <Select value={inquiryType} onValueChange={(value: "received" | "sent") => setInquiryType(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="received">Received Inquiries</SelectItem>
+                <SelectItem value="sent">Sent Inquiries</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filtering controls */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search inquiries..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {inquiriesLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <span className="ml-2">Loading inquiries...</span>
+            </div>
+          ) : filteredInquiries.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                <h3 className="text-lg font-medium mb-2">No inquiries found</h3>
+                <p className="text-muted-foreground">
+                  {(inquiryType === "received" ? receivedInquiries : sentInquiries).length > 0 
+                    ? "Try adjusting your search filters"
+                    : inquiryType === "received" 
+                      ? "When users express interest in your projects, they'll appear here"
+                      : "You haven't submitted any project inquiries yet"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {filteredInquiries.map((inquiry) => (
+                <Card key={inquiry.id} className="shadow-sm">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{inquiry.project_title}</CardTitle>
+                        <CardDescription>
+                          {inquiryType === "received" 
+                            ? `Inquiry received ${new Date(inquiry.created_at).toLocaleDateString()}`
+                            : `Submitted on ${new Date(inquiry.created_at).toLocaleDateString()}`}
+                        </CardDescription>
+                      </div>
+                      <Badge 
+                        variant={
+                          inquiry.status === "pending" ? "outline" : 
+                          inquiry.status === "accepted" ? "secondary" : 
+                          "destructive"
+                        }
+                      >
+                        {inquiry.status.charAt(0).toUpperCase() + inquiry.status.slice(1)}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid md:grid-cols-3 gap-6">
+                    {inquiryType === "received" ? (
+                      <>
+                        <div className="md:col-span-1">
+                          <div className="flex flex-col sm:flex-row md:flex-col items-center gap-4">
+                            <Avatar className="h-16 w-16">
+                              <AvatarImage src={inquiry.applicant_avatar || ''} alt={inquiry.applicant_name} />
+                              <AvatarFallback>{inquiry.applicant_name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="text-center sm:text-left md:text-center">
+                              <h3 className="font-medium">{inquiry.applicant_name}</h3>
+                              <p className="text-sm text-muted-foreground">{inquiry.applicant_email}</p>
+                              <Button variant="outline" size="sm" className="mt-2" asChild>
+                                <Link href={`/users/${inquiry.user_id}`}>
+                                  <User className="h-3 w-3 mr-1" />
+                                  View Profile
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="md:col-span-2">
+                          <h3 className="font-medium mb-2">Note from Applicant:</h3>
+                          <blockquote className="text-muted-foreground border-l-2 pl-4 italic">
+                            {inquiry.note}
+                          </blockquote>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="md:col-span-3">
+                        <h3 className="font-medium mb-2">Your Note:</h3>
+                        <blockquote className="text-muted-foreground border-l-2 pl-4 italic mb-4">
+                          {inquiry.note}
+                        </blockquote>
+                        <div className="flex gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">Submitted:</span>
+                            <span>{formatDate(inquiry.created_at)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">Status:</span>
+                            <span>{inquiry.status.charAt(0).toUpperCase() + inquiry.status.slice(1)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="border-t pt-4 flex justify-between">
+                    {inquiryType === "received" ? (
+                      <>
+                        <Button variant="outline" asChild>
+                          <a href={`mailto:${inquiry.applicant_email}`}>
+                            Reply via Email
+                          </a>
+                        </Button>
+                        <div className="flex gap-2">
+                          {inquiry.status === "pending" && (
+                            <>
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                onClick={() => handleUpdateInquiryStatus(inquiry.id, 'accepted')}
+                              >
+                                Accept
+                              </Button>
+                              <Button 
+                                variant="secondary" 
+                                size="sm"
+                                onClick={() => handleUpdateInquiryStatus(inquiry.id, 'rejected')}
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            disabled={deleteInProgress === inquiry.id}
+                            onClick={() => handleDeleteInquiry(inquiry.id)}
+                          >
+                            {deleteInProgress === inquiry.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Deleting...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Delete
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="outline" asChild>
+                          <Link href={`/projects/${inquiry.project_id}`}>
+                            View Project
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          disabled={deleteInProgress === inquiry.id}
+                          onClick={() => handleDeleteInquiry(inquiry.id)}
+                        >
+                          {deleteInProgress === inquiry.id ? (
+                            <>
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Withdraw Inquiry
+                            </>
+                          )}
+                        </Button>
+                      </>
+                    )}
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Bookmarks Tab */}
+        <TabsContent value="bookmarks" className="space-y-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">My Bookmarks</h2>
+          </div>
+
+          {bookmarksLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <span className="ml-2">Loading your bookmarks...</span>
+            </div>
+          ) : (bookmarkedProjects.length === 0 && bookmarkedUsers.length === 0) ? (
+            <Card>
+              <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                <h3 className="text-lg font-medium mb-2">No bookmarks yet</h3>
+                <p className="text-muted-foreground">
+                  Bookmark projects and users to keep track of interesting content.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {bookmarkedProjects.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Bookmarked Projects</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {bookmarkedProjects.map((project) => (
+                      <Card key={project.id} className="shadow-sm">
+                        <CardHeader className="pb-3">
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {project.is_idea ? (
+                              <Badge variant="outline">Idea</Badge>
+                            ) : (
+                              <Badge variant="outline">Project</Badge>
+                            )}
+                            <Badge variant="outline">{project.recruitment_status}</Badge>
+                          </div>
+                          <CardTitle className="text-lg">{project.title}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground line-clamp-3">
+                            {project.description}
+                          </p>
+                        </CardContent>
+                        <CardFooter className="border-t pt-3">
+                          <Button className="w-full" variant="outline" asChild>
+                            <Link href={`/projects/${project.id}`}>
+                              View Project
+                            </Link>
+                          </Button>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {bookmarkedUsers.length > 0 && (
+                <div className="space-y-4 mt-6">
+                  <h3 className="text-lg font-semibold">Bookmarked Users</h3>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {bookmarkedUsers.map((user) => (
+                      <Card key={user.id} className="shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex flex-col items-center text-center gap-4">
+                            <Avatar className="h-16 w-16">
+                              <AvatarImage src={user.avatar || ''} alt={user.full_name} />
+                              <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold text-lg">{user.full_name}</h3>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {user.bio}
+                              </p>
+                              <Button variant="outline" size="sm" className="mt-4" asChild>
+                                <Link href={`/users/${user.id}`}>
+                                  View Profile
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

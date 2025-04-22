@@ -11,11 +11,31 @@ export type Event = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  status: 'pending' | 'approved' | 'rejected';
+  approved_by?: string;
+  approved_at?: string;
 };
 
 export async function getAllEvents(): Promise<Event[]> {
   const result = await query('SELECT * FROM events ORDER BY start_time');
   return result.rows;
+}
+
+export async function getEventsByStatus(status: 'pending' | 'approved' | 'rejected'): Promise<Event[]> {
+  const result = await query('SELECT * FROM events WHERE status = $1 ORDER BY start_time', [status]);
+  return result.rows;
+}
+
+export async function getApprovedEvents(): Promise<Event[]> {
+  return getEventsByStatus('approved');
+}
+
+export async function getPendingEvents(): Promise<Event[]> {
+  return getEventsByStatus('pending');
+}
+
+export async function getRejectedEvents(): Promise<Event[]> {
+  return getEventsByStatus('rejected');
 }
 
 export async function getEventById(id: string): Promise<Event | null> {
@@ -36,13 +56,14 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
     end_time,
     location,
     color,
-    created_by
+    created_by,
+    status = 'pending'
   } = eventData;
 
   const result = await query(
     `INSERT INTO events (
-      title, description, start_time, end_time, location, color, created_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      title, description, start_time, end_time, location, color, created_by, status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *`,
     [
       title,
@@ -51,11 +72,56 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
       end_time,
       location,
       color,
-      created_by
+      created_by,
+      status
     ]
   );
 
   return result.rows[0];
+}
+
+export async function updateEventStatus(
+  id: string, 
+  status: 'pending' | 'approved' | 'rejected', 
+  managerId?: string
+): Promise<Event | null> {
+  // For approved events, we set the approver and timestamp
+  if (status === 'approved' && managerId) {
+    const result = await query(
+      `UPDATE events SET 
+        status = $1, 
+        approved_by = $2, 
+        approved_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $3 
+      RETURNING *`,
+      [status, managerId, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    return result.rows[0];
+  } else {
+    // For other status changes, we don't set approver info
+    const result = await query(
+      `UPDATE events SET 
+        status = $1, 
+        approved_by = NULL, 
+        approved_at = NULL,
+        updated_at = NOW()
+      WHERE id = $2 
+      RETURNING *`,
+      [status, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    return result.rows[0];
+  }
 }
 
 export async function updateEvent(id: string, eventData: Partial<Event>): Promise<Event | null> {

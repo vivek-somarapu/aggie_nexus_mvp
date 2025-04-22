@@ -12,12 +12,26 @@ export type Event = {
   attendees?: string[];
   created_at: string;
   updated_at: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  approved_by?: string;
+  approved_at?: string;
 };
 
 export const eventService = {
   // Get all events
   getEvents: async (): Promise<Event[]> => {
-    const response = await fetch('/api/events');
+    const response = await fetch('/api/events?status=approved');
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch events: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  // Get events by status
+  getEventsByStatus: async (status: 'pending' | 'approved' | 'rejected'): Promise<Event[]> => {
+    const response = await fetch(`/api/events?status=${status}`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch events: ${response.statusText}`);
@@ -41,14 +55,14 @@ export const eventService = {
     return response.json();
   },
 
-  // Create a new event
-  createEvent: async (eventData: Omit<Event, "id" | "created_at" | "updated_at">): Promise<Event> => {
+  // Create a new event (automatically sets status to pending)
+  createEvent: async (eventData: Omit<Event, "id" | "created_at" | "updated_at" | "status" | "approved_by" | "approved_at">): Promise<Event> => {
     const response = await fetch('/api/events', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(eventData),
+      body: JSON.stringify({ ...eventData, status: 'pending' }),
     });
     
     if (!response.ok) {
@@ -74,6 +88,27 @@ export const eventService = {
     
     if (!response.ok) {
       throw new Error(`Failed to update event: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
+  // Update event status (for manager approval/rejection)
+  updateEventStatus: async (id: string, status: 'pending' | 'approved' | 'rejected'): Promise<Event | null> => {
+    const response = await fetch(`/api/events/${id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+    
+    if (response.status === 404) {
+      return null;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`Failed to update event status: ${response.statusText}`);
     }
     
     return response.json();

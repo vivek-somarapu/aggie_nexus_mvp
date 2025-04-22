@@ -1,0 +1,452 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Calendar as CalendarIcon, ArrowLeft, AlertCircle, Clock, MapPin, CheckCircle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format, addHours } from "date-fns";
+import { motion } from "framer-motion";
+
+// Animation variants
+const pageVariants = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1,
+    transition: { 
+      duration: 0.5,
+      when: "beforeChildren",
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { type: "spring", damping: 12, stiffness: 100 }
+  }
+};
+
+// Form schema validation
+const formSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters").max(100, "Title must be less than 100 characters"),
+  description: z.string().max(500, "Description must be less than 500 characters").optional(),
+  event_type: z.enum([
+    "workshop", 
+    "info_session", 
+    "networking", 
+    "hackathon", 
+    "deadline", 
+    "meeting", 
+    "personal", 
+    "other"
+  ], {
+    required_error: "Please select an event type",
+  }),
+  date: z.date({
+    required_error: "Please select a date",
+  }),
+  start_time: z.string({
+    required_error: "Please select a start time",
+  }),
+  end_time: z.string({
+    required_error: "Please select an end time",
+  }),
+  location: z.string().max(100, "Location must be less than 100 characters").optional(),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+export default function NewEventPage() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  // Create form with validation
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      event_type: "other",
+      date: new Date(),
+      start_time: "12:00",
+      end_time: "13:00",
+      location: "",
+    },
+  });
+
+  // Handle form submission
+  const onSubmit = async (values: FormValues) => {
+    if (!user) {
+      router.push("/auth/login?redirect=/calendar/new");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      // Combine date and time into start and end timestamps
+      const [startHour, startMinute] = values.start_time.split(':').map(Number);
+      const [endHour, endMinute] = values.end_time.split(':').map(Number);
+      
+      const startDate = new Date(values.date);
+      startDate.setHours(startHour, startMinute, 0);
+      
+      const endDate = new Date(values.date);
+      endDate.setHours(endHour, endMinute, 0);
+      
+      // Insert event with pending status
+      const { data, error } = await supabase
+        .from('events')
+        .insert({
+          title: values.title,
+          description: values.description || null,
+          event_type: values.event_type,
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          location: values.location || null,
+          created_by: user.id,
+          status: 'pending' // Events start as pending and need manager approval
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Show success UI
+      setSubmitSuccess(true);
+      
+      // Redirect after a short delay
+      setTimeout(() => {
+        router.push('/calendar');
+      }, 2000);
+      
+    } catch (err: any) {
+      console.error("Error creating event:", err);
+      setSubmitError(err?.message || "Failed to create event. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Event type options
+  const eventTypes = [
+    { value: "workshop", label: "Workshop" },
+    { value: "info_session", label: "Info Session" },
+    { value: "networking", label: "Networking Event" },
+    { value: "hackathon", label: "Hackathon" },
+    { value: "deadline", label: "Project Deadline" },
+    { value: "meeting", label: "Meeting" },
+    { value: "personal", label: "Personal Event" },
+    { value: "other", label: "Other Event" },
+  ];
+
+  // Time options (30 min intervals)
+  const timeOptions = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      const formattedHour = hour.toString().padStart(2, '0');
+      const formattedMinute = minute.toString().padStart(2, '0');
+      timeOptions.push(`${formattedHour}:${formattedMinute}`);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto max-w-2xl p-4 space-y-6">
+        <div className="h-8 w-64 bg-muted rounded animate-pulse mb-4"></div>
+        <div className="h-6 w-96 bg-muted/60 rounded animate-pulse mb-8"></div>
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    router.push("/auth/login?redirect=/calendar/new");
+    return null;
+  }
+
+  if (submitSuccess) {
+    return (
+      <div className="container mx-auto max-w-2xl p-4 space-y-6">
+        <Alert className="bg-green-50 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800">
+          <div className="flex items-center space-x-2">
+            <CheckCircle className="h-5 w-5" />
+            <AlertTitle>Event Submitted!</AlertTitle>
+          </div>
+          <AlertDescription>
+            Your event has been submitted and is pending approval from a manager. You will be redirected to the calendar.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div 
+      className="container mx-auto max-w-2xl p-4 space-y-6"
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.div variants={itemVariants} className="flex items-center">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="mr-2" 
+          onClick={() => router.push('/calendar')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Request an Event</h1>
+          <p className="text-muted-foreground">
+            Submit an event for approval by Aggie Nexus managers
+          </p>
+        </div>
+      </motion.div>
+
+      {submitError && (
+        <motion.div variants={itemVariants}>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{submitError}</AlertDescription>
+          </Alert>
+        </motion.div>
+      )}
+
+      <motion.div variants={itemVariants}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Event Details</CardTitle>
+            <CardDescription>
+              Provide information about your event. All events require approval before appearing on the calendar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter event title" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="event_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Type</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select event type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {eventTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <FormField
+                      control={form.control}
+                      name="start_time"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Time</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Start time" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {timeOptions.map((time) => (
+                                <SelectItem key={time} value={time}>
+                                  {format(new Date(`2000-01-01T${time}`), 'h:mm a')}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="end_time"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>End Time</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="End time" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {timeOptions.map((time) => (
+                                <SelectItem key={time} value={time}>
+                                  {format(new Date(`2000-01-01T${time}`), 'h:mm a')}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter event location (optional)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter event description (optional)" 
+                          className="min-h-[100px]"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Briefly describe your event. Include any important details like prerequisites, what to bring, etc.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting
+                    </>
+                  ) : (
+                    'Submit Event Request'
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+} 

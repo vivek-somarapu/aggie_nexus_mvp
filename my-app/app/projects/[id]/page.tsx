@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Bookmark,
   Calendar,
@@ -30,6 +32,7 @@ import { User as UserType } from "@/lib/models/users"
 import { bookmarkService } from "@/lib/services/bookmark-service"
 import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { createClient } from "@/lib/supabase/client"
 
 export default function ProjectPage() {
   const { id } = useParams() as { id: string }
@@ -42,6 +45,13 @@ export default function ProjectPage() {
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [similarProjects, setSimilarProjects] = useState<Project[]>([])
+  
+  // Inquiry dialog state
+  const [inquiryNote, setInquiryNote] = useState("")
+  const [isInquiryOpen, setIsInquiryOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [inquiryError, setInquiryError] = useState<string | null>(null)
+  const [inquirySuccess, setInquirySuccess] = useState(false)
 
   // Fetch project data
   useEffect(() => {
@@ -103,6 +113,67 @@ export default function ProjectPage() {
       setIsBookmarkLoading(false)
     }
   }
+  
+  // Handle inquiry submission
+  const handleInquirySubmit = async () => {
+    if (!currentUser || !project) {
+      setInquiryError("You must be logged in to submit an inquiry")
+      return
+    }
+    
+    if (!inquiryNote.trim()) {
+      setInquiryError("Please provide a note about your interest")
+      return
+    }
+    
+    try {
+      setIsSubmitting(true)
+      setInquiryError(null)
+      
+      const supabase = createClient()
+      
+      // Check if user already applied to this project
+      const { data: existingApplications } = await supabase
+        .from('project_applications')
+        .select('id')
+        .eq('project_id', project.id)
+        .eq('user_id', currentUser.id)
+        .single()
+      
+      if (existingApplications) {
+        setInquiryError("You have already submitted an inquiry for this project")
+        return
+      }
+      
+      // Submit new application
+      const { error } = await supabase
+        .from('project_applications')
+        .insert({
+          project_id: project.id,
+          user_id: currentUser.id,
+          note: inquiryNote,
+          status: 'pending'
+        })
+      
+      if (error) throw error
+      
+      // Show success message and reset form
+      setInquirySuccess(true)
+      setInquiryNote("")
+      
+      // Close dialog after a delay
+      setTimeout(() => {
+        setIsInquiryOpen(false)
+        setInquirySuccess(false)
+      }, 2000)
+      
+    } catch (err: any) {
+      console.error("Error submitting inquiry:", err)
+      setInquiryError(err?.message || "Failed to submit inquiry. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -125,6 +196,8 @@ export default function ProjectPage() {
     return notFound()
   }
 
+  const isOwner = currentUser?.id === project.owner_id
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -136,19 +209,20 @@ export default function ProjectPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
+      <div className="grid gap-6 md:grid-cols-4">
+        {/* Main Content - Left Column */}
+        <div className="md:col-span-3 space-y-6">
+          <Card className="shadow-sm">
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {project.is_idea ? (
-                      <Badge variant="outline" className="bg-yellow-100 text-black">
+                      <Badge variant="outline">
                         Idea
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-green-100 text-black">
+                      <Badge variant="outline">
                         Project
                       </Badge>
                     )}
@@ -174,7 +248,7 @@ export default function ProjectPage() {
                     {isBookmarkLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-primary" : ""}`} />
+                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
                     )}
                     <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Bookmark project"}</span>
                   </Button>
@@ -247,17 +321,114 @@ export default function ProjectPage() {
                   </Link>
                 </Button>
               )}
-              <Button>
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Contact Owner
-              </Button>
+              
+              {/* Replace contact buttons with Inquire dialog */}
+              {!isOwner && (
+                <Dialog open={isInquiryOpen} onOpenChange={setIsInquiryOpen}>
+                  <DialogTrigger asChild>
+                    <Button disabled={!currentUser}>
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Inquire About Project
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Inquire About {project.title}</DialogTitle>
+                      <DialogDescription>
+                        Send a note to the project owner about your interest. They will be able to see your profile details and contact you back.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    {inquirySuccess ? (
+                      <Alert className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+                        <AlertDescription>
+                          Your inquiry has been submitted successfully! The project owner will review it soon.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <>
+                        {inquiryError && (
+                          <Alert variant="destructive">
+                            <AlertDescription>{inquiryError}</AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        <Textarea
+                          placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
+                          value={inquiryNote}
+                          onChange={(e) => setInquiryNote(e.target.value)}
+                          rows={5}
+                          className="resize-none"
+                        />
+                        
+                        <DialogFooter>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setIsInquiryOpen(false)}
+                            disabled={isSubmitting}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handleInquirySubmit}
+                            disabled={isSubmitting || !inquiryNote.trim() || !currentUser}
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Submitting...
+                              </>
+                            ) : (
+                              'Submit Inquiry'
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              )}
+              
+              {/* Show manage inquiries button for project owner */}
+              {isOwner && (
+                <Button asChild>
+                  <Link href="/profile?tab=inquiries">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Manage Project Inquiries
+                  </Link>
+                </Button>
+              )}
             </CardFooter>
+          </Card>
+          
+          {/* Similar Projects - Moved below main content on mobile, right column on desktop */}
+          <Card className="shadow-sm md:hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Similar Projects</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {similarProjects.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {similarProjects.map((p) => (
+                    <div key={p.id} className="border rounded-lg p-3 hover:bg-muted/30 transition-colors">
+                      <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
+                        {p.title}
+                      </Link>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{p.description}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center">No similar projects found</p>
+              )}
+            </CardContent>
           </Card>
         </div>
 
+        {/* Sidebar - Right Column */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
               <CardTitle className="text-lg">Project Owner</CardTitle>
             </CardHeader>
             <CardContent>
@@ -285,11 +456,12 @@ export default function ProjectPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
               <CardTitle className="text-lg">Contact Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Only show contact info, not contact buttons */}
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <span>{project.contact_info.email}</span>
@@ -300,27 +472,32 @@ export default function ProjectPage() {
                   <span>{project.contact_info.phone}</span>
                 </div>
               )}
-              <Button className="w-full">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Send Message
-              </Button>
+              {!isOwner && (
+                <Button className="w-full" onClick={() => setIsInquiryOpen(true)} disabled={!currentUser}>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Inquire About Project
+                </Button>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          {/* Similar Projects - Only visible on desktop */}
+          <Card className="shadow-sm hidden md:block">
+            <CardHeader className="pb-3">
               <CardTitle className="text-lg">Similar Projects</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               {similarProjects.length > 0 ? (
-                similarProjects.map((p) => (
-                  <div key={p.id} className="border-b pb-4 last:border-0 last:pb-0">
-                    <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
-                      {p.title}
-                    </Link>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{p.description}</p>
-                  </div>
-                ))
+                <div className="space-y-3">
+                  {similarProjects.map((p) => (
+                    <div key={p.id} className="border-b pb-3 last:border-0 last:pb-0">
+                      <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
+                        {p.title}
+                      </Link>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{p.description}</p>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="text-muted-foreground text-center">No similar projects found</p>
               )}

@@ -37,6 +37,7 @@ export type Profile = {
   skills?: string[];
   avatar?: string;
   industry?: string[];
+  is_manager?: boolean;
   // Add more fields as needed
 };
 
@@ -53,6 +54,7 @@ type AuthContextType = {
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  isManager: boolean;
 };
 
 // Create auth context with default values
@@ -68,6 +70,7 @@ const AuthContext = createContext<AuthContextType>({
   requestPasswordReset: async () => {},
   resetPassword: async () => {},
   refreshProfile: async () => {},
+  isManager: false,
 });
 
 /**
@@ -456,6 +459,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requestPasswordReset,
     resetPassword,
     refreshProfile,
+    isManager: profile?.is_manager === true,
   };
   
   return (

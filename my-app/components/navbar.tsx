@@ -1,11 +1,13 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +17,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { LogOut, Menu, Settings, User } from "lucide-react"
+import { LogOut, Menu, Settings, User, ClipboardCheck, Calendar, Users, FileText, MessageSquare } from "lucide-react"
 import { useAuth } from "@/lib/auth"
+import { createClient } from "@/lib/supabase/client"
+import { inquiryService } from "@/lib/services/inquiry-service"
 
 export default function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, isManager } = useAuth()
+  const [pendingInquiries, setPendingInquiries] = useState(0)
 
   const handleLogout = async () => {
     try {
@@ -31,6 +36,39 @@ export default function Navbar() {
       console.error("Error logging out:", error)
     }
   }
+
+  // Fetch pending inquiries count
+  useEffect(() => {
+    if (!user) return
+    
+    const fetchPendingInquiries = async () => {
+      try {
+        const count = await inquiryService.getPendingInquiriesCount(user.id)
+        setPendingInquiries(count)
+      } catch (err) {
+        console.error("Error fetching pending inquiries:", err)
+      }
+    }
+    
+    fetchPendingInquiries()
+    
+    // Set up real-time subscription
+    const supabase = createClient()
+    const channel = supabase
+      .channel('project_applications')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'project_applications'
+      }, () => {
+        fetchPendingInquiries()
+      })
+      .subscribe()
+    
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   const routes = [
     {
@@ -172,6 +210,43 @@ export default function Navbar() {
                   Settings
                 </Link>
               </DropdownMenuItem>
+              {/* Project Inquiries for all users - now in profile page */}
+              <DropdownMenuItem asChild>
+                <Link href="/profile?tab=inquiries" className="cursor-pointer flex items-center justify-between">
+                  <div className="flex items-center">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Project Inquiries
+                  </div>
+                  {pendingInquiries > 0 && (
+                    <Badge variant="destructive" className="ml-2 px-1 py-0 h-5 min-w-5 flex items-center justify-center rounded-full">
+                      {pendingInquiries}
+                    </Badge>
+                  )}
+                </Link>
+              </DropdownMenuItem>
+              {isManager && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/manager/events" className="cursor-pointer">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Event Management
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/manager/users" className="cursor-pointer">
+                      <Users className="mr-2 h-4 w-4" />
+                      User Management
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/manager/projects" className="cursor-pointer">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Project Management
+                    </Link>
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />

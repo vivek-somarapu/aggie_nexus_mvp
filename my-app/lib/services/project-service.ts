@@ -53,6 +53,17 @@ export const projectService = {
     return response.json();
   },
 
+  // Get projects by owner ID
+  getProjectsByOwnerId: async (ownerId: string): Promise<Project[]> => {
+    const response = await fetch(`/api/projects?owner_id=${ownerId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user's projects: ${response.statusText}`);
+    }
+    
+    return response.json();
+  },
+
   // Get a single project by ID
   getProject: async (id: string): Promise<Project | null> => {
     const response = await fetch(`/api/projects/${id}`);

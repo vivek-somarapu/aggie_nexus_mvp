@@ -169,9 +169,10 @@ export default function UserPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Left Column - User Profile */}
+        <div className="md:col-span-2">
+          <Card className="shadow-sm">
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div className="flex items-start gap-4">
@@ -208,7 +209,7 @@ export default function UserPage() {
                     {isLoadingBookmark ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-primary" : ""}`} />
+                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
                     )}
                     <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Bookmark user"}</span>
                   </Button>
@@ -275,7 +276,7 @@ export default function UserPage() {
                           href={user.linkedin_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-primary hover:underline"
+                          className="flex items-center gap-2 hover:underline"
                         >
                           <Linkedin className="h-4 w-4" />
                           <span>LinkedIn</span>
@@ -287,7 +288,7 @@ export default function UserPage() {
                           href={user.website_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-primary hover:underline"
+                          className="flex items-center gap-2 hover:underline"
                         >
                           <ExternalLink className="h-4 w-4" />
                           <span>Website</span>
@@ -299,7 +300,7 @@ export default function UserPage() {
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-primary hover:underline"
+                          className="flex items-center gap-2 hover:underline"
                         >
                           <ExternalLink className="h-4 w-4" />
                           <span>{link.title}</span>
@@ -310,29 +311,73 @@ export default function UserPage() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="border-t pt-6">
+            <CardFooter className="border-t pt-6 flex justify-end">
               <Button>
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Contact User
               </Button>
             </CardFooter>
           </Card>
+        </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>User&apos;s Projects</CardTitle>
+        {/* Right Column - User Information and Similar Users */}
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">User Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {user.graduation_year && (
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                  <span>Graduation Year: {user.graduation_year}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-muted-foreground" />
+                <span>Profile Views: {user.views}</span>
+              </div>
+              <Button className="w-full mt-2">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Send Message
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Similar Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingUser ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="ml-2">Loading similar users...</span>
+                </div>
+              ) : (
+                <SimilarUsers userId={user.id} industries={user.industry} />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Projects section - Full width in mobile, spans columns in desktop */}
+        <div className="md:col-span-3">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle>User's Projects</CardTitle>
               <CardDescription>Projects created or owned by {user.full_name}</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingProjects ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                  <Loader2 className="h-6 w-6 animate-spin" />
                   <span className="ml-2">Loading projects...</span>
                 </div>
               ) : userProjects.length > 0 ? (
-                <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {userProjects.map((project) => (
-                    <div key={project.id} className="border-b pb-4 last:border-0 last:pb-0">
+                    <div key={project.id} className="border rounded-md p-4 hover:bg-muted/30 transition-colors">
                       <div className="flex justify-between items-start">
                         <div>
                           <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
@@ -340,11 +385,11 @@ export default function UserPage() {
                           </Link>
                           <div className="flex flex-wrap gap-2 mt-1">
                             {project.is_idea ? (
-                              <Badge variant="outline" className="bg-yellow-100 text-black">
+                              <Badge variant="outline">
                                 Idea
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="bg-green-100 text-black">
+                              <Badge variant="outline">
                                 Project
                               </Badge>
                             )}
@@ -361,48 +406,8 @@ export default function UserPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No projects found for this user&apos;s profile.</p>
+                  <p className="text-muted-foreground">No projects found for this user's profile.</p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">User Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {user.graduation_year && (
-                <div className="flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                  <span>Graduation Year: {user.graduation_year}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-muted-foreground" />
-                <span>Profile Views: {user.views}</span>
-              </div>
-              <Button className="w-full">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Send Message
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Similar Users</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoadingUser ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                  <span className="ml-2">Loading similar users...</span>
-                </div>
-              ) : (
-                <SimilarUsers userId={user.id} industries={user.industry} />
               )}
             </CardContent>
           </Card>
