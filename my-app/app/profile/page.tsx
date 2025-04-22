@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Bookmark, ExternalLink, GraduationCap, Linkedin, Loader2, Pencil, Save, User, Plus, PenLine, MessageSquare, Clock, CalendarIcon, MapPin, Filter, Search, Trash2 } from "lucide-react"
+import { Bookmark, ExternalLink, GraduationCap, Linkedin, Loader2, Pencil, Save, User, Plus, PenLine, MessageSquare, Clock, CalendarIcon, MapPin, Filter, Search, Trash2, Eye, Mail } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { userService } from "@/lib/services/user-service"
 import { bookmarkService } from "@/lib/services/bookmark-service"
@@ -25,6 +25,53 @@ import { hasJustLoggedIn, profileSetupStatus } from "@/lib/profile-utils"
 import { inquiryService, ProjectInquiry } from "@/lib/services/inquiry-service"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatDate } from "@/lib/utils"
+import { motion, AnimatePresence } from "framer-motion"
+
+// Animation variants
+const pageVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.5 }
+  },
+  exit: { 
+    opacity: 0,
+    transition: { duration: 0.3 } 
+  }
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      type: "spring", 
+      damping: 15, 
+      stiffness: 100
+    } 
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, x: -10 },
+  visible: { 
+    opacity: 1, 
+    x: 0, 
+    transition: { duration: 0.4 } 
+  }
+}
 
 export default function ProfilePage() {
   const { user: currentUser } = useAuth()
@@ -67,7 +114,6 @@ export default function ProfilePage() {
     skills: [] as string[],
   })
   
-  // Set active tab from URL if present
   useEffect(() => {
     if (tabFromUrl) {
       const validTabs = ['profile', 'projects', 'inquiries', 'bookmarks']
@@ -76,7 +122,7 @@ export default function ProfilePage() {
       }
     }
   }, [tabFromUrl])
-
+  
   // Check if profile needs completion
   useEffect(() => {
     if (!currentUser) return;
@@ -265,40 +311,67 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-6"
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
       {/* Profile Completion Banner - only shown if needed */}
-      {showCompletionBanner && (
-        <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
-          <AlertDescription className="flex justify-between items-center">
-            <div className="flex-1">
-              <p className="font-medium text-blue-800 dark:text-blue-300">Your profile is incomplete</p>
-              <p className="text-sm text-blue-600 dark:text-blue-400">Complete your profile to connect with others and showcase your skills.</p>
-            </div>
-            <Button 
-              size="sm" 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => router.push('/profile/setup')}
-            >
-              Complete Profile
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+      <AnimatePresence>
+        {showCompletionBanner && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+              <AlertDescription className="flex justify-between items-center">
+                <div className="flex-1">
+                  <p className="font-medium text-blue-800 dark:text-blue-300">Your profile is incomplete</p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">Complete your profile to connect with others and showcase your skills.</p>
+                </div>
+                <Button 
+                  size="sm" 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => router.push('/profile/setup')}
+                >
+                  Complete Profile
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <motion.div 
+        className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+      >
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
           <p className="text-muted-foreground">Manage your profile, projects, inquiries and bookmarks</p>
         </div>
-      </div>
+      </motion.div>
       
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <Tabs defaultValue={activeTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="projects">My Projects</TabsTrigger>
@@ -308,211 +381,350 @@ export default function ProfilePage() {
 
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update your profile information and preferences</CardDescription>
-                </div>
-                <Button
-                  variant={isEditing ? "default" : "outline"}
-                  onClick={() => isEditing ? handleSubmit : setIsEditing(true)}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : isEditing ? (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </>
-                  ) : (
-                    <>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Profile
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex flex-col items-center gap-4">
-                    <Avatar className="h-20 w-20">
-                      <AvatarImage 
-                        src={currentUser?.avatar || ""} 
-                        className="object-cover"
-                      />
-                      <AvatarFallback>
-                        {currentUser?.full_name ? currentUser.full_name.charAt(0) : <User />}
-                      </AvatarFallback>
-                    </Avatar>
-                    {isEditing && (
-                      <Button variant="outline" size="sm">
-                        Change Avatar
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="flex-1 grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="full_name">Full Name</Label>
-                      <Input
-                        id="full_name"
-                        name="full_name"
-                        value={formData.full_name}
-                        onChange={handleChange}
-                        disabled={!isEditing || isLoading}
-                      />
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div 
+                key="loading"
+                className="flex justify-center items-center py-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <span className="ml-2">Loading your profile...</span>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="profile-content"
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+                className="flex justify-center"
+              >
+                <div className="w-full max-w-4xl">
+                  <Card className="shadow-md border border-border/50 overflow-hidden">
+                    <div className="relative h-40 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5">
+                      <div className="absolute top-4 right-4">
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          className="shadow-sm"
+                          onClick={() => router.push('/profile/settings')}
+                        >
+                          <Pencil className="h-4 w-4 mr-1.5" />
+                          Edit Profile
+                        </Button>
+                      </div>
                     </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        disabled={!isEditing || isLoading}
-                      />
+                    <div className="px-6 -mt-16 relative">
+                      <motion.div 
+                        className="flex flex-col md:flex-row gap-6 mb-6"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                      >
+                        <motion.div 
+                          whileHover={{ scale: 1.05 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                        >
+                          <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-border/40 shadow-md">
+                            <AvatarImage 
+                              src={currentUser?.avatar || ""} 
+                              className="object-cover"
+                              alt={currentUser?.full_name || "User"}
+                            />
+                            <AvatarFallback className="text-3xl bg-muted">
+                              {currentUser?.full_name ? currentUser.full_name.charAt(0) : <User className="h-16 w-16" />}
+                            </AvatarFallback>
+                          </Avatar>
+                        </motion.div>
+                        
+                        <div className="flex-1 space-y-1.5">
+                          <motion.h2 
+                            className="text-2xl font-bold tracking-tight"
+                            variants={itemVariants}
+                          >
+                            {currentUser?.full_name || ""}
+                          </motion.h2>
+                          
+                          <motion.div 
+                            className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+                            variants={itemVariants}
+                          >
+                            <div className="flex items-center">
+                              <Eye className="h-4 w-4 mr-1" />
+                              <span>0 profile views</span>
+                            </div>
+                            
+                            {currentUser?.is_texas_am_affiliate && (
+                              <div className="flex items-center">
+                                <Separator orientation="vertical" className="h-4 mx-2" />
+                                <GraduationCap className="h-4 w-4 mr-1" />
+                                <span>Texas A&M Affiliate</span>
+                              </div>
+                            )}
+                            
+                            {currentUser?.graduation_year && currentUser.graduation_year > 0 && (
+                              <div className="flex items-center">
+                                <Separator orientation="vertical" className="h-4 mx-2" />
+                                <CalendarIcon className="h-4 w-4 mr-1" />
+                                <span>Class of {currentUser.graduation_year}</span>
+                              </div>
+                            )}
+                          </motion.div>
+                          
+                          {currentUser?.industry && currentUser.industry.length > 0 && (
+                            <motion.div 
+                              className="flex flex-wrap gap-2 mt-2"
+                              variants={containerVariants}
+                              initial="hidden"
+                              animate="visible"
+                            >
+                              {currentUser.industry.map((ind) => (
+                                <motion.div key={ind} variants={itemVariants}>
+                                  <Badge variant="secondary">
+                                    {ind}
+                                  </Badge>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </div>
+                      </motion.div>
+                      
+                      <Separator />
+                      
+                      <motion.div 
+                        className="grid md:grid-cols-3 gap-8 py-6"
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        <motion.div className="md:col-span-2 space-y-6" variants={itemVariants}>
+                          {/* About */}
+                          <div>
+                            <h3 className="font-semibold mb-2 text-lg">About</h3>
+                            <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+                              {currentUser?.bio || "No bio provided yet."}
+                            </p>
+                          </div>
+                          
+                          {/* Skills */}
+                          {currentUser?.skills && currentUser.skills.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold mb-2 text-lg">Skills</h3>
+                              <div className="flex flex-wrap gap-2">
+                                {currentUser.skills.map((skill) => (
+                                  <Badge key={skill} variant="outline">
+                                    {skill}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                        
+                        <motion.div className="space-y-5" variants={itemVariants}>
+                          {/* Contact */}
+                          <div>
+                            <h3 className="font-semibold mb-2 text-lg">Contact</h3>
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3">
+                                <Mail className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm">{currentUser?.email}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Links */}
+                          {(currentUser?.linkedin_url || currentUser?.website_url) && (
+                            <div>
+                              <h3 className="font-semibold mb-2 text-lg">Links</h3>
+                              <div className="space-y-3">
+                                {currentUser?.linkedin_url && (
+                                  <div className="flex items-center gap-3 group">
+                                    <Linkedin className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                    <a 
+                                      href={currentUser.linkedin_url}
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-sm text-primary hover:underline"
+                                    >
+                                      LinkedIn
+                                    </a>
+                                  </div>
+                                )}
+                                {currentUser?.website_url && (
+                                  <div className="flex items-center gap-3 group">
+                                    <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                    <a 
+                                      href={currentUser.website_url}
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-sm text-primary hover:underline truncate max-w-[200px]"
+                                    >
+                                      {currentUser.website_url.replace(/^https?:\/\/(www\.)?/, '')}
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      </motion.div>
                     </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        name="bio"
-                        value={formData.bio}
-                        onChange={handleChange}
-                        disabled={!isEditing || isLoading}
-                      />
-                    </div>
-                  </div>
+                    
+                    <CardFooter className="border-t py-5 flex justify-center bg-muted/30">
+                      <motion.div 
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Button 
+                          asChild
+                          variant="outline" 
+                          className="px-8"
+                          size="lg"
+                        >
+                          <Link href={currentUser ? `/users/${currentUser.id}` : "#"}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Public Profile
+                          </Link>
+                        </Button>
+                      </motion.div>
+                    </CardFooter>
+                  </Card>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-                    <Input
-                      id="linkedin_url"
-                      name="linkedin_url"
-                      value={formData.linkedin_url}
-                      onChange={handleChange}
-                      disabled={!isEditing || isLoading}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="website_url">Website URL</Label>
-                    <Input
-                      id="website_url"
-                      name="website_url"
-                      value={formData.website_url}
-                      onChange={handleChange}
-                      disabled={!isEditing || isLoading}
-                    />
-                  </div>
-                  
-                  {/* Other profile fields can be added here */}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </TabsContent>
 
         {/* My Projects Tab */}
         <TabsContent value="projects" className="space-y-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">My Projects</h2>
-            <Button asChild>
-              <Link href="/projects/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Project
-              </Link>
-            </Button>
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+              <Button asChild>
+                <Link href="/projects/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Project
+                </Link>
+              </Button>
+            </motion.div>
           </div>
 
-          {projectsLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <span className="ml-2">Loading your projects...</span>
-            </div>
-          ) : userProjects.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 flex flex-col items-center justify-center text-center">
-                <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  You haven't created any projects yet. Get started by creating your first project.
-                </p>
-                <Button asChild>
-                  <Link href="/projects/new">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Project
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {userProjects.map((project) => (
-                <Card key={project.id} className="shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {project.is_idea ? (
-                        <Badge variant="outline">Idea</Badge>
-                      ) : (
-                        <Badge variant="outline">Project</Badge>
-                      )}
-                      <Badge variant="outline">{project.project_status}</Badge>
-                      <Badge variant="outline">{project.recruitment_status}</Badge>
-                    </div>
-                    <CardTitle className="text-lg">{project.title}</CardTitle>
-                    <CardDescription>
-                      Created on {formatDate(project.created_at)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-                      {project.description}
+          <AnimatePresence mode="wait">
+            {projectsLoading ? (
+              <motion.div 
+                key="loading"
+                className="flex justify-center items-center py-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <span className="ml-2">Loading your projects...</span>
+              </motion.div>
+            ) : userProjects.length === 0 ? (
+              <motion.div
+                key="no-projects"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card>
+                  <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                    <h3 className="text-lg font-medium mb-2">No projects yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      You haven't created any projects yet. Get started by creating your first project.
                     </p>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {project.industry.slice(0, 3).map((ind) => (
-                        <Badge key={ind} variant="secondary" className="text-xs">
-                          {ind}
-                        </Badge>
-                      ))}
-                      {project.industry.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{project.industry.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button asChild>
+                        <Link href="/projects/new">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Project
+                        </Link>
+                      </Button>
+                    </motion.div>
                   </CardContent>
-                  <CardFooter className="border-t pt-3 flex justify-between">
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/projects/${project.id}`}>
-                        View Details
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/projects/edit/${project.id}`}>
-                        <PenLine className="h-3 w-3 mr-1" />
-                        Edit
-                      </Link>
-                    </Button>
-                  </CardFooter>
                 </Card>
-              ))}
-            </div>
-          )}
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="projects"
+                className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {userProjects.map((project) => (
+                  <motion.div
+                    key={project.id}
+                    variants={cardVariants}
+                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  >
+                    <Card className="shadow-sm h-full flex flex-col">
+                      <CardHeader className="pb-3">
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {project.is_idea ? (
+                            <Badge variant="outline">Idea</Badge>
+                          ) : (
+                            <Badge variant="outline">Project</Badge>
+                          )}
+                          <Badge variant="outline">{project.project_status}</Badge>
+                          <Badge variant="outline">{project.recruitment_status}</Badge>
+                        </div>
+                        <CardTitle className="text-lg">{project.title}</CardTitle>
+                        <CardDescription>
+                          Created on {formatDate(project.created_at)}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                          {project.description}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {project.industry.slice(0, 3).map((ind) => (
+                            <Badge key={ind} variant="secondary" className="text-xs">
+                              {ind}
+                            </Badge>
+                          ))}
+                          {project.industry.length > 3 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{project.industry.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="border-t pt-3 flex justify-between">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/projects/${project.id}`}>
+                            View Details
+                          </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/projects/edit/${project.id}`}>
+                            <PenLine className="h-3 w-3 mr-1" />
+                            Edit
+                          </Link>
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </TabsContent>
 
         {/* Project Inquiries Tab */}
         <TabsContent value="inquiries" className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+          <motion.div 
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+          >
             <div>
               <h2 className="text-xl font-semibold">Project Inquiries</h2>
               <p className="text-muted-foreground">Manage inquiries for your projects and track your applications</p>
@@ -526,10 +738,15 @@ export default function ProfilePage() {
                 <SelectItem value="sent">Sent Inquiries</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </motion.div>
 
           {/* Filtering controls */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <motion.div 
+            className="flex flex-col sm:flex-row gap-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -553,273 +770,358 @@ export default function ProfilePage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          </motion.div>
 
-          {inquiriesLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <span className="ml-2">Loading inquiries...</span>
-            </div>
-          ) : filteredInquiries.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 flex flex-col items-center justify-center text-center">
-                <h3 className="text-lg font-medium mb-2">No inquiries found</h3>
-                <p className="text-muted-foreground">
-                  {(inquiryType === "received" ? receivedInquiries : sentInquiries).length > 0 
-                    ? "Try adjusting your search filters"
-                    : inquiryType === "received" 
-                      ? "When users express interest in your projects, they'll appear here"
-                      : "You haven't submitted any project inquiries yet"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredInquiries.map((inquiry) => (
-                <Card key={inquiry.id} className="shadow-sm">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{inquiry.project_title}</CardTitle>
-                        <CardDescription>
-                          {inquiryType === "received" 
-                            ? `Inquiry received ${new Date(inquiry.created_at).toLocaleDateString()}`
-                            : `Submitted on ${new Date(inquiry.created_at).toLocaleDateString()}`}
-                        </CardDescription>
-                      </div>
-                      <Badge 
-                        variant={
-                          inquiry.status === "pending" ? "outline" : 
-                          inquiry.status === "accepted" ? "secondary" : 
-                          "destructive"
-                        }
-                      >
-                        {inquiry.status.charAt(0).toUpperCase() + inquiry.status.slice(1)}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="grid md:grid-cols-3 gap-6">
-                    {inquiryType === "received" ? (
-                      <>
-                        <div className="md:col-span-1">
-                          <div className="flex flex-col sm:flex-row md:flex-col items-center gap-4">
-                            <Avatar className="h-16 w-16">
-                              <AvatarImage src={inquiry.applicant_avatar || ''} alt={inquiry.applicant_name} />
-                              <AvatarFallback>{inquiry.applicant_name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="text-center sm:text-left md:text-center">
-                              <h3 className="font-medium">{inquiry.applicant_name}</h3>
-                              <p className="text-sm text-muted-foreground">{inquiry.applicant_email}</p>
-                              <Button variant="outline" size="sm" className="mt-2" asChild>
-                                <Link href={`/users/${inquiry.user_id}`}>
-                                  <User className="h-3 w-3 mr-1" />
-                                  View Profile
-                                </Link>
-                              </Button>
+          <AnimatePresence mode="wait">
+            {inquiriesLoading ? (
+              <motion.div 
+                key="loading"
+                className="flex justify-center items-center py-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <span className="ml-2">Loading inquiries...</span>
+              </motion.div>
+            ) : filteredInquiries.length === 0 ? (
+              <motion.div
+                key="no-inquiries"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card>
+                  <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                    <h3 className="text-lg font-medium mb-2">No inquiries found</h3>
+                    <p className="text-muted-foreground">
+                      {(inquiryType === "received" ? receivedInquiries : sentInquiries).length > 0 
+                        ? "Try adjusting your search filters"
+                        : inquiryType === "received" 
+                          ? "When users express interest in your projects, they'll appear here"
+                          : "You haven't submitted any project inquiries yet"}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="inquiries"
+                className="space-y-4"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {filteredInquiries.map((inquiry) => (
+                  <motion.div
+                    key={inquiry.id}
+                    variants={cardVariants}
+                    whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                  >
+                    <Card className="shadow-sm hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-lg">{inquiry.project_title}</CardTitle>
+                            <CardDescription>
+                              {inquiryType === "received" 
+                                ? `Inquiry received ${new Date(inquiry.created_at).toLocaleDateString()}`
+                                : `Submitted on ${new Date(inquiry.created_at).toLocaleDateString()}`}
+                            </CardDescription>
+                          </div>
+                          <Badge 
+                            variant={
+                              inquiry.status === "pending" ? "outline" : 
+                              inquiry.status === "accepted" ? "secondary" : 
+                              "destructive"
+                            }
+                          >
+                            {inquiry.status.charAt(0).toUpperCase() + inquiry.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="grid md:grid-cols-3 gap-6">
+                        {inquiryType === "received" ? (
+                          <>
+                            <div className="md:col-span-1">
+                              <div className="flex flex-col sm:flex-row md:flex-col items-center gap-4">
+                                <Avatar className="h-16 w-16">
+                                  <AvatarImage src={inquiry.applicant_avatar || ''} alt={inquiry.applicant_name} />
+                                  <AvatarFallback>{inquiry.applicant_name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="text-center sm:text-left md:text-center">
+                                  <h3 className="font-medium">{inquiry.applicant_name}</h3>
+                                  <p className="text-sm text-muted-foreground">{inquiry.applicant_email}</p>
+                                  <Button variant="outline" size="sm" className="mt-2" asChild>
+                                    <Link href={`/users/${inquiry.user_id}`}>
+                                      <User className="h-3 w-3 mr-1" />
+                                      View Profile
+                                    </Link>
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="md:col-span-2">
+                              <h3 className="font-medium mb-2">Note from Applicant:</h3>
+                              <blockquote className="text-muted-foreground border-l-2 pl-4 italic">
+                                {inquiry.note}
+                              </blockquote>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="md:col-span-3">
+                            <h3 className="font-medium mb-2">Your Note:</h3>
+                            <blockquote className="text-muted-foreground border-l-2 pl-4 italic mb-4">
+                              {inquiry.note}
+                            </blockquote>
+                            <div className="flex gap-2 flex-wrap">
+                              <div className="flex items-center gap-2 text-sm">
+                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground">Submitted:</span>
+                                <span>{formatDate(inquiry.created_at)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground">Status:</span>
+                                <span>{inquiry.status.charAt(0).toUpperCase() + inquiry.status.slice(1)}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="md:col-span-2">
-                          <h3 className="font-medium mb-2">Note from Applicant:</h3>
-                          <blockquote className="text-muted-foreground border-l-2 pl-4 italic">
-                            {inquiry.note}
-                          </blockquote>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="md:col-span-3">
-                        <h3 className="font-medium mb-2">Your Note:</h3>
-                        <blockquote className="text-muted-foreground border-l-2 pl-4 italic mb-4">
-                          {inquiry.note}
-                        </blockquote>
-                        <div className="flex gap-2 flex-wrap">
-                          <div className="flex items-center gap-2 text-sm">
-                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Submitted:</span>
-                            <span>{formatDate(inquiry.created_at)}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Status:</span>
-                            <span>{inquiry.status.charAt(0).toUpperCase() + inquiry.status.slice(1)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="border-t pt-4 flex justify-between">
-                    {inquiryType === "received" ? (
-                      <>
-                        <Button variant="outline" asChild>
-                          <a href={`mailto:${inquiry.applicant_email}`}>
-                            Reply via Email
-                          </a>
-                        </Button>
-                        <div className="flex gap-2">
-                          {inquiry.status === "pending" && (
-                            <>
+                        )}
+                      </CardContent>
+                      <CardFooter className="border-t pt-4 flex justify-between">
+                        {inquiryType === "received" ? (
+                          <>
+                            <Button variant="outline" asChild>
+                              <a href={`mailto:${inquiry.applicant_email}`}>
+                                Reply via Email
+                              </a>
+                            </Button>
+                            <div className="flex gap-2">
+                              {inquiry.status === "pending" && (
+                                <>
+                                  <Button 
+                                    variant="default" 
+                                    size="sm"
+                                    onClick={() => handleUpdateInquiryStatus(inquiry.id, 'accepted')}
+                                  >
+                                    Accept
+                                  </Button>
+                                  <Button 
+                                    variant="secondary" 
+                                    size="sm"
+                                    onClick={() => handleUpdateInquiryStatus(inquiry.id, 'rejected')}
+                                  >
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
                               <Button 
-                                variant="default" 
+                                variant="destructive" 
                                 size="sm"
-                                onClick={() => handleUpdateInquiryStatus(inquiry.id, 'accepted')}
+                                disabled={deleteInProgress === inquiry.id}
+                                onClick={() => handleDeleteInquiry(inquiry.id)}
                               >
-                                Accept
+                                {deleteInProgress === inquiry.id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Delete
+                                  </>
+                                )}
                               </Button>
-                              <Button 
-                                variant="secondary" 
-                                size="sm"
-                                onClick={() => handleUpdateInquiryStatus(inquiry.id, 'rejected')}
-                              >
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            disabled={deleteInProgress === inquiry.id}
-                            onClick={() => handleDeleteInquiry(inquiry.id)}
-                          >
-                            {deleteInProgress === inquiry.id ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Deleting...
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <Button variant="outline" asChild>
-                          <Link href={`/projects/${inquiry.project_id}`}>
-                            View Project
-                          </Link>
-                        </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          disabled={deleteInProgress === inquiry.id}
-                          onClick={() => handleDeleteInquiry(inquiry.id)}
-                        >
-                          {deleteInProgress === inquiry.id ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Deleting...
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              Withdraw Inquiry
-                            </>
-                          )}
-                        </Button>
-                      </>
-                    )}
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Button variant="outline" asChild>
+                              <Link href={`/projects/${inquiry.project_id}`}>
+                                View Project
+                              </Link>
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              disabled={deleteInProgress === inquiry.id}
+                              onClick={() => handleDeleteInquiry(inquiry.id)}
+                            >
+                              {deleteInProgress === inquiry.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Withdraw Inquiry
+                                </>
+                              )}
+                            </Button>
+                          </>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </TabsContent>
 
         {/* Bookmarks Tab */}
         <TabsContent value="bookmarks" className="space-y-6">
-          <div className="flex justify-between items-center mb-4">
+          <motion.div 
+            className="flex justify-between items-center mb-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+          >
             <h2 className="text-xl font-semibold">My Bookmarks</h2>
-          </div>
+          </motion.div>
 
-          {bookmarksLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 text-primary animate-spin" />
-              <span className="ml-2">Loading your bookmarks...</span>
-            </div>
-          ) : (bookmarkedProjects.length === 0 && bookmarkedUsers.length === 0) ? (
-            <Card>
-              <CardContent className="py-10 flex flex-col items-center justify-center text-center">
-                <h3 className="text-lg font-medium mb-2">No bookmarks yet</h3>
-                <p className="text-muted-foreground">
-                  Bookmark projects and users to keep track of interesting content.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {bookmarkedProjects.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Bookmarked Projects</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {bookmarkedProjects.map((project) => (
-                      <Card key={project.id} className="shadow-sm">
-                        <CardHeader className="pb-3">
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {project.is_idea ? (
-                              <Badge variant="outline">Idea</Badge>
-                            ) : (
-                              <Badge variant="outline">Project</Badge>
-                            )}
-                            <Badge variant="outline">{project.recruitment_status}</Badge>
-                          </div>
-                          <CardTitle className="text-lg">{project.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground line-clamp-3">
-                            {project.description}
-                          </p>
-                        </CardContent>
-                        <CardFooter className="border-t pt-3">
-                          <Button className="w-full" variant="outline" asChild>
-                            <Link href={`/projects/${project.id}`}>
-                              View Project
-                            </Link>
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {bookmarkedUsers.length > 0 && (
-                <div className="space-y-4 mt-6">
-                  <h3 className="text-lg font-semibold">Bookmarked Users</h3>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {bookmarkedUsers.map((user) => (
-                      <Card key={user.id} className="shadow-sm">
-                        <CardContent className="pt-6">
-                          <div className="flex flex-col items-center text-center gap-4">
-                            <Avatar className="h-16 w-16">
-                              <AvatarImage src={user.avatar || ''} alt={user.full_name} />
-                              <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <h3 className="font-semibold text-lg">{user.full_name}</h3>
-                              <p className="text-sm text-muted-foreground line-clamp-2">
-                                {user.bio}
+          <AnimatePresence mode="wait">
+            {bookmarksLoading ? (
+              <motion.div 
+                key="loading"
+                className="flex justify-center items-center py-12"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <span className="ml-2">Loading your bookmarks...</span>
+              </motion.div>
+            ) : (bookmarkedProjects.length === 0 && bookmarkedUsers.length === 0) ? (
+              <motion.div
+                key="no-bookmarks"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card>
+                  <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                    <h3 className="text-lg font-medium mb-2">No bookmarks yet</h3>
+                    <p className="text-muted-foreground">
+                      Bookmark projects and users to keep track of interesting content.
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ) : (
+              <>
+                {bookmarkedProjects.length > 0 && (
+                  <motion.div 
+                    className="space-y-4"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <h3 className="text-lg font-semibold">Bookmarked Projects</h3>
+                    <motion.div 
+                      className="grid gap-4 md:grid-cols-2"
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      {bookmarkedProjects.map((project) => (
+                        <motion.div
+                          key={project.id}
+                          variants={cardVariants}
+                          whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                        >
+                          <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
+                            <CardHeader className="pb-3">
+                              <div className="flex flex-wrap gap-2 mb-2">
+                                {project.is_idea ? (
+                                  <Badge variant="outline">Idea</Badge>
+                                ) : (
+                                  <Badge variant="outline">Project</Badge>
+                                )}
+                                <Badge variant="outline">{project.recruitment_status}</Badge>
+                              </div>
+                              <CardTitle className="text-lg">{project.title}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground line-clamp-3">
+                                {project.description}
                               </p>
-                              <Button variant="outline" size="sm" className="mt-4" asChild>
-                                <Link href={`/users/${user.id}`}>
-                                  View Profile
-                                </Link>
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+                            </CardContent>
+                            <CardFooter className="border-t pt-3">
+                              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full">
+                                <Button className="w-full" variant="outline" asChild>
+                                  <Link href={`/projects/${project.id}`}>
+                                    View Project
+                                  </Link>
+                                </Button>
+                              </motion.div>
+                            </CardFooter>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </motion.div>
+                )}
+
+                {bookmarkedUsers.length > 0 && (
+                  <motion.div 
+                    className="space-y-4 mt-6"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <h3 className="text-lg font-semibold">Bookmarked Users</h3>
+                    <motion.div 
+                      className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      {bookmarkedUsers.map((user) => (
+                        <motion.div
+                          key={user.id}
+                          variants={cardVariants}
+                          whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                        >
+                          <Card className="shadow-sm hover:shadow-md transition-shadow">
+                            <CardContent className="pt-6">
+                              <div className="flex flex-col items-center text-center gap-4">
+                                <motion.div whileHover={{ scale: 1.05 }} transition={{ type: "spring", stiffness: 300 }}>
+                                  <Avatar className="h-16 w-16">
+                                    <AvatarImage src={user.avatar || ''} alt={user.full_name} />
+                                    <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                </motion.div>
+                                <div>
+                                  <h3 className="font-semibold text-lg">{user.full_name}</h3>
+                                  <p className="text-sm text-muted-foreground line-clamp-2">
+                                    {user.bio}
+                                  </p>
+                                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                    <Button variant="outline" size="sm" className="mt-4" asChild>
+                                      <Link href={`/users/${user.id}`}>
+                                        View Profile
+                                      </Link>
+                                    </Button>
+                                  </motion.div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </motion.div>
+                )}
+              </>
+            )}
+          </AnimatePresence>
         </TabsContent>
       </Tabs>
-    </div>
+    </motion.div>
   )
 }
 
