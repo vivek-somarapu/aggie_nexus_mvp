@@ -173,6 +173,7 @@ export default function CalendarPage() {
       
       console.log("Fetching calendar events...");
       
+      // Always fetch public events regardless of auth state
       const publicEvents = await eventService.getEvents();
       // Safe cast since we know the API returns the correct shape
       setEvents(publicEvents as unknown as Event[]);
@@ -182,8 +183,7 @@ export default function CalendarPage() {
         try {
           // Since getUserEvents doesn't exist, we'll filter the events for this user
           // This is a temporary solution - ideally we'd implement proper getUserEvents in the service
-          const allEvents = await eventService.getEvents();
-          const userEvents = allEvents.filter(event => event.organizer_id === user.id);
+          const userEvents = publicEvents.filter(event => event.organizer_id === user.id);
           // Safe cast since we know the API returns the correct shape
           setPersonalEvents(userEvents as unknown as Event[]);
         } catch (err) {
@@ -194,17 +194,15 @@ export default function CalendarPage() {
     } catch (err) {
       console.error("Error fetching events:", err);
       setError("Failed to load events. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
+    } finally {
+      setIsLoading(false);
+    }
   };
     
-  // Fetch events when component mounts or auth state changes
+  // Fetch events when component mounts
   useEffect(() => {
-    if (!authLoading) {
-      getEvents();
-    }
-  }, [authLoading, user]);
+    getEvents();
+  }, [user]); // Only re-fetch when user state changes
   
   // Get all events (public + personal)
   const allEvents = [...events, ...personalEvents];
@@ -318,10 +316,12 @@ export default function CalendarPage() {
               <TabsTrigger value="list">List</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button onClick={() => router.push('/calendar/new')} size="sm" className="flex items-center">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Event
-          </Button>
+          {user && (
+            <Button onClick={() => router.push('/calendar/new')} size="sm" className="flex items-center">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Event
+            </Button>
+          )}
         </div>
       </motion.div>
       

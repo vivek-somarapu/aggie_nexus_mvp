@@ -58,7 +58,6 @@ export async function middleware(request: NextRequest) {
       '/bookmarks',
       '/users',
       '/projects',
-      '/calendar',
     ];
 
     // List of routes that require email verification

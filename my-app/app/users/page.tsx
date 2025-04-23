@@ -213,29 +213,18 @@ export default function UsersPage() {
       industryFilter === "all" || 
       (user.industry && user.industry.includes(industryFilter));
     
-    // Filter by user type based on industry keywords
-    const matchesUserType = 
-      userTypeFilter === "all" || 
-      (userTypeFilter === "builders" && user.industry && 
-        user.industry.some(ind => 
-          ["Engineering", "Science", "Technology", "Research", "Development"].includes(ind)
-        )) ||
-      (userTypeFilter === "funders" && user.industry && 
-        user.industry.some(ind => 
-          ["Investing", "Finance", "Venture Capital", "Angel Investing", "Investment Banking"].includes(ind)
-        ));
-    
-    const isMatch = matchesIndustry && matchesUserType;
-    return isMatch;
+    // No longer filter by user type since we removed that UI
+    // Just match by industry
+    return matchesIndustry;
   });
   
   // Log filtering results for debugging
   useEffect(() => {
     if (dataFetched) {
       console.log(`Filtering users: ${users.length} total, ${filteredUsers.length} after filters`);
-      console.log(`Filters: userType=${userTypeFilter}, tamu=${tamuFilter}, industry=${industryFilter}, skill=${skillFilter}`);
+      console.log(`Filters: tamu=${tamuFilter}, industry=${industryFilter}, skill=${skillFilter}`);
     }
-  }, [filteredUsers, users, userTypeFilter, tamuFilter, industryFilter, skillFilter, dataFetched]);
+  }, [filteredUsers, users, tamuFilter, industryFilter, skillFilter, dataFetched]);
 
   return (
     <motion.div 
@@ -288,14 +277,6 @@ export default function UsersPage() {
         transition={{ delay: 0.3, duration: 0.4 }}
       >
         <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-          <Tabs value={userTypeFilter} onValueChange={setUserTypeFilter}>
-            <TabsList className="mb-4 md:mb-0">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="builders">Builders</TabsTrigger>
-              <TabsTrigger value="funders">Funders</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
           <div className="flex flex-col md:flex-row gap-4">
             <Tabs value={tamuFilter} onValueChange={setTamuFilter}>
               <TabsList>
