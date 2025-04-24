@@ -240,8 +240,8 @@ export default function UsersPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
         >
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-muted-foreground">Find collaborators, builders, and funders for your projects</p>
+          <h1 className="text-3xl font-bold tracking-tight text-blue-600/80">Users</h1>
+          <p className="text-muted-foreground">Connect with talented Aggies, industry experts, and potential mentors to grow your network</p>
         </motion.div>
       </div>
       

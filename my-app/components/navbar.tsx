@@ -175,7 +175,7 @@ export default function Navbar() {
 
         {/* Right Side Actions */}
         <div className="flex flex-1 items-center justify-end space-x-4">
-          <Button variant="ghost" size="sm" asChild className="hidden md:inline-flex">
+          <Button variant="ghost" size="sm" asChild className="hidden md:inline-flex bg-[#500000] text-white hover:bg-[#500000]/90 hover:text-white">
             <Link href="/projects/new">Create Project</Link>
           </Button>
 

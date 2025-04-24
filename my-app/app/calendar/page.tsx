@@ -299,9 +299,9 @@ export default function CalendarPage() {
     >
       <motion.div variants={itemVariants} className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center mb-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Events Calendar</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-green-600/80">Events Calendar</h1>
           <p className="text-muted-foreground">
-            Discover upcoming events and opportunities
+            Stay organized with upcoming events, workshops, and networking opportunities
           </p>
         </div>
         

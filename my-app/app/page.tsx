@@ -135,7 +135,7 @@ export default function Home() {
           className="container flex-1 flex flex-col items-center justify-center py-12 md:py-16 text-center relative"
         >
           <div className="space-y-6 max-w-3xl mt-16">
-            <Badge className="bg-primary text-primary-foreground hover:bg-primary/90 border-none px-4 py-2 text-sm mb-4">
+            <Badge className="bg-[#500000] text-white hover:bg-[#500000]/90 border-none px-4 py-2 text-sm mb-4">
               Connecting Innovators at Texas A&M and Beyond
             </Badge>
             <motion.h1 
@@ -468,10 +468,10 @@ export default function Home() {
         </section>
         
         {/* Feature Preview Section */}
-        <div className="h-6 md:h-8"></div>
+        <div className="h-2 md:h-4"></div>
         
-        <section className="py-16 md:py-20 my-6 container mx-auto overflow-hidden">
-          <div className="text-center max-w-3xl mx-auto mb-8 px-6 md:px-8">
+        <section className="py-8 md:py-12 my-2 container mx-auto overflow-hidden">
+          <div className="text-center max-w-3xl mx-auto mb-6 px-6 md:px-8">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Platform Features</h2>
             <p className="mt-4 text-lg text-muted-foreground">
               Designed to facilitate every stage of your entrepreneurial journey
