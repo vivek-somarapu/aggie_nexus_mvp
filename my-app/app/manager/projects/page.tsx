@@ -22,7 +22,7 @@ interface Project {
   description?: string;
   status?: string;
   created_at: string;
-  created_by?: string;
+  owner_id?: string;
 }
 
 // Extended project with UI-specific properties
@@ -107,7 +107,7 @@ export default function ProjectManagementPage() {
       
       // Get creator profiles if there are any projects with creator IDs
       const userIds = data
-        .map(project => project.created_by)
+        .map(project => project.owner_id)
         .filter((id): id is string => id !== null && id !== undefined);
       
       if (userIds.length > 0) {
@@ -139,7 +139,7 @@ export default function ProjectManagementPage() {
         // Safe access to other properties
         description: project.description || '',
         status: project.status || 'active',
-        owner_name: project.created_by ? (profilesData[project.created_by] || 'Unknown') : 'Unknown'
+        owner_name: project.owner_id ? (profilesData[project.owner_id] || 'Unknown') : 'Unknown'
       }));
       
       console.log("Transformed projects:", transformedProjects);

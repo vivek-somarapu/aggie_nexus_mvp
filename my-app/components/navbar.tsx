@@ -78,7 +78,7 @@ export default function Navbar() {
     },
     {
       href: "/users",
-      label: "Users",
+      label: "Talent",
       active: pathname === "/users" || pathname.startsWith("/users/"),
     },
     {

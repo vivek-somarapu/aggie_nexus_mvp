@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from 'next/navigation';
 import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Info, Loader2, AlertCircle, Plus, UserCircle2, ChevronLeft, ChevronRight, MapPin, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Info, Loader2, AlertCircle, Plus, UserCircle2, ChevronLeft, ChevronRight, MapPin, Clock, Calendar as CalendarIcon, Home } from "lucide-react";
 import { format, parseISO, isValid, addDays, isWithinInterval } from "date-fns";
 import { eventService } from "@/lib/services/event-service";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ import {
   CalendarEvent as FullCalendarEvent,
 } from "@/components/ui/full-calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Link from "next/link";
 
 // Import and augment the Event type to match API response
 import type { Event as BaseEvent } from "@/lib/services/event-service";
@@ -165,6 +166,40 @@ export default function CalendarPage() {
     personal: "Personal Events"
   };
   
+  // The color palette available in our variants
+  const colorPalette = [
+    'blue', 'green', 'yellow', 'pink', 'purple', 
+    'red', 'orange', 'indigo', 'teal', 'cyan', 
+    'emerald', 'rose', 'amber', 'lime', 'sky'
+  ];
+  
+  // Function to get a random color from our palette
+  const getRandomColor = () => {
+    return colorPalette[Math.floor(Math.random() * colorPalette.length)];
+  };
+  
+  // Function to get badge variant based on event type
+  const getBadgeVariant = (type: string) => {
+    switch(type as EventType) {
+      case "workshop":
+        return "blue";
+      case "info_session":
+        return "green";
+      case "networking":
+        return "yellow";
+      case "hackathon":
+        return "purple";
+      case "deadline":
+        return "red";
+      case "meeting":
+        return "orange";
+      case "personal":
+        return "pink";
+      default:
+        return "default";
+    }
+  };
+  
   // Function to get events
   const getEvents = async () => {
     try {
@@ -212,6 +247,20 @@ export default function CalendarPage() {
     categoryFilter === "all" || (event.event_type || event.color) === categoryFilter
   );
   
+  // Map of event IDs to consistent colors (so same event always has same color)
+  const eventColorMap = useMemo(() => {
+    const colorMap = new Map<string, string>();
+    
+    // Assign a random color to each event and store it in the map
+    filteredEvents.forEach(event => {
+      if (!colorMap.has(event.id)) {
+        colorMap.set(event.id, getRandomColor());
+      }
+    });
+    
+    return colorMap;
+  }, [filteredEvents]);
+  
   // Get events for selected date
   const eventsForSelectedDate = date 
     ? filteredEvents.filter(event => {
@@ -244,28 +293,6 @@ export default function CalendarPage() {
     return new Date(a.start as string).getTime() - new Date(b.start as string).getTime();
   });
 
-  // Function to get badge variant based on event type
-  const getBadgeVariant = (type: string) => {
-    switch(type as EventType) {
-      case "workshop":
-        return "blue";
-      case "info_session":
-        return "green";
-      case "networking":
-        return "yellow";
-      case "hackathon":
-        return "purple";
-      case "deadline":
-        return "red";
-      case "meeting":
-        return "orange";
-      case "personal":
-        return "pink";
-      default:
-        return "default";
-    }
-  };
-  
   // Convert events to FullCalendarEvent format for the full calendar
   const calendarEvents: FullCalendarEvent[] = filteredEvents
     .filter(event => event.start && event.end) // Only include events with valid dates
@@ -274,7 +301,8 @@ export default function CalendarPage() {
       title: event.title,
       start: new Date(event.start),
       end: new Date(event.end),
-      color: (event.color ? getBadgeVariant(event.color) : getBadgeVariant(event.event_type || 'other')) as any,
+      // Use random color from map instead of event type-based color
+      color: eventColorMap.get(event.id) as any,
       description: event.description || '',
       location: event.location || '',
     }));
@@ -306,6 +334,14 @@ export default function CalendarPage() {
         </div>
         
         <div className="flex space-x-2 mt-2 sm:mt-0">
+          {!user && !authLoading && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/">
+                <Home className="h-4 w-4 mr-2" />
+                Return Home
+              </Link>
+            </Button>
+          )}
           <Tabs
             value={view}
             onValueChange={(v) => setView(v as "calendar" | "list")}
@@ -349,7 +385,7 @@ export default function CalendarPage() {
       )}
       
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
-        <Select
+        {/* <Select
           value={categoryFilter}
           onValueChange={setCategoryFilter}
         >
@@ -364,7 +400,7 @@ export default function CalendarPage() {
               </SelectItem>
             ))}
           </SelectContent>
-        </Select>
+        </Select> */}
 
         <Tabs
           value={view}
@@ -443,7 +479,13 @@ export default function CalendarPage() {
                             transition={{ type: "spring", damping: 20 }}
                             whileHover={{ x: 5 }}
                             className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
-                            onClick={() => router.push(`/calendar/${event.id}`)}
+                            onClick={() => {
+                              const fullEvent = calendarEvents.find(e => e.id === event.id);
+                              if (fullEvent) {
+                                setSelectedEvent(fullEvent as ProcessedEvent);
+                                setDialogOpen(true);
+                              }
+                            }}
                           >
                             <Badge 
                               variant="outline" 
@@ -582,19 +624,33 @@ export default function CalendarPage() {
                               >
                                 <Card 
                                   className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                                  onClick={() => router.push(`/calendar/${event.id}`)}
+                                  onClick={() => {
+                                    const fullEvent = calendarEvents.find(e => e.id === event.id);
+                                    if (fullEvent) {
+                                      setSelectedEvent(fullEvent as ProcessedEvent);
+                                      setDialogOpen(true);
+                                    }
+                                  }}
                                 >
                                   <div className={cn(
                                     "h-1 w-full",
                                     {
-                                      "bg-blue-500": event.event_type === "workshop",
-                                      "bg-green-500": event.event_type === "info_session",
-                                      "bg-yellow-500": event.event_type === "networking",
-                                      "bg-purple-500": event.event_type === "hackathon",
-                                      "bg-red-500": event.event_type === "deadline",
-                                      "bg-orange-500": event.event_type === "meeting",
-                                      "bg-pink-500": event.event_type === "personal",
-                                      "bg-gray-500": event.event_type === "other",
+                                      "bg-blue-500": eventColorMap.get(event.id) === "blue",
+                                      "bg-green-500": eventColorMap.get(event.id) === "green",
+                                      "bg-yellow-500": eventColorMap.get(event.id) === "yellow",
+                                      "bg-pink-500": eventColorMap.get(event.id) === "pink",
+                                      "bg-purple-500": eventColorMap.get(event.id) === "purple",
+                                      "bg-red-500": eventColorMap.get(event.id) === "red",
+                                      "bg-orange-500": eventColorMap.get(event.id) === "orange",
+                                      "bg-indigo-500": eventColorMap.get(event.id) === "indigo",
+                                      "bg-teal-500": eventColorMap.get(event.id) === "teal",
+                                      "bg-cyan-500": eventColorMap.get(event.id) === "cyan",
+                                      "bg-emerald-500": eventColorMap.get(event.id) === "emerald",
+                                      "bg-rose-500": eventColorMap.get(event.id) === "rose",
+                                      "bg-amber-500": eventColorMap.get(event.id) === "amber",
+                                      "bg-lime-500": eventColorMap.get(event.id) === "lime",
+                                      "bg-sky-500": eventColorMap.get(event.id) === "sky",
+                                      "bg-gray-500": !eventColorMap.get(event.id),
                                     }
                                   )} />
                                   <CardContent className="p-4">
@@ -712,14 +768,22 @@ export default function CalendarPage() {
                                           className={cn(
                                             "w-1 h-full self-stretch flex-shrink-0 rounded-full",
                                             {
-                                              "bg-blue-500": event.event_type === "workshop",
-                                              "bg-green-500": event.event_type === "info_session",
-                                              "bg-yellow-500": event.event_type === "networking",
-                                              "bg-purple-500": event.event_type === "hackathon",
-                                              "bg-red-500": event.event_type === "deadline",
-                                              "bg-orange-500": event.event_type === "meeting",
-                                              "bg-pink-500": event.event_type === "personal",
-                                              "bg-gray-500": event.event_type === "other",
+                                              "bg-blue-500": eventColorMap.get(event.id) === "blue",
+                                              "bg-green-500": eventColorMap.get(event.id) === "green",
+                                              "bg-yellow-500": eventColorMap.get(event.id) === "yellow",
+                                              "bg-pink-500": eventColorMap.get(event.id) === "pink",
+                                              "bg-purple-500": eventColorMap.get(event.id) === "purple",
+                                              "bg-red-500": eventColorMap.get(event.id) === "red",
+                                              "bg-orange-500": eventColorMap.get(event.id) === "orange",
+                                              "bg-indigo-500": eventColorMap.get(event.id) === "indigo",
+                                              "bg-teal-500": eventColorMap.get(event.id) === "teal",
+                                              "bg-cyan-500": eventColorMap.get(event.id) === "cyan",
+                                              "bg-emerald-500": eventColorMap.get(event.id) === "emerald",
+                                              "bg-rose-500": eventColorMap.get(event.id) === "rose",
+                                              "bg-amber-500": eventColorMap.get(event.id) === "amber",
+                                              "bg-lime-500": eventColorMap.get(event.id) === "lime",
+                                              "bg-sky-500": eventColorMap.get(event.id) === "sky",
+                                              "bg-gray-500": !eventColorMap.get(event.id),
                                             }
                                           )}
                                         />

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     // Check if user is authenticated and is a manager for non-approved events
     if (status && status !== 'approved') {
       const cookieStore = cookies();
-      const supabase = createClient(cookieStore);
+      const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       
       // If not authenticated or requesting non-approved events
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   try {
     // Check if user is authenticated
     const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {

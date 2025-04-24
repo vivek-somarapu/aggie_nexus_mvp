@@ -240,7 +240,7 @@ export default function UsersPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
         >
-          <h1 className="text-3xl font-bold tracking-tight text-blue-600/80">Users</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-blue-600/80">Talent</h1>
           <p className="text-muted-foreground">Connect with talented Aggies, industry experts, and potential mentors to grow your network</p>
         </motion.div>
       </div>
@@ -253,7 +253,7 @@ export default function UsersPage() {
         <Alert variant="info" className="mb-6 bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Note: Only users with complete profiles (including bio and skills) are displayed here.
+            Note: Only talent with complete profiles (including bio and skills) are displayed here.
           </AlertDescription>
         </Alert>
       </motion.div>
@@ -296,7 +296,7 @@ export default function UsersPage() {
         >
           <div className="flex-1">
             <Input
-              placeholder="Search users..."
+              placeholder="Search talent..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full"
@@ -342,7 +342,7 @@ export default function UsersPage() {
                 transition={{ duration: 0.3 }}
               >
                 <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <span className="ml-2">Loading users...</span>
+                <span className="ml-2">Loading talent...</span>
               </motion.div>
             ) : (
               <>
@@ -354,7 +354,7 @@ export default function UsersPage() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                   >
-                    <p className="text-lg font-medium">No users found</p>
+                    <p className="text-lg font-medium">No talent found</p>
                     <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
                   </motion.div>
                 ) : (

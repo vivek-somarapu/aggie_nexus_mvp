@@ -62,7 +62,11 @@ export default function AuthWaitingPage() {
     setIsChecking(true)
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.auth.refreshSession()
+      
+      // Force a complete session refresh to get the latest verification status
+      const { data, error } = await supabase.auth.refreshSession({}, {
+        forceRefresh: true
+      })
       
       if (error) {
         // Ignore AuthSessionMissingError as it's expected when session is being created
@@ -93,7 +97,30 @@ export default function AuthWaitingPage() {
           }
         }, 1500)
       } else {
-        setMessage(`Email not verified yet. Please check your inbox.`)
+        // Try getUser as a fallback in case refreshSession isn't showing updated status
+        const { data: userData } = await supabase.auth.getUser()
+        
+        if (userData?.user?.email_confirmed_at) {
+          setIsVerified(true)
+          setMessage("Email verified! Redirecting you...")
+          setIsRedirecting(true)
+          
+          // Signal to other tabs that verification is complete
+          localStorage.setItem("emailVerified", "true")
+          
+          // Remove verification flag from sessionStorage
+          sessionStorage.removeItem("awaitingVerification")
+          
+          setTimeout(() => {
+            if (profile && profile.bio && profile.skills?.length) {
+              router.push("/")
+            } else {
+              router.push("/profile/setup")
+            }
+          }, 1500)
+        } else {
+          setMessage(`Email not verified yet. Please check your inbox.`)
+        }
       }
     } catch (err) {
       console.error("Error checking verification:", err)
@@ -150,8 +177,10 @@ export default function AuthWaitingPage() {
       try {
         const supabase = createClient()
         
-        // Refresh the session to get the latest user data
-        const { data, error } = await supabase.auth.refreshSession()
+        // Refresh the session to get the latest user data with forceRefresh
+        const { data, error } = await supabase.auth.refreshSession({}, {
+          forceRefresh: true
+        })
         
         if (error) {
           // Ignore AuthSessionMissingError as it's expected when session is being created
@@ -187,6 +216,40 @@ export default function AuthWaitingPage() {
               router.push("/profile/setup")
             }
           }, 1500) // Small delay for better UX
+        } else {
+          // Try getUser as a fallback in case refreshSession isn't showing updated status
+          try {
+            const { data: userData } = await supabase.auth.getUser()
+            
+            if (userData?.user?.email_confirmed_at) {
+              setIsVerified(true)
+              setMessage("Email verified! Redirecting you...")
+              setIsRedirecting(true)
+              
+              // Clear the interval
+              if (checkInterval.current) {
+                clearInterval(checkInterval.current)
+                checkInterval.current = null
+              }
+              
+              // Signal to other tabs that verification is complete
+              localStorage.setItem("emailVerified", "true")
+              
+              // Remove verification flag from sessionStorage
+              sessionStorage.removeItem("awaitingVerification")
+              
+              // Check if profile is complete
+              setTimeout(() => {
+                if (profile && profile.bio && profile.skills && profile.skills.length > 0) {
+                  router.push("/")
+                } else {
+                  router.push("/profile/setup")
+                }
+              }, 1500) // Small delay for better UX
+            }
+          } catch (userError) {
+            console.error("Error getting user data:", userError)
+          }
         }
       } catch (err) {
         console.error("Error checking email verification:", err)

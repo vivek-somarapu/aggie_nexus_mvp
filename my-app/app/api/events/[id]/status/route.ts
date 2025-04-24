@@ -8,7 +8,7 @@ export async function PATCH(
 ) {
   try {
     const cookieStore = cookies();
-    const supabase = createClient(cookieStore);
+    const supabase = createClient();
 
     // Check authentication
     const { data: { session } } = await supabase.auth.getSession();

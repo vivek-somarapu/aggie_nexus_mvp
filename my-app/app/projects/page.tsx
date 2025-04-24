@@ -306,8 +306,8 @@ export default function ProjectsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Industries</SelectItem>
-              {industries.map((industry: string) => (
-                <SelectItem key={industry} value={industry}>
+              {industries.map((industry: string, index: number) => (
+                <SelectItem key={`${industry}-${index}`} value={industry}>
                   {industry}
                 </SelectItem>
               ))}

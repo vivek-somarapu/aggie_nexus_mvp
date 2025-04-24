@@ -19,6 +19,7 @@ import {
   MessageSquare,
   Share2,
   Loader2,
+  Home,
 } from "lucide-react"
 import { userService } from "@/lib/services/user-service"
 import { projectService } from "@/lib/services/project-service"
@@ -26,6 +27,9 @@ import { bookmarkService } from "@/lib/services/bookmark-service"
 import { useAuth } from "@/lib"
 import { User } from "@/lib/models/users"
 import { Project } from "@/lib/services/project-service"
+import { createClient } from "@/lib/supabase/client"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 // Simple Alert component
 function Alert({ variant, className, children }: { 
@@ -57,6 +61,13 @@ export default function UserPage() {
   const [isLoadingBookmark, setIsLoadingBookmark] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [bookmarkError, setBookmarkError] = useState<string | null>(null)
+  
+  // Message dialog state
+  const [messageNote, setMessageNote] = useState("")
+  const [isMessageOpen, setIsMessageOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [messageError, setMessageError] = useState<string | null>(null)
+  const [messageSuccess, setMessageSuccess] = useState(false)
   
   // Fetch user data
   useEffect(() => {
@@ -139,6 +150,54 @@ export default function UserPage() {
     }
   };
   
+  // Handle message submission
+  const handleMessageSubmit = async () => {
+    if (!currentUser || !user) {
+      setMessageError("You must be logged in to send a message")
+      return
+    }
+    
+    if (!messageNote.trim()) {
+      setMessageError("Please provide a message")
+      return
+    }
+    
+    try {
+      setIsSubmitting(true)
+      setMessageError(null)
+      
+      const supabase = createClient()
+      
+      // Create new message
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: currentUser.id,
+          recipient_id: user.id,
+          content: messageNote,
+          status: 'unread'
+        })
+      
+      if (error) throw error
+      
+      // Show success message and reset form
+      setMessageSuccess(true)
+      setMessageNote("")
+      
+      // Close dialog after a delay
+      setTimeout(() => {
+        setIsMessageOpen(false)
+        setMessageSuccess(false)
+      }, 2000)
+      
+    } catch (err: any) {
+      console.error("Error sending message:", err)
+      setMessageError(err?.message || "Failed to send message. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+  
   if (isLoadingUser) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -165,6 +224,13 @@ export default function UserPage() {
           <Link href="/users">
             <ChevronLeft className="h-4 w-4 mr-1" />
             Back to Users
+          </Link>
+        </Button>
+        
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/">
+            <Home className="h-4 w-4 mr-1" />
+            Home
           </Link>
         </Button>
       </div>
@@ -312,10 +378,69 @@ export default function UserPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t pt-6 flex justify-end">
-              <Button>
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Contact User
-              </Button>
+              <Dialog open={isMessageOpen} onOpenChange={setIsMessageOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Contact User
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Send Message to {user.full_name}</DialogTitle>
+                    <DialogDescription>
+                      Your message will be sent directly to the user. They will be able to see your profile details and reply to you.
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  {messageSuccess ? (
+                    <Alert className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+                      <AlertDescription>
+                        Your message has been sent successfully! The user will reply to you soon.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <>
+                      {messageError && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{messageError}</AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      <Textarea
+                        placeholder="Write your message here. Introduce yourself and explain why you're reaching out..."
+                        value={messageNote}
+                        onChange={(e) => setMessageNote(e.target.value)}
+                        rows={5}
+                        className="resize-none"
+                      />
+                      
+                      <DialogFooter>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setIsMessageOpen(false)}
+                          disabled={isSubmitting}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleMessageSubmit}
+                          disabled={isSubmitting || !messageNote.trim() || !currentUser}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            'Send Message'
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
             </CardFooter>
           </Card>
         </div>
@@ -337,7 +462,7 @@ export default function UserPage() {
                 <Eye className="h-4 w-4 text-muted-foreground" />
                 <span>Profile Views: {user.views}</span>
               </div>
-              <Button className="w-full mt-2">
+              <Button className="w-full mt-2" onClick={() => setIsMessageOpen(true)} disabled={!currentUser}>
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Send Message
               </Button>
