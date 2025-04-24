@@ -51,6 +51,7 @@ type AuthContextType = {
   signUp: (email: string, password: string, fullName: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<boolean>;
+  signInWithGitHub: () => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -67,6 +68,7 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => false,
   signOut: async () => {},
   signInWithGoogle: async () => false,
+  signInWithGitHub: async () => false,
   requestPasswordReset: async () => {},
   resetPassword: async () => {},
   refreshProfile: async () => {},
@@ -290,28 +292,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       
+      // Don't try to insert into users table directly after signup
+      // Supabase auth handles the user creation in auth.users
+      // Any profile data will be set when the user completes their profile
+      // or we can use a database webhook to automatically create profiles
+      
+      // If we need the user information immediately after signup,
+      // we should simply set the state with the data we have
       if (data.user) {
         setUser(mapSupabaseUser(data.user));
-        
-        // Initialize user profile (minimal details from signup)
-        try {
-          // Set initial profile values in database
-          await supabase.from('users').upsert({
-            id: data.user.id,
-            email,
-            full_name: fullName,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-          
-          // Fetch the created profile
-          const userProfile = await fetchUserProfile(data.user.id);
-          setProfile(userProfile);
-        } catch (profileErr) {
-          console.error("Error creating initial profile:", profileErr);
-        }
       }
       
+      // Return true to indicate successful signup
+      // The user will need to verify their email before they can use full functionality
       return true;
     } catch (err: any) {
       setError(err.message || 'Failed to sign up');
@@ -364,7 +357,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-        },
+        }
       });
       
       if (error) {
@@ -374,7 +367,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       return true;
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google');
+      console.error("AUTH: Error during Google OAuth sign-in", err);
+      setError(err.message || "Failed to sign in with Google");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  /**
+   * Sign in with GitHub OAuth
+   */
+  const signInWithGitHub = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        }
+      });
+      
+      if (error) {
+        setError(error.message);
+        return false;
+      }
+      
+      return true;
+    } catch (err: any) {
+      console.error("AUTH: Error during GitHub OAuth sign-in", err);
+      setError(err.message || "Failed to sign in with GitHub");
       return false;
     } finally {
       setIsLoading(false);
@@ -456,6 +481,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     signInWithGoogle,
+    signInWithGitHub,
     requestPasswordReset,
     resetPassword,
     refreshProfile,

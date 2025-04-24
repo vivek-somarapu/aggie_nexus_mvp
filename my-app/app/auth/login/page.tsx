@@ -7,13 +7,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 
 export default function LoginPage() {
-  const { signIn, signInWithGoogle, signInWithGitHub, isLoading, error } = useAuth()
+  const { signIn, signInWithGoogle, signInWithGitHub, isLoading, error: authError } = useAuth()
   const [localError, setLocalError] = useState<string | null>(null)
+  
+  // Use a single error state that prioritizes local errors over context errors
+  const error = localError || authError
 
   const handleSubmit = async (data: { email: string; password: string }) => {
     try {
+      setLocalError(null)
       const success = await signIn(data.email, data.password)
-      if (!success && !localError) {
+      if (!success && !authError) {
         setLocalError("Login failed. Please check your credentials.")
       }
     } catch (err: any) {
@@ -23,6 +27,7 @@ export default function LoginPage() {
 
   const handleOAuthLogin = async (provider: "google" | "github") => {
     try {
+      setLocalError(null)
       if (provider === "google") {
         await signInWithGoogle()
       } else {
@@ -38,10 +43,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <h1 className="text-3xl font-bold text-center mb-6">Welcome Back</h1>
 
-        {(error || localError) && (
+        {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error || localError}</AlertDescription>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
@@ -49,7 +54,7 @@ export default function LoginPage() {
           type="login"
           onSubmit={handleSubmit}
           loading={isLoading}
-          error={error || localError}
+          error={error}
           onOAuthLogin={handleOAuthLogin}
         />
       </div>
