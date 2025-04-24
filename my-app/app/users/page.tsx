@@ -374,22 +374,33 @@ export default function UsersPage() {
                       >
                         <Link href={`/users/${user.id}`}>
                           <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
-                            <CardHeader className="pb-2">
-                              <div className="flex justify-between">
-                                <motion.div 
-                                  whileHover={{ scale: 1.05 }}
-                                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                                >
-                                  <Avatar className={`h-12 w-12 ${user.is_texas_am_affiliate ? "ring-4 ring-[#500000]" : ""}`}>
-                                    <AvatarImage src={user.avatar ?? ''} alt={user.full_name} />
-                                    <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
-                                  </Avatar>
-                                </motion.div>
+                            <CardHeader className="pb-0 pt-3 px-4">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                  <motion.div 
+                                    whileHover={{ scale: 1.05 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                                  >
+                                    <Avatar className={`h-10 w-10 ${user.is_texas_am_affiliate ? "ring-2 ring-[#500000]" : ""}`}>
+                                      <AvatarImage src={user.avatar ?? ''} alt={user.full_name} />
+                                      <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                  </motion.div>
+                                  <div>
+                                    <h3 className="font-semibold text-base">{user.full_name}</h3>
+                                    {user.is_texas_am_affiliate && (
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <GraduationCap className="h-3 w-3" />
+                                        <span>TAMU</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                                 <motion.div whileTap={{ scale: 0.95 }}>
                                   <Button 
                                     variant="ghost" 
                                     size="icon" 
-                                    className="h-8 w-8"
+                                    className="h-7 w-7"
                                     onClick={(e) => handleBookmarkToggle(user.id, e)}
                                     disabled={isBookmarkLoading}
                                   >
@@ -405,34 +416,30 @@ export default function UsersPage() {
                                 </motion.div>
                               </div>
                             </CardHeader>
-                            <CardContent className="pb-2">
-                              <div className="mb-2">
-                                <h3 className="font-semibold text-lg">{user.full_name}</h3>
-                                {user.is_texas_am_affiliate && (
-                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                    <GraduationCap className="h-3 w-3" />
-                                    <span>Texas A&M Affiliate</span>
-                                  </div>
-                                )}
-                              </div>
-                              <p className="text-muted-foreground line-clamp-3 mb-4">{user.bio}</p>
-                              <div className="flex flex-wrap gap-2 mb-4">
-                                {user.industry?.map((ind) => (
-                                  <Badge key={ind} variant="secondary" className="text-xs">
+                            <CardContent className="py-2 px-4">
+                              <p className="text-muted-foreground text-sm line-clamp-3 mb-2">{user.bio}</p>
+                              <div className="flex flex-wrap gap-1 mb-1">
+                                {user.industry?.slice(0, 2).map((ind) => (
+                                  <Badge key={ind} variant="secondary" className="text-xs px-1.5 py-0">
                                     {ind}
                                   </Badge>
                                 ))}
+                                {user.industry?.length > 2 && (
+                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                    +{user.industry.length - 2}
+                                  </Badge>
+                                )}
                               </div>
                             </CardContent>
-                            <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                              {user.skills?.slice(0, 4).map((skill) => (
-                                <Badge key={skill} variant="outline" className="text-xs">
+                            <CardFooter className="border-t pt-2 pb-2 px-4 flex flex-wrap gap-1">
+                              {user.skills?.slice(0, 3).map((skill) => (
+                                <Badge key={skill} variant="outline" className="text-xs px-1.5 py-0">
                                   {skill}
                                 </Badge>
                               ))}
-                              {user.skills?.length > 4 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{user.skills.length - 4}
+                              {user.skills?.length > 3 && (
+                                <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                  +{user.skills.length - 3}
                                 </Badge>
                               )}
                             </CardFooter>

@@ -111,6 +111,47 @@ export default function Home() {
 
   return (
     <div className="relative overflow-hidden">
+      {/* Decorative circles logo background with animation */}
+      <motion.div
+        className="
+          absolute
+          -right-35
+          top-35
+          transform
+          rotate-[220deg]
+          z-0
+          pointer-events-none
+          opacity-60
+        "
+        initial={{ opacity: 0, scale: 0.8, rotate: 205 }}
+        animate={{ 
+          opacity: 0.6, 
+          scale: 1, 
+          rotate: 220,
+          transition: { 
+            duration: 0.8,
+            ease: "easeOut"
+          }
+        }}
+        whileInView={{ 
+          x: [0, 10, 0], 
+          transition: { 
+            repeat: Infinity, 
+            repeatType: "reverse", 
+            duration: 8
+          } 
+        }}
+      >
+        <Image
+          src="/images/circles-logo.png"
+          alt="Decorative circles"
+          width={800}
+          height={600}
+          className="object-contain"
+          priority
+        />
+      </motion.div>
+      
       {/* Display guest navbar if user is not logged in */}
       {!user && <GuestNavbar />}
       
