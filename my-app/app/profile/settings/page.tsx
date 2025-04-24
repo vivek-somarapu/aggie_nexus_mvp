@@ -11,11 +11,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, Shield, User, Upload, Loader2 } from "lucide-react"
+import { ChevronLeft, Shield, User, Upload, Loader2, AlertTriangle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // Dynamically import the Bell icon with SSR disabled
 const BellIcon = dynamic(() => import("lucide-react").then((mod) => mod.Bell), {
@@ -23,9 +35,12 @@ const BellIcon = dynamic(() => import("lucide-react").then((mod) => mod.Bell), {
 });
 
 export default function SettingsPage() {
-  const { user, isLoading: authLoading } = useAuth()
+  const { user, isLoading: authLoading, signOut } = useAuth()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
@@ -150,6 +165,46 @@ export default function SettingsPage() {
       toast.error("Failed to update profile. Please try again.")
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!user) return
+    
+    setIsDeletingAccount(true)
+    setError(null)
+    
+    try {
+      // Call the API endpoint to delete account
+      const response = await fetch('/api/account', {
+        method: 'DELETE',
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error("Error deleting account:", errorData.error)
+        // We'll show error but still log them out and redirect
+        toast.error("Account deletion may have failed, but you've been logged out")
+      } else {
+        // Show success toast
+        toast.success("Your account has been deleted")
+      }
+    } catch (err) {
+      console.error("Error deleting account:", err)
+      // We'll still log them out even if there was an error
+      toast.error("Account deletion may have failed, but you've been logged out")
+    } finally {
+      // Always sign out and redirect regardless of deletion success
+      try {
+        await signOut()
+      } catch (signOutErr) {
+        console.error("Error signing out:", signOutErr)
+      }
+      
+      // Always redirect to landing page
+      setIsDeletingAccount(false)
+      setShowDeleteConfirmation(false)
+      router.push("/")
     }
   }
 
@@ -483,8 +538,66 @@ export default function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <Card className="border-destructive/20">
+            <CardHeader>
+              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardDescription>
+                Permanently delete your account and all your data
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-md bg-destructive/10 p-4">
+                <div className="flex items-start gap-4">
+                  <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+                  <div>
+                    <h3 className="font-medium text-destructive">Delete Account</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Once you delete your account, there is no going back. This action is permanent and will delete all your data.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <Button 
+                variant="destructive" 
+                onClick={() => setShowDeleteConfirmation(true)}
+                className="w-full sm:w-auto"
+              >
+                Delete Account
+              </Button>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
+      
+      <AlertDialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your account and remove your data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Account"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

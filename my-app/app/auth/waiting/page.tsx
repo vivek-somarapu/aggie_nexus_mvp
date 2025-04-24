@@ -28,6 +28,7 @@ export default function AuthWaitingPage() {
   const [elapsedTime, setElapsedTime] = useState(0)
   const checkInterval = useRef<NodeJS.Timeout | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [isChecking, setIsChecking] = useState(false)
 
   // Initialize email from localStorage and set verification flag in sessionStorage
   useEffect(() => {
@@ -56,13 +57,59 @@ export default function AuthWaitingPage() {
     }
   }, [])
 
+  // Handle manual verification check
+  const handleManualCheck = async () => {
+    setIsChecking(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.refreshSession()
+      
+      if (error) {
+        // Ignore AuthSessionMissingError as it's expected when session is being created
+        if (error.name !== "AuthSessionMissingError") {
+          console.error("Error refreshing session:", error)
+        } else {
+          setMessage("Please sign in first to verify your email")
+        }
+        return
+      }
+      
+      if (data.user?.email_confirmed_at) {
+        setIsVerified(true)
+        setMessage("Email verified! Redirecting you...")
+        setIsRedirecting(true)
+        
+        // Signal to other tabs that verification is complete
+        localStorage.setItem("emailVerified", "true")
+        
+        // Remove verification flag from sessionStorage
+        sessionStorage.removeItem("awaitingVerification")
+        
+        setTimeout(() => {
+          if (profile && profile.bio && profile.skills?.length) {
+            router.push("/")
+          } else {
+            router.push("/profile/setup")
+          }
+        }, 1500)
+      } else {
+        setMessage(`Email not verified yet. Please check your inbox.`)
+      }
+    } catch (err) {
+      console.error("Error checking verification:", err)
+    } finally {
+      setIsChecking(false)
+    }
+  }
+
   // Set up polling to check verification status
   useEffect(() => {
     let startTime = Date.now()
+    let isMounted = true
     
     // Check for inbound verification from another tab
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "emailVerified" && e.newValue === "true") {
+      if (e.key === "emailVerified" && e.newValue === "true" && isMounted) {
         setIsVerified(true)
         setMessage("Email verified! Redirecting you...")
         setIsRedirecting(true)
@@ -154,6 +201,7 @@ export default function AuthWaitingPage() {
     
     // Clean up on unmount
     return () => {
+      isMounted = false
       if (checkInterval.current) {
         clearInterval(checkInterval.current)
       }
@@ -413,6 +461,20 @@ export default function AuthWaitingPage() {
                       </Link>
                     </Button>
                   </div>
+                  
+                  <Button 
+                    onClick={handleManualCheck} 
+                    variant="secondary" 
+                    className="w-full mt-4" 
+                    disabled={isChecking || !userEmail}
+                  >
+                    {isChecking ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                    )}
+                    Check Verification Status
+                  </Button>
                 </motion.div>
                 
                 <motion.div 
