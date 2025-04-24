@@ -1,36 +1,134 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProjectBookmarks, toggleProjectBookmark } from '@/lib/models/bookmarks';
+import { createClient } from '@/lib/supabase/server';
 
+/**
+ * GET: Fetch project bookmarks for the current authenticated user
+ */
 export async function GET(request: NextRequest) {
+  const supabase = createClient();
+  
+  // Check if user is authenticated
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+  
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    const { data, error } = await supabase
+      .from('project_bookmarks')
+      .select('*')
+      .eq('user_id', session.user.id);
+      
+    if (error) {
+      console.error('Error fetching project bookmarks:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch bookmarks' },
+        { status: 500 }
+      );
     }
     
-    const bookmarks = await getProjectBookmarks(userId);
-    return NextResponse.json(bookmarks);
-  } catch (error) {
-    console.error('Error fetching project bookmarks:', error);
-    return NextResponse.json({ error: 'Failed to fetch project bookmarks' }, { status: 500 });
+    return NextResponse.json(data || []);
+  } catch (err) {
+    console.error('Exception in project bookmarks API:', err);
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 }
+    );
   }
 }
 
+/**
+ * POST: Toggle a project bookmark
+ */
 export async function POST(request: NextRequest) {
+  const supabase = createClient();
+  
+  // Check if user is authenticated
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+  
   try {
-    const body = await request.json();
-    const { userId, projectId } = body;
+    const requestData = await request.json();
+    const { projectId } = requestData;
     
-    if (!userId || !projectId) {
-      return NextResponse.json({ error: 'User ID and Project ID are required' }, { status: 400 });
+    if (!projectId) {
+      return NextResponse.json(
+        { error: 'Project ID is required' },
+        { status: 400 }
+      );
     }
     
-    const result = await toggleProjectBookmark(userId, projectId);
+    // Check if bookmark already exists
+    const { data: existingBookmark, error: fetchError } = await supabase
+      .from('project_bookmarks')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('project_id', projectId)
+      .single();
+      
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error checking for existing bookmark:', fetchError);
+      return NextResponse.json(
+        { error: 'Failed to check bookmark status' },
+        { status: 500 }
+      );
+    }
+    
+    let result;
+    
+    // Toggle the bookmark - if it exists, remove it
+    if (existingBookmark) {
+      const { error: deleteError } = await supabase
+        .from('project_bookmarks')
+        .delete()
+        .eq('id', existingBookmark.id);
+        
+      if (deleteError) {
+        console.error('Error removing bookmark:', deleteError);
+        return NextResponse.json(
+          { error: 'Failed to remove bookmark' },
+          { status: 500 }
+        );
+      }
+      
+      result = { action: 'removed', projectId };
+    } else {
+      // Otherwise, add it
+      const { error: insertError } = await supabase
+        .from('project_bookmarks')
+        .insert({
+          user_id: session.user.id,
+          project_id: projectId,
+          saved_at: new Date().toISOString()
+        });
+        
+      if (insertError) {
+        console.error('Error adding bookmark:', insertError);
+        return NextResponse.json(
+          { error: 'Failed to add bookmark' },
+          { status: 500 }
+        );
+      }
+      
+      result = { action: 'added', projectId };
+    }
+    
     return NextResponse.json(result);
-  } catch (error) {
-    console.error('Error toggling project bookmark:', error);
-    return NextResponse.json({ error: 'Failed to toggle project bookmark' }, { status: 500 });
+  } catch (err) {
+    console.error('Exception in toggle project bookmark API:', err);
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 }
+    );
   }
 } 

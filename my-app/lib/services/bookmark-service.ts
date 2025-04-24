@@ -5,7 +5,7 @@ import { Project } from "@/lib/services/project-service";
 export const bookmarkService = {
   // Get user bookmarks for a user
   getUserBookmarks: async (userId: string): Promise<UserBookmark[]> => {
-    const response = await fetch(`/api/bookmarks/users?userId=${userId}`);
+    const response = await fetch(`/api/bookmarks/users`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch user bookmarks: ${response.statusText}`);
@@ -16,7 +16,7 @@ export const bookmarkService = {
   
   // Get project bookmarks for a user
   getProjectBookmarks: async (userId: string): Promise<ProjectBookmark[]> => {
-    const response = await fetch(`/api/bookmarks/projects?userId=${userId}`);
+    const response = await fetch(`/api/bookmarks/projects`);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch project bookmarks: ${response.statusText}`);
@@ -43,7 +43,7 @@ export const bookmarkService = {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, bookmarkedUserId }),
+      body: JSON.stringify({ bookmarked_user_id: bookmarkedUserId }),
     });
     
     if (!response.ok) {
@@ -51,7 +51,7 @@ export const bookmarkService = {
     }
     
     const result = await response.json();
-    return result.isBookmarked;
+    return result.action === 'added';
   },
   
   // Toggle a project bookmark
@@ -61,7 +61,7 @@ export const bookmarkService = {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, projectId }),
+      body: JSON.stringify({ projectId }),
     });
     
     if (!response.ok) {
@@ -73,13 +73,23 @@ export const bookmarkService = {
   
   // Check if a user is bookmarked
   isUserBookmarked: async (userId: string, bookmarkedUserId: string): Promise<boolean> => {
-    const bookmarks = await bookmarkService.getUserBookmarks(userId);
-    return bookmarks.some((bookmark: UserBookmark) => bookmark.bookmarked_user_id === bookmarkedUserId);
+    try {
+      const bookmarks = await bookmarkService.getUserBookmarks(userId);
+      return bookmarks.some((bookmark: UserBookmark) => bookmark.bookmarked_user_id === bookmarkedUserId);
+    } catch (err) {
+      console.error('Error checking user bookmark status:', err);
+      return false;
+    }
   },
   
   // Check if a project is bookmarked
   isProjectBookmarked: async (userId: string, projectId: string): Promise<boolean> => {
-    const bookmarks = await bookmarkService.getProjectBookmarks(userId);
-    return bookmarks.some((bookmark: ProjectBookmark) => bookmark.project_id === projectId);
+    try {
+      const bookmarks = await bookmarkService.getProjectBookmarks(userId);
+      return bookmarks.some((bookmark: ProjectBookmark) => bookmark.project_id === projectId);
+    } catch (err) {
+      console.error('Error checking project bookmark status:', err);
+      return false;
+    }
   }
 }; 
