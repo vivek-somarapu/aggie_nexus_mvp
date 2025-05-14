@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, notFound } from "next/navigation"
+import { useParams, notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Share2,
   User,
+  Pencil,
 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import { projectService, Project } from "@/lib/services/project-service"
@@ -98,8 +99,13 @@ export default function ProjectPage() {
     }
     
     fetchProjectData()
+    console.log(currentUser)
   }, [id, currentUser])
   
+  const handleEdit = async () => {
+    redirect(`/projects/edit/${project?.id}`)
+  }
+
   const handleBookmarkToggle = async () => {
     if (!currentUser || !project) return
     
@@ -239,6 +245,15 @@ export default function ProjectPage() {
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
+                  {currentUser?.id == owner?.id && 
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={handleEdit}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span className="sr-only">Edit project</span>
+                  </Button>}
                   <Button 
                     variant="outline" 
                     size="icon" 
