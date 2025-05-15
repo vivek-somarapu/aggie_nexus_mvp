@@ -1,69 +1,47 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth"
-import { userService } from "@/lib/services/user-service"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, ChevronRight, ChevronLeft, User as UserIcon, Check } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import Link from "next/link"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { User as UserType } from "@/lib/models/users";
+import { userService } from "@/lib/services/user-service";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Loader2,
+  ChevronRight,
+  ChevronLeft,
+  User as UserIcon,
+  Check,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import Link from "next/link";
 
-// Get industry options from the project page
-const industryOptions = [
-  "Technology",
-  "Healthcare",
-  "Education",
-  "Finance",
-  "Entertainment",
-  "Retail",
-  "Manufacturing",
-  "Agriculture",
-  "Energy",
-  "Transportation",
-  "Real Estate",
-  "Nonprofit",
-  "Sports",
-  "Food & Beverage",
-  "Other"
-]
-
-// Get skill options from the project page
-const skillOptions = [
-  "Programming",
-  "Design",
-  "Marketing",
-  "Sales",
-  "Finance",
-  "Management",
-  "Writing",
-  "Research",
-  "Customer Service",
-  "Data Analysis",
-  "Project Management",
-  "Leadership",
-  "Communication",
-  "Problem Solving",
-  "Creativity"
-]
+import { industryOptions, skillOptions } from "@/lib/constants";
 
 export default function ProfileSetupPage() {
-  const { user, isLoading: authLoading } = useAuth()
-  const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(1)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([])
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
-  const [isFromAuthError, setIsFromAuthError] = useState(false)
-
+  const { user: authUser, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [isFromAuthError, setIsFromAuthError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<UserType | null>(null);
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -74,150 +52,170 @@ export default function ProfileSetupPage() {
     is_texas_am_affiliate: false,
     resume_url: "",
     contact: { email: "", phone: "" },
-  })
+  });
 
   // Initialize form with user data if available
   useEffect(() => {
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        full_name: user.full_name || "",
-        email: user.email || "",
-        bio: user.bio || "",
-        linkedin_url: user.linkedin_url || "",
-        website_url: user.website_url || "",
-        graduation_year: user.graduation_year?.toString() || "",
-        is_texas_am_affiliate: user.is_texas_am_affiliate || false,
-        contact: {
-          email: user.email || "",
-          phone: user.contact?.phone || ""
+    if (!authUser?.id) return;
+    const fetchUser = async () => {
+      try {
+        setIsLoading(true);
+        const userData = await userService.getUser(authUser.id);
+        if (!userData) {
+          throw new Error("User not found");
         }
-      }))
+        setUser(userData);
+        setFormData((prev) => ({
+          ...prev,
+          full_name: userData.full_name || "",
+          email: userData.email || "",
+          bio: userData.bio || "",
+          linkedin_url: userData.linkedin_url || "",
+          website_url: userData.website_url || "",
+          graduation_year: userData.graduation_year?.toString() || "",
+          is_texas_am_affiliate: userData.is_texas_am_affiliate || false,
+          contact: {
+            email: userData.email || "",
+            phone: userData.contact?.phone || "",
+          },
+        }));
+        if (userData.industry) {
+          setSelectedIndustries(userData.industry);
+        }
 
-      if (user.industry) {
-        setSelectedIndustries(user.industry)
+        if (userData.skills) {
+          setSelectedSkills(userData.skills);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
       }
-
-      if (user.skills) {
-        setSelectedSkills(user.skills)
-      }
-    }
-  }, [user])
+    };
+    fetchUser();
+  }, [authUser?.id]);
 
   // Check if user was redirected from auth error
   useEffect(() => {
     // Check localStorage for auth error flag
-    const authErrorFlag = localStorage.getItem("auth_profile_error")
+    const authErrorFlag = localStorage.getItem("auth_profile_error");
     if (authErrorFlag === "true") {
-      setIsFromAuthError(true)
-      setMessage("We detected an issue with your profile during signup. Please complete your profile setup now.")
+      setIsFromAuthError(true);
+      setMessage(
+        "We detected an issue with your profile during signup. Please complete your profile setup now."
+      );
       // Jump directly to step 2 (basic information)
-      setCurrentStep(2)
+      setCurrentStep(2);
       // Clear the flag
-      localStorage.removeItem("auth_profile_error")
+      localStorage.removeItem("auth_profile_error");
     }
-  }, [])
+  }, []);
 
   // Handle user interaction
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
       contact: {
         ...prev.contact,
-        [name]: value
-      }
-    }))
-  }
+        [name]: value,
+      },
+    }));
+  };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target
-    setFormData(prev => ({
+    const { name, checked } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: checked
-    }))
-  }
+      [name]: checked,
+    }));
+  };
 
   const handleIndustrySelect = (industry: string) => {
     if (selectedIndustries.includes(industry)) {
-      setSelectedIndustries(selectedIndustries.filter(i => i !== industry))
+      setSelectedIndustries(selectedIndustries.filter((i) => i !== industry));
     } else {
-      setSelectedIndustries([...selectedIndustries, industry])
+      setSelectedIndustries([...selectedIndustries, industry]);
     }
-  }
+  };
 
   const handleSkillSelect = (skill: string) => {
     if (selectedSkills.includes(skill)) {
-      setSelectedSkills(selectedSkills.filter(s => s !== skill))
+      setSelectedSkills(selectedSkills.filter((s) => s !== skill));
     } else {
-      setSelectedSkills([...selectedSkills, skill])
+      setSelectedSkills([...selectedSkills, skill]);
     }
-  }
+  };
 
   const nextStep = () => {
-    setCurrentStep(prev => prev + 1)
-  }
+    setCurrentStep((prev) => prev + 1);
+  };
 
   const prevStep = () => {
-    setCurrentStep(prev => prev - 1)
-  }
+    setCurrentStep((prev) => prev - 1);
+  };
 
   const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    
+    if (e) e.preventDefault();
+
     if (!user) {
-      setError("You must be logged in to update your profile")
-      return
+      setError("You must be logged in to update your profile");
+      return;
     }
-    
+
     try {
-      setIsSubmitting(true)
-      setError(null)
-      
+      setIsSubmitting(true);
+      setError(null);
+
       // Format the data for API with validation
       const userData = {
         ...formData,
         // Ensure full_name is never empty - use email prefix if empty
-        full_name: formData.full_name || (formData.email?.split('@')[0] || 'User'),
+        full_name:
+          formData.full_name || formData.email?.split("@")[0] || "User",
         industry: selectedIndustries,
         skills: selectedSkills,
-        graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : null,
+        graduation_year: formData.graduation_year
+          ? parseInt(formData.graduation_year)
+          : null,
         // Explicitly mark profile as completed
         profile_setup_completed: true,
-        profile_setup_skipped: false
-      }
-      
+        profile_setup_skipped: false,
+      };
+
       // Update user via API
-      await userService.updateUser(user.id, userData)
-      
+      await userService.updateUser(user.id, userData);
+
       if (isFromAuthError) {
-        setMessage("Your profile has been successfully created!")
+        setMessage("Your profile has been successfully created!");
       }
-      
+
       // Redirect to home page or profile
-      router.push("/")
+      router.push("/");
     } catch (err: any) {
-      console.error("Error updating profile:", err)
-      setError(err.message || "Failed to update profile. Please try again.")
+      console.error("Error updating profile:", err);
+      setError(err.message || "Failed to update profile. Please try again.");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const skipToHome = async () => {
     try {
@@ -226,16 +224,16 @@ export default function ProfileSetupPage() {
         await userService.updateUser(user.id, {
           profile_setup_skipped: true,
           // Add a timestamp to record when setup was skipped
-          profile_setup_skipped_at: new Date().toISOString()
+          profile_setup_skipped_at: new Date().toISOString(),
         });
       }
-      router.push("/")
+      router.push("/");
     } catch (err) {
       console.error("Error recording skip preference:", err);
       // Continue to home page even if there's an error
-      router.push("/")
+      router.push("/");
     }
-  }
+  };
 
   if (authLoading) {
     return (
@@ -243,7 +241,7 @@ export default function ProfileSetupPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="ml-2">Loading...</span>
       </div>
-    )
+    );
   }
 
   if (!user) {
@@ -258,7 +256,7 @@ export default function ProfileSetupPage() {
           </AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
   // Step 1: Welcome screen with options
@@ -269,20 +267,25 @@ export default function ProfileSetupPage() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Welcome to Aggie Nexus!</CardTitle>
             <CardDescription>
-              Would you like to set up your profile now or continue to the platform?
+              Would you like to set up your profile now or continue to the
+              platform?
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-center">
               <Avatar className="h-24 w-24">
-                <AvatarImage src={user.avatar || undefined} alt={user.full_name} />
+                <AvatarImage
+                  src={user.avatar || undefined}
+                  alt={user.full_name}
+                />
                 <AvatarFallback>
                   <UserIcon className="h-12 w-12" />
                 </AvatarFallback>
               </Avatar>
             </div>
             <p className="text-center text-muted-foreground">
-              Setting up your profile helps others find you and makes it easier to connect with like-minded individuals.
+              Setting up your profile helps others find you and makes it easier
+              to connect with like-minded individuals.
             </p>
             {message && (
               <Alert className="mt-4">
@@ -291,12 +294,16 @@ export default function ProfileSetupPage() {
             )}
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={skipToHome}>Skip for now</Button>
-            <Button onClick={nextStep}>Set up profile <ChevronRight className="ml-2 h-4 w-4" /></Button>
+            <Button variant="outline" onClick={skipToHome}>
+              Skip for now
+            </Button>
+            <Button onClick={nextStep}>
+              Set up profile <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
           </CardFooter>
         </Card>
       </div>
-    )
+    );
   }
 
   // Step 2: Basic information
@@ -325,7 +332,7 @@ export default function ProfileSetupPage() {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -338,7 +345,7 @@ export default function ProfileSetupPage() {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="bio">Bio</Label>
               <Textarea
@@ -387,7 +394,7 @@ export default function ProfileSetupPage() {
           </CardFooter>
         </Card>
       </div>
-    )
+    );
   }
 
   // Step 3: Skills and Industries
@@ -397,7 +404,9 @@ export default function ProfileSetupPage() {
         <Card className="w-full max-w-md mx-auto">
           <CardHeader>
             <CardTitle>Skills & Industries</CardTitle>
-            <CardDescription>Select your skills and industries of interest</CardDescription>
+            <CardDescription>
+              Select your skills and industries of interest
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -412,7 +421,10 @@ export default function ProfileSetupPage() {
                       onChange={() => handleIndustrySelect(industry)}
                       className="rounded border-gray-300"
                     />
-                    <Label htmlFor={`industry-${industry}`} className="font-normal">
+                    <Label
+                      htmlFor={`industry-${industry}`}
+                      className="font-normal"
+                    >
                       {industry}
                     </Label>
                   </div>
@@ -450,7 +462,7 @@ export default function ProfileSetupPage() {
           </CardFooter>
         </Card>
       </div>
-    )
+    );
   }
 
   // Step 4: Contact and Links
@@ -518,7 +530,7 @@ export default function ProfileSetupPage() {
           </CardFooter>
         </Card>
       </div>
-    )
+    );
   }
 
   // Step 5: Review and Submit
@@ -538,7 +550,9 @@ export default function ProfileSetupPage() {
 
           <div className="space-y-1">
             <p className="text-sm font-medium">Name</p>
-            <p className="text-sm text-muted-foreground">{formData.full_name}</p>
+            <p className="text-sm text-muted-foreground">
+              {formData.full_name}
+            </p>
           </div>
 
           <div className="space-y-1">
@@ -556,40 +570,52 @@ export default function ProfileSetupPage() {
           {formData.graduation_year && (
             <div className="space-y-1">
               <p className="text-sm font-medium">Graduation Year</p>
-              <p className="text-sm text-muted-foreground">{formData.graduation_year}</p>
+              <p className="text-sm text-muted-foreground">
+                {formData.graduation_year}
+              </p>
             </div>
           )}
 
           <div className="space-y-1">
             <p className="text-sm font-medium">Texas A&M Affiliate</p>
-            <p className="text-sm text-muted-foreground">{formData.is_texas_am_affiliate ? "Yes" : "No"}</p>
+            <p className="text-sm text-muted-foreground">
+              {formData.is_texas_am_affiliate ? "Yes" : "No"}
+            </p>
           </div>
 
           {selectedIndustries.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm font-medium">Industries</p>
-              <p className="text-sm text-muted-foreground">{selectedIndustries.join(", ")}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedIndustries.join(", ")}
+              </p>
             </div>
           )}
 
           {selectedSkills.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm font-medium">Skills</p>
-              <p className="text-sm text-muted-foreground">{selectedSkills.join(", ")}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedSkills.join(", ")}
+              </p>
             </div>
           )}
 
           {formData.linkedin_url && (
             <div className="space-y-1">
               <p className="text-sm font-medium">LinkedIn</p>
-              <p className="text-sm text-muted-foreground">{formData.linkedin_url}</p>
+              <p className="text-sm text-muted-foreground">
+                {formData.linkedin_url}
+              </p>
             </div>
           )}
 
           {formData.website_url && (
             <div className="space-y-1">
               <p className="text-sm font-medium">Website</p>
-              <p className="text-sm text-muted-foreground">{formData.website_url}</p>
+              <p className="text-sm text-muted-foreground">
+                {formData.website_url}
+              </p>
             </div>
           )}
         </CardContent>
@@ -612,5 +638,5 @@ export default function ProfileSetupPage() {
         </CardFooter>
       </Card>
     </div>
-  )
-} 
+  );
+}
