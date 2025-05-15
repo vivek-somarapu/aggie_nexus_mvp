@@ -235,6 +235,8 @@ export default function SettingsPage() {
         graduation_year: formData.graduation_year,
         avatar: formData.avatar,
         resume_url: formData.resume_url,
+        industry: selectedIndustries,
+        skills: selectedSkills,
       });
 
       if (result) {

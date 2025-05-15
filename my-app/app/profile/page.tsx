@@ -479,7 +479,7 @@ export default function ProfilePage() {
                           </Avatar>
                         </motion.div>
 
-                        <div className="flex-1 space-y-1.5">
+                        <div className="flex-1 space-y-4">
                           <motion.h2
                             className="text-2xl font-bold tracking-tight"
                             variants={itemVariants}
@@ -488,7 +488,7 @@ export default function ProfilePage() {
                           </motion.h2>
 
                           <motion.div
-                            className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+                            className="flex flex-wrap items-center gap-2 text-sm mt-10 text-muted-foreground"
                             variants={itemVariants}
                           >
                             <div className="flex items-center">
