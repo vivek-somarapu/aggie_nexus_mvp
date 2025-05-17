@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { userService } from "@/lib/services/user-service";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import { InputFile } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -27,7 +29,8 @@ import {
   Upload,
   Loader2,
   AlertTriangle,
-  ChevronRight,
+  Download,
+  Trash2,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +49,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { industryOptions, skillOptions } from "@/lib/constants";
+import { TagSelector } from "@/components/profile/tag-selector";
+import { type } from "os";
 
 // Dynamically import the Bell icon with SSR disabled
 const BellIcon = dynamic(() => import("lucide-react").then((mod) => mod.Bell), {
@@ -201,19 +206,21 @@ export default function SettingsPage() {
     }
   };
 
-  const handleIndustrySelect = (industry: string) => {
-    if (selectedIndustries.includes(industry)) {
-      setSelectedIndustries(selectedIndustries.filter((i) => i !== industry));
-    } else {
-      setSelectedIndustries([...selectedIndustries, industry]);
-    }
-  };
+  const handleDeleteAvatar = async () => {
+    if (!formData.avatar) return;
 
-  const handleSkillSelect = (skill: string) => {
-    if (selectedSkills.includes(skill)) {
-      setSelectedSkills(selectedSkills.filter((s) => s !== skill));
-    } else {
-      setSelectedSkills([...selectedSkills, skill]);
+    try {
+      const filePath = formData.avatar.split(
+        "/storage/v1/object/public/avatars/"
+      )[1];
+      if (filePath) {
+        await supabase.storage.from("avatars").remove([filePath]);
+      }
+
+      setFormData((prev) => ({ ...prev, avatar: "" }));
+    } catch (err) {
+      console.error("Failed to delete avatar from storage:", err);
+      toast.error("Could not delete avatar from storage.");
     }
   };
 
@@ -410,27 +417,45 @@ export default function SettingsPage() {
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-border/40 shadow-md">
                   <AvatarImage src={formData.avatar} alt={formData.full_name} />
-                  <AvatarFallback>
-                    {formData.full_name ? (
-                      formData.full_name.charAt(0).toUpperCase()
-                    ) : (
-                      <User />
-                    )}
-                  </AvatarFallback>
+                  {formData?.avatar ? (
+                    <Image
+                      src={formData.avatar}
+                      alt={formData.full_name ?? "User"}
+                      width={128}
+                      height={128}
+                      className="object-cover rounded-full"
+                      priority
+                    />
+                  ) : (
+                    <AvatarFallback className="text-3xl bg-muted">
+                      {formData.full_name ? (
+                        formData.full_name.charAt(0).toUpperCase()
+                      ) : (
+                        <User className="h-16 w-16" />
+                      )}
+                    </AvatarFallback>
+                  )}
                 </Avatar>
 
                 <div className="flex-1">
-                  <Label htmlFor="avatar-upload" className="block mb-2">
-                    Upload New Picture
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="avatar-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarChange}
-                      className="max-w-xs"
-                    />
+                  <div>
+                    <Label htmlFor="avatar-upload" className="block mb-2">
+                      Upload New Picture
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="avatar-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="max-w-xs"
+                      />
+                      {formData.avatar && (
+                        <Button type="button" onClick={handleDeleteAvatar}>
+                          <Trash2 /> Delete
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Recommended: Square image, at least 200x200px
@@ -479,63 +504,51 @@ export default function SettingsPage() {
                     id="bio"
                     name="bio"
                     value={formData.bio || ""}
-                    onChange={handleChange}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        bio: e.target.value.slice(0, 250),
+                      }))
+                    }
                     placeholder="Tell us about yourself"
                     rows={4}
                   />
+                  <div className="text-sm text-muted-foreground text-right">
+                    {formData.bio?.length || 0} / 250
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="w-full max-w-md mx-auto">
+          <Card>
             <CardHeader>
               <CardTitle>Skills & Industries</CardTitle>
               <CardDescription>
                 Select your skills and industries of interest
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Industries (Select all that apply)</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {industryOptions.map((industry) => (
-                    <div key={industry} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`industry-${industry}`}
-                        checked={selectedIndustries.includes(industry)}
-                        onChange={() => handleIndustrySelect(industry)}
-                        className="rounded border-gray-300"
-                      />
-                      <Label
-                        htmlFor={`industry-${industry}`}
-                        className="font-normal"
-                      >
-                        {industry}
-                      </Label>
-                    </div>
-                  ))}
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>Industries</Label>
+                  <TagSelector
+                    label="Industries"
+                    options={industryOptions}
+                    selected={selectedIndustries}
+                    onChange={setSelectedIndustries}
+                  />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Skills (Select all that apply)</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {skillOptions.map((skill) => (
-                    <div key={skill} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`skill-${skill}`}
-                        checked={selectedSkills.includes(skill)}
-                        onChange={() => handleSkillSelect(skill)}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor={`skill-${skill}`} className="font-normal">
-                        {skill}
-                      </Label>
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  <Label>Skills</Label>
+                  <TagSelector
+                    label="Skills"
+                    options={skillOptions}
+                    selected={selectedSkills}
+                    onChange={setSelectedSkills}
+                    maxTags={15}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -595,23 +608,34 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="flex items-center gap-4">
-                  {formData.resume_url ? (
-                    <a
-                      href={formData.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline text-sm"
-                    >
-                      Download current resume
-                    </a>
-                  ) : (
-                    <p className="text-sm text-gray-500">No resume uploaded</p>
-                  )}
-                  <Input
-                    type="file"
+                  <InputFile
+                    label="Upload resume"
                     accept=".pdf"
                     onChange={handleResumeChange}
                   />
+                  <div className="mt-auto flex justify-end">
+                    {formData.resume_url ? (
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="text-sm py-4"
+                      >
+                        <a
+                          href={formData.resume_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Download className="mr-1 h-4 w-4" />
+                          Resume
+                        </a>
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">
+                        No resume uploaded
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 

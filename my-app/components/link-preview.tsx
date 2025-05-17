@@ -60,8 +60,13 @@ export function LinkWithPreview({ url, name, children }: Props) {
   return (
     <HoverCard.Root openDelay={0} closeDelay={100}>
       <HoverCard.Trigger asChild>
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          {children}
+        <a
+          href={url}
+          target="_blank"
+          className="text-sm"
+          rel="noopener noreferrer"
+        >
+          {preview?.title ?? new URL(url).hostname.replace(/^www\./, "")}
         </a>
       </HoverCard.Trigger>
 

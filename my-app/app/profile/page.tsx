@@ -1,65 +1,43 @@
 "use client";
 
-import type React from "react";
-import { useState, useEffect } from "react";
+import { v4 as uuid } from "uuid";
+/* ────── React & Next ────── */
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+
+import { AnimatePresence, motion } from "framer-motion";
+
+/* ────── Auth & Types ────── */
+
+import { useAuth } from "@/lib/auth";
+import { User as UserType } from "@/lib/models/users";
+
+/* ────── Components: UI ────── */
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { InputFile } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { TagSelector } from "@/components/profile/tag-selector";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIsMobile } from "@/lib/is-mobile";
-import { Badge } from "@/components/ui/badge";
-import {
-  Bookmark,
-  ExternalLink,
-  GraduationCap,
-  Linkedin,
-  Loader2,
-  Pencil,
-  Save,
-  User,
-  Plus,
-  PenLine,
-  MessageSquare,
-  Clock,
-  CalendarIcon,
-  MapPin,
-  Filter,
-  FileText,
-  Search,
-  Trash2,
-  Eye,
-  Mail,
-} from "lucide-react";
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-
-import { useAuth } from "@/lib/auth";
-import type { User as AuthUser } from "@/lib/auth";
-import { userService } from "@/lib/services/user-service";
-import { bookmarkService } from "@/lib/services/bookmark-service";
-import { User as UserType } from "@/lib/models/users";
-import { Project, projectService } from "@/lib/services/project-service";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useRouter } from "next/navigation";
-import { profileSetupStatus } from "@/lib/profile-utils";
-import { inquiryService, ProjectInquiry } from "@/lib/services/inquiry-service";
 import {
   Select,
   SelectContent,
@@ -67,19 +45,61 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatDate } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import { LinkWithPreview } from "@/components/link-preview";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+/* ────── Components: Custom ────── */
+import { LinkWithPreview } from "@/components/link-preview";
+import { ProfileCard } from "@/components/profile/profile-card";
+import { ProfileTab } from "@/components/profile/profile-tab";
+import ProfileCompletionBanner from "@/components/profile/completion-banner";
+
+/* ────── Libs ────── */
+import { useIsMobile } from "@/lib/is-mobile";
+
+import { formatDate } from "@/lib/utils";
+
+/* ────── Services ────── */
+import { userService } from "@/lib/services/user-service";
+import { bookmarkService } from "@/lib/services/bookmark-service";
+import { ProjectInquiry, inquiryService } from "@/lib/services/inquiry-service";
+import { Project, projectService } from "@/lib/services/project-service";
+
+/* ────── Constants ────── */
 import {
-  pageVariants,
-  containerVariants,
   cardVariants,
+  containerVariants,
   itemVariants,
+  pageVariants,
+  skillOptions,
 } from "@/lib/constants";
+
+/* ────── Icons ────── */
+import {
+  CalendarIcon,
+  ExternalLink,
+  FileText,
+  Filter,
+  Linkedin,
+  Download,
+  Loader2,
+  Mail,
+  MessageSquare,
+  PenLine,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  User,
+} from "lucide-react";
+import { Label } from "@/components/ui/label";
+
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 export default function ProfilePage() {
   const { user: currentUser } = useAuth();
+  const { refreshProfile } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const isMobile = useIsMobile();
   const searchParams = useSearchParams();
@@ -90,6 +110,7 @@ export default function ProfilePage() {
   const [bookmarksLoading, setBookmarksLoading] = useState(true);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [inquiriesLoading, setInquiriesLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([]);
   const [bookmarkedUsers, setBookmarkedUsers] = useState<UserType[]>([]);
@@ -99,7 +120,7 @@ export default function ProfilePage() {
   );
   const [sentInquiries, setSentInquiries] = useState<ProjectInquiry[]>([]);
 
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCompletionBanner, setShowCompletionBanner] = useState(false);
 
@@ -113,6 +134,10 @@ export default function ProfilePage() {
     []
   );
   const [deleteInProgress, setDeleteInProgress] = useState<string | null>(null);
+
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+
   // Full user data
   const [user, setUser] = useState<UserType | null>(null);
 
@@ -123,11 +148,13 @@ export default function ProfilePage() {
     bio: "",
     linkedin_url: "",
     website_url: "",
-    graduation_year: 0,
+    graduation_year: undefined as number | undefined,
     is_texas_am_affiliate: false,
     avatar: "",
     skills: [] as string[],
+    industry: [] as string[],
     resume_url: "",
+    contact: { email: "", phone: "" } as { email: string; phone: string },
   });
 
   useEffect(() => {
@@ -142,48 +169,45 @@ export default function ProfilePage() {
   // fetch user and check if profile is complete
   useEffect(() => {
     if (!currentUser?.id) return;
-
-    const fetchAndCheck = async () => {
-      setIsLoading(true);
+    const fetchUser = async () => {
       try {
+        setIsLoading(true);
         const userData = await userService.getUser(currentUser.id);
-        if (!userData) throw new Error("User not found");
-
-        // set user
+        if (!userData) {
+          throw new Error("User not found");
+        }
+        console.log("Raw userData:", userData);
         setUser(userData);
         setFormData({
           full_name: userData.full_name || "",
-          email: userData.email,
+          email: userData.email || "",
           bio: userData.bio || "",
+          industry: userData.industry || [],
+          skills: userData.skills || [],
           linkedin_url: userData.linkedin_url || "",
           website_url: userData.website_url || "",
-          graduation_year: userData.graduation_year || 0,
           is_texas_am_affiliate: userData.is_texas_am_affiliate || false,
+          graduation_year: userData.graduation_year ?? undefined,
           avatar: userData.avatar || "",
           resume_url: userData.resume_url || "",
-          skills: userData.skills || [],
+          contact: {
+            email: userData.contact?.email || userData.email || "",
+            phone: userData.contact?.phone || "",
+          },
         });
-
-        // set up the user in the format auth.User
-        const authUserForCheck: AuthUser = {
-          id: userData.id,
-          email: userData.email,
-          bio: userData.bio ?? undefined,
-          skills: userData.skills ?? undefined,
-          avatar: userData.avatar ?? undefined,
-        };
-
-        // check the profile status - complete/incomplete
-        const status = profileSetupStatus(authUserForCheck);
-        setShowCompletionBanner(status.shouldSetupProfile);
+        if (userData.industry) {
+          setSelectedIndustries(userData.industry);
+        }
+        if (userData.skills) {
+          setSelectedSkills(userData.skills);
+        }
       } catch (err) {
-        console.error("Could not fetch the user", err);
+        console.error(err);
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchAndCheck();
+    fetchUser();
   }, [currentUser?.id]);
 
   // Load bookmarks
@@ -327,6 +351,155 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsSaving(true);
+
+      // 1) upload file to bucket
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${uuid()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 2) get public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(fileName);
+
+      // 3) update user profile with new avatar URL
+      setFormData((prev) => ({
+        ...prev,
+        avatar: publicUrl,
+      }));
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      toast.error("Failed to upload avatar. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleDeleteAvatar = async () => {
+    if (!formData.avatar) return;
+
+    try {
+      const filePath = formData.avatar.split(
+        "/storage/v1/object/public/avatars/"
+      )[1];
+      if (filePath) {
+        await supabase.storage.from("avatars").remove([filePath]);
+      }
+
+      setFormData((prev) => ({ ...prev, avatar: "" }));
+    } catch (err) {
+      console.error("Failed to delete avatar from storage:", err);
+      toast.error("Could not delete avatar from storage.");
+    }
+  };
+
+  const handleSwitchChange = (checked: boolean, name: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: checked,
+    }));
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      const result = await userService.updateUser(user.id, {
+        full_name: formData.full_name,
+        bio: formData.bio,
+        linkedin_url: formData.linkedin_url,
+        website_url: formData.website_url,
+        is_texas_am_affiliate: formData.is_texas_am_affiliate,
+        graduation_year: formData.graduation_year,
+        avatar: formData.avatar,
+        resume_url: formData.resume_url,
+        industry: selectedIndustries,
+        contact: formData.contact,
+        skills: selectedSkills,
+      });
+
+      if (result) {
+        await refreshProfile();
+        setIsEditOpen(false);
+        toast.success("Your profile has been updated successfully");
+        window.location.reload();
+        router.refresh();
+      }
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      setError("Failed to update profile. Please try again.");
+      toast.error("Failed to update profile. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsSaving(true);
+      // генерируем уникальное имя
+      const ext = file.name.split(".").pop();
+      const filename = `${uuid()}.${ext}`;
+      // заливаем в bucket "resumes"
+      const { error: uploadError } = await supabase.storage
+        .from("resumes")
+        .upload(filename, file, { cacheControl: "3600", upsert: false });
+      if (uploadError) throw uploadError;
+
+      // получаем публичный URL
+      const { data } = supabase.storage.from("resumes").getPublicUrl(filename);
+      setFormData((prev) => ({
+        ...prev,
+        resume_url: data.publicUrl,
+      }));
+      toast.success("Resume uploaded");
+    } catch (err) {
+      console.error("Error uploading resume:", err);
+      toast.error("Failed to upload resume. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      contact: {
+        ...prev.contact,
+        [name]: value,
+      },
+    }));
+  };
+
   if (!currentUser) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -344,36 +517,7 @@ export default function ProfilePage() {
       exit="exit"
     >
       {/* Profile Completion Banner - only shown if needed */}
-      <AnimatePresence>
-        {showCompletionBanner && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
-              <AlertDescription className="flex justify-between items-center">
-                <div className="flex-1">
-                  <p className="font-medium text-blue-800 dark:text-blue-300">
-                    Your profile is incomplete
-                  </p>
-                  <p className="text-sm text-blue-600 dark:text-blue-400">
-                    Complete your profile to connect with others and showcase
-                    your skills.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => router.push("/profile/setup")}
-                >
-                  Complete Profile
-                </Button>
-              </AlertDescription>
-            </Alert>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ProfileCompletionBanner visible={showCompletionBanner} />
 
       <motion.div
         className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
@@ -389,6 +533,7 @@ export default function ProfilePage() {
         </div>
       </motion.div>
 
+      {/* error message */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -403,712 +548,464 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="projects">My Projects</TabsTrigger>
-          <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
-          <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
-        </TabsList>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Profile Card */}
+        <ProfileCard
+          user={user}
+          formData={formData}
+          setFormData={setFormData}
+          selectedIndustries={selectedIndustries}
+          setSelectedIndustries={setSelectedIndustries}
+          handleAvatarChange={handleAvatarChange}
+          handleDeleteAvatar={handleDeleteAvatar}
+          handleSwitchChange={handleSwitchChange}
+          handleSaveProfile={handleSaveProfile}
+          isSaving={isSaving}
+        />
 
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-6">
-          <AnimatePresence mode="wait">
-            {isLoading ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="projects">My Projects</TabsTrigger>
+            <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
+            <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
+          </TabsList>
+
+          {/* Profile Tab */}
+          <ProfileTab
+            isEditOpen={isEditOpen}
+            setIsEditOpen={setIsEditOpen}
+            isLoading={isLoading}
+            user={user}
+            formData={formData}
+            setFormData={setFormData}
+            selectedSkills={selectedSkills}
+            setSelectedSkills={setSelectedSkills}
+            handleResumeChange={handleResumeChange}
+            handleSaveProfile={handleSaveProfile}
+            handleChange={handleChange}
+            handleContactChange={handleContactChange}
+          />
+
+          {/* My Projects Tab */}
+          <TabsContent value="projects" className="space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">My Projects</h2>
               <motion.div
-                key="loading"
-                className="flex justify-center items-center py-12"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
               >
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <span className="ml-2">Loading your profile...</span>
+                <Button asChild>
+                  <Link href="/projects/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Project
+                  </Link>
+                </Button>
               </motion.div>
-            ) : (
-              <motion.div
-                key="profile-content"
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                className="flex justify-center"
-              >
-                <div className="w-full max-w-4xl">
-                  <Card className="shadow-md border border-border/50 overflow-hidden">
-                    <div className="relative h-40 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5">
-                      <div className="absolute top-4 right-4">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="shadow-sm"
-                          onClick={() => router.push("/profile/settings")}
-                        >
-                          <Pencil className="h-4 w-4 mr-1.5" />
-                          Edit Profile
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="px-6 -mt-16 relative">
+            </div>
+
+            <AnimatePresence mode="wait">
+              {projectsLoading ? (
+                <motion.div
+                  key="loading"
+                  className="flex justify-center items-center py-12"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <span className="ml-2">Loading your projects...</span>
+                </motion.div>
+              ) : userProjects.length === 0 ? (
+                <motion.div
+                  key="no-projects"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Card>
+                    <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-lg font-medium mb-2">
+                        No projects yet
+                      </h3>
+                      <p className="text-muted-foreground mb-4">
+                        You haven't created any projects yet. Get started by
+                        creating your first project.
+                      </p>
                       <motion.div
-                        className="flex flex-col md:flex-row gap-6 mb-6"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                       >
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          transition={{
-                            type: "spring",
-                            stiffness: 400,
-                            damping: 10,
-                          }}
-                        >
-                          <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-border/40 shadow-md">
-                            <AvatarImage
-                              src={user?.avatar || ""}
-                              className="object-cover"
-                              alt={user?.full_name || "User"}
-                            />
-                            <AvatarFallback className="text-3xl bg-muted">
-                              {user?.full_name ? (
-                                user.full_name.charAt(0)
-                              ) : (
-                                <User className="h-16 w-16" />
-                              )}
-                            </AvatarFallback>
-                          </Avatar>
-                        </motion.div>
-
-                        <div className="flex-1 space-y-4">
-                          <motion.h2
-                            className="text-2xl font-bold tracking-tight"
-                            variants={itemVariants}
-                          >
-                            {user?.full_name || ""}
-                          </motion.h2>
-
-                          <motion.div
-                            className="flex flex-wrap items-center gap-2 text-sm mt-10 text-muted-foreground"
-                            variants={itemVariants}
-                          >
-                            <div className="flex items-center">
-                              <Eye className="h-4 w-4 mr-1" />
-                              <span>0 profile views</span>
-                            </div>
-
-                            {user?.is_texas_am_affiliate && (
-                              <div className="flex items-center">
-                                <Separator
-                                  orientation="vertical"
-                                  className="h-4 mx-2"
-                                />
-                                <GraduationCap className="h-4 w-4 mr-1" />
-                                <span>Texas A&M Affiliate</span>
-                              </div>
-                            )}
-
-                            {user?.graduation_year &&
-                              user.graduation_year > 0 && (
-                                <div className="flex items-center">
-                                  <Separator
-                                    orientation="vertical"
-                                    className="h-4 mx-2"
-                                  />
-                                  <CalendarIcon className="h-4 w-4 mr-1" />
-                                  <span>Class of {user.graduation_year}</span>
-                                </div>
-                              )}
-                          </motion.div>
-
-                          {user?.industry && user.industry.length > 0 && (
-                            <motion.div
-                              className="flex flex-wrap gap-2 mt-2"
-                              variants={containerVariants}
-                              initial="hidden"
-                              animate="visible"
-                            >
-                              {user.industry.map((ind) => (
-                                <motion.div key={ind} variants={itemVariants}>
-                                  <Badge variant="secondary">{ind}</Badge>
-                                </motion.div>
-                              ))}
-                            </motion.div>
-                          )}
-                        </div>
-                      </motion.div>
-
-                      <Separator />
-
-                      <motion.div
-                        className="grid md:grid-cols-3 gap-8 py-6"
-                        variants={containerVariants}
-                        initial="hidden"
-                        animate="visible"
-                      >
-                        <motion.div
-                          className="md:col-span-2 space-y-6"
-                          variants={itemVariants}
-                        >
-                          {/* About */}
-                          <div>
-                            <h3 className="font-semibold mb-2 text-lg">
-                              About
-                            </h3>
-                            <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
-                              {user?.bio || "No bio provided yet."}
-                            </p>
-                          </div>
-
-                          {/* Skills */}
-                          {user?.skills && user.skills.length > 0 && (
-                            <div>
-                              <h3 className="font-semibold mb-2 text-lg">
-                                Skills
-                              </h3>
-                              <div className="flex flex-wrap gap-2">
-                                {user.skills.map((skill) => (
-                                  <Badge key={skill} variant="outline">
-                                    {skill}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </motion.div>
-
-                        <motion.div
-                          className="space-y-5"
-                          variants={itemVariants}
-                        >
-                          {/* Contact */}
-                          <div>
-                            <h3 className="font-semibold mb-2 text-lg">
-                              Contact
-                            </h3>
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-3">
-                                <Mail className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{user?.email}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Links */}
-                          {(user?.linkedin_url || user?.website_url) && (
-                            <div>
-                              <h3 className="font-semibold mb-2 text-lg">
-                                Links
-                              </h3>
-                              <div className="space-y-3">
-                                {user?.linkedin_url && (
-                                  <div className="flex items-center gap-3 group">
-                                    <Linkedin className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                    {/* <a
-                                      href={user.linkedin_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-sm text-primary hover:underline"
-                                    >
-                                      LinkedIn
-                                    </a> */}
-                                    <LinkWithPreview
-                                      name={user?.full_name}
-                                      url={user.linkedin_url}
-                                    >
-                                      LinkedIn
-                                    </LinkWithPreview>
-                                  </div>
-                                )}
-                                {user?.website_url && (
-                                  <div className="flex items-center gap-3 group">
-                                    <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                    {/* <a
-                                      href={user.website_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-sm text-primary hover:underline truncate max-w-[200px]"
-                                    >
-                                      {user.website_url.replace(
-                                        /^https?:\/\/(www\.)?/,
-                                        ""
-                                      )}
-                                    </a> */}
-                                    <LinkWithPreview
-                                      name={user?.full_name}
-                                      url={user.website_url}
-                                    >
-                                      {user.website_url.replace(
-                                        /^https?:\/\/(www\.)?/,
-                                        ""
-                                      )}
-                                    </LinkWithPreview>
-                                  </div>
-                                )}
-                                {user?.resume_url &&
-                                  (isMobile ? (
-                                    // Mobile: just a link
-                                    <a
-                                      href={user.resume_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-3 text-sm text-primary hover:underline"
-                                    >
-                                      <FileText className="h-4 w-4 text-muted-foreground" />
-                                      View Resume
-                                    </a>
-                                  ) : (
-                                    // Desktop: modal preview
-                                    <Dialog>
-                                      <DialogTrigger asChild>
-                                        <div className="flex items-center gap-3 group cursor-pointer text-primary hover:underline">
-                                          <FileText className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                          <span className="text-sm">
-                                            View Resume
-                                          </span>
-                                        </div>
-                                      </DialogTrigger>
-                                      <DialogContent className="max-w-3xl">
-                                        <DialogHeader>
-                                          <DialogTitle>
-                                            {user.full_name}'s Resume
-                                          </DialogTitle>
-                                        </DialogHeader>
-                                        <iframe
-                                          src={user.resume_url}
-                                          title="Resume"
-                                          className="w-full h-[80vh] rounded-md border"
-                                        />
-                                        <Button asChild className="mt-4">
-                                          <a
-                                            href={user.resume_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                          >
-                                            Download PDF
-                                          </a>
-                                        </Button>
-                                      </DialogContent>
-                                    </Dialog>
-                                  ))}
-                              </div>
-                            </div>
-                          )}
-                        </motion.div>
-                      </motion.div>
-                    </div>
-
-                    <CardFooter className="border-t py-5 flex justify-center bg-muted/30">
-                      <motion.div
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Button
-                          asChild
-                          variant="outline"
-                          className="px-8"
-                          size="lg"
-                        >
-                          <Link href={user ? `/users/${user.id}` : "#"}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Public Profile
+                        <Button asChild>
+                          <Link href="/projects/new">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Project
                           </Link>
                         </Button>
                       </motion.div>
-                    </CardFooter>
+                    </CardContent>
                   </Card>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </TabsContent>
-
-        {/* My Projects Tab */}
-        <TabsContent value="projects" className="space-y-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">My Projects</h2>
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-              <Button asChild>
-                <Link href="/projects/new">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Project
-                </Link>
-              </Button>
-            </motion.div>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {projectsLoading ? (
-              <motion.div
-                key="loading"
-                className="flex justify-center items-center py-12"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <span className="ml-2">Loading your projects...</span>
-              </motion.div>
-            ) : userProjects.length === 0 ? (
-              <motion.div
-                key="no-projects"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <Card>
-                  <CardContent className="py-10 flex flex-col items-center justify-center text-center">
-                    <h3 className="text-lg font-medium mb-2">
-                      No projects yet
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      You haven't created any projects yet. Get started by
-                      creating your first project.
-                    </p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="projects"
+                  className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {userProjects.map((project) => (
                     <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      key={project.id}
+                      variants={cardVariants}
+                      whileHover={{ y: -5, transition: { duration: 0.2 } }}
                     >
-                      <Button asChild>
-                        <Link href="/projects/new">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Project
-                        </Link>
-                      </Button>
+                      <Card className="shadow-sm h-full flex flex-col">
+                        <CardHeader className="pb-3">
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {project.is_idea ? (
+                              <Badge variant="outline">Idea</Badge>
+                            ) : (
+                              <Badge variant="outline">Project</Badge>
+                            )}
+                            <Badge variant="outline">
+                              {project.project_status}
+                            </Badge>
+                            <Badge variant="outline">
+                              {project.recruitment_status}
+                            </Badge>
+                          </div>
+                          <CardTitle className="text-lg">
+                            {project.title}
+                          </CardTitle>
+                          <CardDescription>
+                            Created on {formatDate(project.created_at)}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                            {project.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {project.industry.slice(0, 3).map((ind) => (
+                              <Badge
+                                key={ind}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {ind}
+                              </Badge>
+                            ))}
+                            {project.industry.length > 3 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{project.industry.length - 3} more
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                        <CardFooter className="border-t pt-3 flex justify-between">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/projects/${project.id}`}>
+                              View Details
+                            </Link>
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/projects/edit/${project.id}`}>
+                              <PenLine className="h-3 w-3 mr-1" />
+                              Edit
+                            </Link>
+                          </Button>
+                        </CardFooter>
+                      </Card>
                     </motion.div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="projects"
-                className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {userProjects.map((project) => (
-                  <motion.div
-                    key={project.id}
-                    variants={cardVariants}
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                  >
-                    <Card className="shadow-sm h-full flex flex-col">
-                      <CardHeader className="pb-3">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {project.is_idea ? (
-                            <Badge variant="outline">Idea</Badge>
-                          ) : (
-                            <Badge variant="outline">Project</Badge>
-                          )}
-                          <Badge variant="outline">
-                            {project.project_status}
-                          </Badge>
-                          <Badge variant="outline">
-                            {project.recruitment_status}
-                          </Badge>
-                        </div>
-                        <CardTitle className="text-lg">
-                          {project.title}
-                        </CardTitle>
-                        <CardDescription>
-                          Created on {formatDate(project.created_at)}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-                          {project.description}
-                        </p>
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {project.industry.slice(0, 3).map((ind) => (
-                            <Badge
-                              key={ind}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {ind}
-                            </Badge>
-                          ))}
-                          {project.industry.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{project.industry.length - 3} more
-                            </Badge>
-                          )}
-                        </div>
-                      </CardContent>
-                      <CardFooter className="border-t pt-3 flex justify-between">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/projects/${project.id}`}>
-                            View Details
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/projects/edit/${project.id}`}>
-                            <PenLine className="h-3 w-3 mr-1" />
-                            Edit
-                          </Link>
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </TabsContent>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </TabsContent>
 
-        {/* Project Inquiries Tab */}
-        <TabsContent value="inquiries" className="space-y-6">
-          <motion.div
-            className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div>
-              <h2 className="text-xl font-semibold">Project Inquiries</h2>
-              <p className="text-muted-foreground">
-                Manage inquiries for your projects and track your applications
-              </p>
-            </div>
-            <Select
-              value={inquiryType}
-              onValueChange={(value: "received" | "sent") =>
-                setInquiryType(value)
-              }
+          {/* Project Inquiries Tab */}
+          <TabsContent value="inquiries" className="space-y-6">
+            <motion.div
+              className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
             >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="received">Received Inquiries</SelectItem>
-                <SelectItem value="sent">Sent Inquiries</SelectItem>
-              </SelectContent>
-            </Select>
-          </motion.div>
-
-          {/* Filtering controls */}
-          <motion.div
-            className="flex flex-col sm:flex-row gap-4"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search inquiries..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <div>
+                <h2 className="text-xl font-semibold">Project Inquiries</h2>
+                <p className="text-muted-foreground">
+                  Manage inquiries for your projects and track your applications
+                </p>
+              </div>
+              <Select
+                value={inquiryType}
+                onValueChange={(value: "received" | "sent") =>
+                  setInquiryType(value)
+                }
+              >
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
+                  <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="accepted">Accepted</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="received">Received Inquiries</SelectItem>
+                  <SelectItem value="sent">Sent Inquiries</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </motion.div>
+            </motion.div>
 
-          <AnimatePresence mode="wait">
-            {inquiriesLoading ? (
-              <motion.div
-                key="loading"
-                className="flex justify-center items-center py-12"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <span className="ml-2">Loading inquiries...</span>
-              </motion.div>
-            ) : filteredInquiries.length === 0 ? (
-              <motion.div
-                key="no-inquiries"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <Card>
-                  <CardContent className="py-10 flex flex-col items-center justify-center text-center">
-                    <h3 className="text-lg font-medium mb-2">
-                      No inquiries found
-                    </h3>
-                    <p className="text-muted-foreground">
-                      {(inquiryType === "received"
-                        ? receivedInquiries
-                        : sentInquiries
-                      ).length > 0
-                        ? "Try adjusting your search filters"
-                        : inquiryType === "received"
-                        ? "When users express interest in your projects, they'll appear here"
-                        : "You haven't submitted any project inquiries yet"}
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="inquiries"
-                className="space-y-4"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                {filteredInquiries.map((inquiry) => (
-                  <motion.div
-                    key={inquiry.id}
-                    variants={cardVariants}
-                    whileHover={{ y: -3, transition: { duration: 0.2 } }}
-                  >
-                    <Card className="shadow-sm hover:shadow-md transition-shadow">
-                      <CardHeader>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle className="text-lg">
-                              {inquiry.project_title}
-                            </CardTitle>
-                            <CardDescription>
-                              {inquiryType === "received"
-                                ? `Inquiry received ${new Date(
-                                    inquiry.created_at
-                                  ).toLocaleDateString()}`
-                                : `Submitted on ${new Date(
-                                    inquiry.created_at
-                                  ).toLocaleDateString()}`}
-                            </CardDescription>
+            {/* Filtering controls */}
+            <motion.div
+              className="flex flex-col sm:flex-row gap-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search inquiries..."
+                  className="pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </motion.div>
+
+            <AnimatePresence mode="wait">
+              {inquiriesLoading ? (
+                <motion.div
+                  key="loading"
+                  className="flex justify-center items-center py-12"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <span className="ml-2">Loading inquiries...</span>
+                </motion.div>
+              ) : filteredInquiries.length === 0 ? (
+                <motion.div
+                  key="no-inquiries"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Card>
+                    <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-lg font-medium mb-2">
+                        No inquiries found
+                      </h3>
+                      <p className="text-muted-foreground">
+                        {(inquiryType === "received"
+                          ? receivedInquiries
+                          : sentInquiries
+                        ).length > 0
+                          ? "Try adjusting your search filters"
+                          : inquiryType === "received"
+                          ? "When users express interest in your projects, they'll appear here"
+                          : "You haven't submitted any project inquiries yet"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="inquiries"
+                  className="space-y-4"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {filteredInquiries.map((inquiry) => (
+                    <motion.div
+                      key={inquiry.id}
+                      variants={cardVariants}
+                      whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                    >
+                      <Card className="shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg">
+                                {inquiry.project_title}
+                              </CardTitle>
+                              <CardDescription>
+                                {inquiryType === "received"
+                                  ? `Inquiry received ${new Date(
+                                      inquiry.created_at
+                                    ).toLocaleDateString()}`
+                                  : `Submitted on ${new Date(
+                                      inquiry.created_at
+                                    ).toLocaleDateString()}`}
+                              </CardDescription>
+                            </div>
+                            <Badge
+                              variant={
+                                inquiry.status === "pending"
+                                  ? "outline"
+                                  : inquiry.status === "accepted"
+                                  ? "secondary"
+                                  : "destructive"
+                              }
+                            >
+                              {inquiry.status.charAt(0).toUpperCase() +
+                                inquiry.status.slice(1)}
+                            </Badge>
                           </div>
-                          <Badge
-                            variant={
-                              inquiry.status === "pending"
-                                ? "outline"
-                                : inquiry.status === "accepted"
-                                ? "secondary"
-                                : "destructive"
-                            }
-                          >
-                            {inquiry.status.charAt(0).toUpperCase() +
-                              inquiry.status.slice(1)}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="grid md:grid-cols-3 gap-6">
-                        {inquiryType === "received" ? (
-                          <>
-                            <div className="md:col-span-1">
-                              <div className="flex flex-col sm:flex-row md:flex-col items-center gap-4">
-                                <Avatar className="h-16 w-16">
-                                  <AvatarImage
-                                    src={inquiry.applicant_avatar || ""}
-                                    alt={inquiry.applicant_name}
-                                  />
-                                  <AvatarFallback>
-                                    {inquiry.applicant_name.charAt(0)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="text-center sm:text-left md:text-center">
-                                  <h3 className="font-medium">
-                                    {inquiry.applicant_name}
-                                  </h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    {inquiry.applicant_email}
-                                  </p>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="mt-2"
-                                    asChild
-                                  >
-                                    <Link href={`/users/${inquiry.user_id}`}>
-                                      <User className="h-3 w-3 mr-1" />
-                                      View Profile
-                                    </Link>
-                                  </Button>
+                        </CardHeader>
+                        <CardContent className="grid md:grid-cols-3 gap-6">
+                          {inquiryType === "received" ? (
+                            <>
+                              <div className="md:col-span-1">
+                                <div className="flex flex-col sm:flex-row md:flex-col items-center gap-4">
+                                  <Avatar className="h-16 w-16">
+                                    <AvatarImage
+                                      src={inquiry.applicant_avatar || ""}
+                                      alt={inquiry.applicant_name}
+                                    />
+                                    <AvatarFallback>
+                                      {inquiry.applicant_name.charAt(0)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="text-center sm:text-left md:text-center">
+                                    <h3 className="font-medium">
+                                      {inquiry.applicant_name}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                      {inquiry.applicant_email}
+                                    </p>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="mt-2"
+                                      asChild
+                                    >
+                                      <Link href={`/users/${inquiry.user_id}`}>
+                                        <User className="h-3 w-3 mr-1" />
+                                        View Profile
+                                      </Link>
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="md:col-span-2">
+                                <h3 className="font-medium mb-2">
+                                  Note from Applicant:
+                                </h3>
+                                <blockquote className="text-muted-foreground border-l-2 pl-4 italic">
+                                  {inquiry.note}
+                                </blockquote>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="md:col-span-3">
+                              <h3 className="font-medium mb-2">Your Note:</h3>
+                              <blockquote className="text-muted-foreground border-l-2 pl-4 italic mb-4">
+                                {inquiry.note}
+                              </blockquote>
+                              <div className="flex gap-2 flex-wrap">
+                                <div className="flex items-center gap-2 text-sm">
+                                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">
+                                    Submitted:
+                                  </span>
+                                  <span>{formatDate(inquiry.created_at)}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">
+                                    Status:
+                                  </span>
+                                  <span>
+                                    {inquiry.status.charAt(0).toUpperCase() +
+                                      inquiry.status.slice(1)}
+                                  </span>
                                 </div>
                               </div>
                             </div>
-                            <div className="md:col-span-2">
-                              <h3 className="font-medium mb-2">
-                                Note from Applicant:
-                              </h3>
-                              <blockquote className="text-muted-foreground border-l-2 pl-4 italic">
-                                {inquiry.note}
-                              </blockquote>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="md:col-span-3">
-                            <h3 className="font-medium mb-2">Your Note:</h3>
-                            <blockquote className="text-muted-foreground border-l-2 pl-4 italic mb-4">
-                              {inquiry.note}
-                            </blockquote>
-                            <div className="flex gap-2 flex-wrap">
-                              <div className="flex items-center gap-2 text-sm">
-                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">
-                                  Submitted:
-                                </span>
-                                <span>{formatDate(inquiry.created_at)}</span>
+                          )}
+                        </CardContent>
+                        <CardFooter className="border-t pt-4 flex justify-between">
+                          {inquiryType === "received" ? (
+                            <>
+                              <Button variant="outline" asChild>
+                                <a href={`mailto:${inquiry.applicant_email}`}>
+                                  Reply via Email
+                                </a>
+                              </Button>
+                              <div className="flex gap-2">
+                                {inquiry.status === "pending" && (
+                                  <>
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleUpdateInquiryStatus(
+                                          inquiry.id,
+                                          "accepted"
+                                        )
+                                      }
+                                    >
+                                      Accept
+                                    </Button>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleUpdateInquiryStatus(
+                                          inquiry.id,
+                                          "rejected"
+                                        )
+                                      }
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  disabled={deleteInProgress === inquiry.id}
+                                  onClick={() =>
+                                    handleDeleteInquiry(inquiry.id)
+                                  }
+                                >
+                                  {deleteInProgress === inquiry.id ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                      Delete
+                                    </>
+                                  )}
+                                </Button>
                               </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">
-                                  Status:
-                                </span>
-                                <span>
-                                  {inquiry.status.charAt(0).toUpperCase() +
-                                    inquiry.status.slice(1)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter className="border-t pt-4 flex justify-between">
-                        {inquiryType === "received" ? (
-                          <>
-                            <Button variant="outline" asChild>
-                              <a href={`mailto:${inquiry.applicant_email}`}>
-                                Reply via Email
-                              </a>
-                            </Button>
-                            <div className="flex gap-2">
-                              {inquiry.status === "pending" && (
-                                <>
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleUpdateInquiryStatus(
-                                        inquiry.id,
-                                        "accepted"
-                                      )
-                                    }
-                                  >
-                                    Accept
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleUpdateInquiryStatus(
-                                        inquiry.id,
-                                        "rejected"
-                                      )
-                                    }
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
+                            </>
+                          ) : (
+                            <>
+                              <Button variant="outline" asChild>
+                                <Link href={`/projects/${inquiry.project_id}`}>
+                                  View Project
+                                </Link>
+                              </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
@@ -1123,236 +1020,218 @@ export default function ProfilePage() {
                                 ) : (
                                   <>
                                     <Trash2 className="h-3 w-3 mr-1" />
-                                    Delete
+                                    Withdraw Inquiry
                                   </>
                                 )}
                               </Button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <Button variant="outline" asChild>
-                              <Link href={`/projects/${inquiry.project_id}`}>
-                                View Project
-                              </Link>
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              disabled={deleteInProgress === inquiry.id}
-                              onClick={() => handleDeleteInquiry(inquiry.id)}
-                            >
-                              {deleteInProgress === inquiry.id ? (
-                                <>
-                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                  Deleting...
-                                </>
-                              ) : (
-                                <>
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  Withdraw Inquiry
-                                </>
-                              )}
-                            </Button>
-                          </>
-                        )}
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </TabsContent>
-
-        {/* Bookmarks Tab */}
-        <TabsContent value="bookmarks" className="space-y-6">
-          <motion.div
-            className="flex justify-between items-center mb-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-          >
-            <h2 className="text-xl font-semibold">My Bookmarks</h2>
-          </motion.div>
-
-          <AnimatePresence mode="wait">
-            {bookmarksLoading ? (
-              <motion.div
-                key="loading"
-                className="flex justify-center items-center py-12"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <span className="ml-2">Loading your bookmarks...</span>
-              </motion.div>
-            ) : bookmarkedProjects.length === 0 &&
-              bookmarkedUsers.length === 0 ? (
-              <motion.div
-                key="no-bookmarks"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <Card>
-                  <CardContent className="py-10 flex flex-col items-center justify-center text-center">
-                    <h3 className="text-lg font-medium mb-2">
-                      No bookmarks yet
-                    </h3>
-                    <p className="text-muted-foreground">
-                      Bookmark projects and users to keep track of interesting
-                      content.
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : (
-              <>
-                {bookmarkedProjects.length > 0 && (
-                  <motion.div
-                    className="space-y-4"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    <h3 className="text-lg font-semibold">
-                      Bookmarked Projects
-                    </h3>
-                    <motion.div
-                      className="grid gap-4 md:grid-cols-2"
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="visible"
-                    >
-                      {bookmarkedProjects.map((project) => (
-                        <motion.div
-                          key={project.id}
-                          variants={cardVariants}
-                          whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                        >
-                          <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
-                            <CardHeader className="pb-3">
-                              <div className="flex flex-wrap gap-2 mb-2">
-                                {project.is_idea ? (
-                                  <Badge variant="outline">Idea</Badge>
-                                ) : (
-                                  <Badge variant="outline">Project</Badge>
-                                )}
-                                <Badge variant="outline">
-                                  {project.recruitment_status}
-                                </Badge>
-                              </div>
-                              <CardTitle className="text-lg">
-                                {project.title}
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-sm text-muted-foreground line-clamp-3">
-                                {project.description}
-                              </p>
-                            </CardContent>
-                            <CardFooter className="border-t pt-3">
-                              <motion.div
-                                whileHover={{ scale: 1.03 }}
-                                whileTap={{ scale: 0.97 }}
-                                className="w-full"
-                              >
-                                <Button
-                                  className="w-full"
-                                  variant="outline"
-                                  asChild
-                                >
-                                  <Link href={`/projects/${project.id}`}>
-                                    View Project
-                                  </Link>
-                                </Button>
-                              </motion.div>
-                            </CardFooter>
-                          </Card>
-                        </motion.div>
-                      ))}
+                            </>
+                          )}
+                        </CardFooter>
+                      </Card>
                     </motion.div>
-                  </motion.div>
-                )}
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </TabsContent>
 
-                {bookmarkedUsers.length > 0 && (
-                  <motion.div
-                    className="space-y-4 mt-6"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <h3 className="text-lg font-semibold">Bookmarked Users</h3>
+          {/* Bookmarks Tab */}
+          <TabsContent value="bookmarks" className="space-y-6">
+            <motion.div
+              className="flex justify-between items-center mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <h2 className="text-xl font-semibold">My Bookmarks</h2>
+            </motion.div>
+
+            <AnimatePresence mode="wait">
+              {bookmarksLoading ? (
+                <motion.div
+                  key="loading"
+                  className="flex justify-center items-center py-12"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <span className="ml-2">Loading your bookmarks...</span>
+                </motion.div>
+              ) : bookmarkedProjects.length === 0 &&
+                bookmarkedUsers.length === 0 ? (
+                <motion.div
+                  key="no-bookmarks"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Card>
+                    <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-lg font-medium mb-2">
+                        No bookmarks yet
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Bookmark projects and users to keep track of interesting
+                        content.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ) : (
+                <>
+                  {bookmarkedProjects.length > 0 && (
                     <motion.div
-                      className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="visible"
+                      className="space-y-4"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
                     >
-                      {bookmarkedUsers.map((user) => (
-                        <motion.div
-                          key={user.id}
-                          variants={cardVariants}
-                          whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                        >
-                          <Card className="shadow-sm hover:shadow-md transition-shadow">
-                            <CardContent className="pt-6">
-                              <div className="flex flex-col items-center text-center gap-4">
+                      <h3 className="text-lg font-semibold">
+                        Bookmarked Projects
+                      </h3>
+                      <motion.div
+                        className="grid gap-4 md:grid-cols-2"
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        {bookmarkedProjects.map((project) => (
+                          <motion.div
+                            key={project.id}
+                            variants={cardVariants}
+                            whileHover={{
+                              y: -5,
+                              transition: { duration: 0.2 },
+                            }}
+                          >
+                            <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
+                              <CardHeader className="pb-3">
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  {project.is_idea ? (
+                                    <Badge variant="outline">Idea</Badge>
+                                  ) : (
+                                    <Badge variant="outline">Project</Badge>
+                                  )}
+                                  <Badge variant="outline">
+                                    {project.recruitment_status}
+                                  </Badge>
+                                </div>
+                                <CardTitle className="text-lg">
+                                  {project.title}
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm text-muted-foreground line-clamp-3">
+                                  {project.description}
+                                </p>
+                              </CardContent>
+                              <CardFooter className="border-t pt-3">
                                 <motion.div
-                                  whileHover={{ scale: 1.05 }}
-                                  transition={{
-                                    type: "spring",
-                                    stiffness: 300,
-                                  }}
+                                  whileHover={{ scale: 1.03 }}
+                                  whileTap={{ scale: 0.97 }}
+                                  className="w-full"
                                 >
-                                  <Avatar className="h-16 w-16">
-                                    <AvatarImage
-                                      src={user.avatar || ""}
-                                      alt={user.full_name}
-                                    />
-                                    <AvatarFallback>
-                                      {user.full_name.charAt(0)}
-                                    </AvatarFallback>
-                                  </Avatar>
+                                  <Button
+                                    className="w-full"
+                                    variant="outline"
+                                    asChild
+                                  >
+                                    <Link href={`/projects/${project.id}`}>
+                                      View Project
+                                    </Link>
+                                  </Button>
                                 </motion.div>
-                                <div>
-                                  <h3 className="font-semibold text-lg">
-                                    {user.full_name}
-                                  </h3>
-                                  <p className="text-sm text-muted-foreground line-clamp-2">
-                                    {user.bio}
-                                  </p>
+                              </CardFooter>
+                            </Card>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    </motion.div>
+                  )}
+
+                  {bookmarkedUsers.length > 0 && (
+                    <motion.div
+                      className="space-y-4 mt-6"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      <h3 className="text-lg font-semibold">
+                        Bookmarked Users
+                      </h3>
+                      <motion.div
+                        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        {bookmarkedUsers.map((user) => (
+                          <motion.div
+                            key={user.id}
+                            variants={cardVariants}
+                            whileHover={{
+                              y: -5,
+                              transition: { duration: 0.2 },
+                            }}
+                          >
+                            <Card className="shadow-sm hover:shadow-md transition-shadow">
+                              <CardContent className="pt-6">
+                                <div className="flex flex-col items-center text-center gap-4">
                                   <motion.div
                                     whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    transition={{
+                                      type: "spring",
+                                      stiffness: 300,
+                                    }}
                                   >
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="mt-4"
-                                      asChild
-                                    >
-                                      <Link href={`/users/${user.id}`}>
-                                        View Profile
-                                      </Link>
-                                    </Button>
+                                    <Avatar className="h-16 w-16">
+                                      <AvatarImage
+                                        src={user.avatar || ""}
+                                        alt={user.full_name}
+                                      />
+                                      <AvatarFallback>
+                                        {user.full_name.charAt(0)}
+                                      </AvatarFallback>
+                                    </Avatar>
                                   </motion.div>
+                                  <div>
+                                    <h3 className="font-semibold text-lg">
+                                      {user.full_name}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground line-clamp-2">
+                                      {user.bio}
+                                    </p>
+                                    <motion.div
+                                      whileHover={{ scale: 1.05 }}
+                                      whileTap={{ scale: 0.95 }}
+                                    >
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-4"
+                                        asChild
+                                      >
+                                        <Link href={`/users/${user.id}`}>
+                                          View Profile
+                                        </Link>
+                                      </Button>
+                                    </motion.div>
+                                  </div>
                                 </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ))}
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        ))}
+                      </motion.div>
                     </motion.div>
-                  </motion.div>
-                )}
-              </>
-            )}
-          </AnimatePresence>
-        </TabsContent>
-      </Tabs>
+                  )}
+                </>
+              )}
+            </AnimatePresence>
+          </TabsContent>
+        </Tabs>
+      </div>
     </motion.div>
   );
 }
