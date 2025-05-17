@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-
+import { cn } from "@/lib/utils";
 import { User as UserType } from "@/lib/models/users";
 import {
   containerVariants,
@@ -102,7 +102,14 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
             whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 400, damping: 10 }}
           >
-            <Avatar className="h-32 w-32 relative border-4 border-background ring-2 ring-border/40 shadow-md overflow-hidden">
+            <Avatar
+              className={cn(
+                "h-32 w-32 relative ring-2 shadow-md overflow-hidden",
+                user?.is_texas_am_affiliate
+                  ? "border-4 border-[#500000]"
+                  : "border-4 border-background ring-border/40"
+              )}
+            >
               {user?.avatar ? (
                 <Image
                   src={user.avatar}
