@@ -13,6 +13,11 @@ import {
 } from "@/lib/constants";
 
 import {
+  ProfileAvatar,
+  ProfileAvatarEdit,
+} from "@/components/profile/profile-avatar";
+
+import {
   CalendarIcon,
   GraduationCap,
   Eye,
@@ -60,7 +65,7 @@ interface ProfileCardProps<T extends MinimalFormData = MinimalFormData> {
   handleDeleteAvatar: () => void;
   handleSwitchChange: (checked: boolean, name: keyof T) => void;
   handleSaveProfile: () => void;
-
+  showCompletionBanner: boolean;
   isSaving: boolean;
 }
 
@@ -74,6 +79,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
   handleDeleteAvatar,
   handleSwitchChange,
   handleSaveProfile,
+  showCompletionBanner,
   isSaving,
 }: ProfileCardProps<T>) {
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -83,9 +89,11 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
       {/* Gradient heading */}
       <div className="relative -mt-7 h-50 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5">
         <div className="absolute top-6 right-4">
-          <Button variant="secondary" size="sm" className="shadow-sm" asChild>
-            <Link href={`/users/${user?.id}`}>View Profile</Link>
-          </Button>
+          {!showCompletionBanner && (
+            <Button variant="secondary" size="sm" className="shadow-sm" asChild>
+              <Link href={`/users/${user?.id}`}>View Profile</Link>
+            </Button>
+          )}
         </div>
       </div>
 

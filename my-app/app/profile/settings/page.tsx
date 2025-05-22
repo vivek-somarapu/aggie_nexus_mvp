@@ -312,16 +312,12 @@ export default function SettingsPage() {
 
     try {
       setIsSaving(true);
-      // генерируем уникальное имя
       const ext = file.name.split(".").pop();
       const filename = `${uuid()}.${ext}`;
-      // заливаем в bucket "resumes"
       const { error: uploadError } = await supabase.storage
         .from("resumes")
         .upload(filename, file, { cacheControl: "3600", upsert: false });
       if (uploadError) throw uploadError;
-
-      // получаем публичный URL
       const { data } = supabase.storage.from("resumes").getPublicUrl(filename);
       setFormData((prev) => ({
         ...prev,
@@ -865,7 +861,7 @@ export default function SettingsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAccount}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90"
               disabled={isDeletingAccount}
             >
               {isDeletingAccount ? (

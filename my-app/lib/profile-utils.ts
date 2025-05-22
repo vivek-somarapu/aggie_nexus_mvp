@@ -1,4 +1,4 @@
-import { User } from './auth';
+import { User } from "./auth";
 
 /**
  * Determines whether a user needs to complete their profile setup
@@ -9,40 +9,31 @@ export function profileSetupStatus(user: User | null, justLoggedIn = false) {
     return {
       shouldSetupProfile: false,
       hasSkippedSetup: false,
-      hasCompletedSetup: false
+      hasCompletedSetup: false,
     };
   }
 
-  // Check if user has explicitly completed their profile
-  if (user.profile_setup_completed) {
+  // Do they actually have the minimal required fields?
+  const hasRequiredData =
+    user.full_name?.trim() !== "" &&
+    user.bio?.trim() !== "" &&
+    Array.isArray(user.skills) &&
+    user.skills.length > 0;
+
+  // If they lack real data, always prompt
+  if (!hasRequiredData) {
     return {
-      shouldSetupProfile: false,
-      hasSkippedSetup: false,
-      hasCompletedSetup: true
+      shouldSetupProfile: true,
+      hasSkippedSetup: Boolean(user.profile_setup_skipped),
+      hasCompletedSetup: false,
     };
   }
 
-  // Check if user has skipped profile setup
-  if (user.profile_setup_skipped) {
-    // Only prompt again if they just logged in
-    return {
-      shouldSetupProfile: justLoggedIn,
-      hasSkippedSetup: true,
-      hasCompletedSetup: false
-    };
-  }
-
-  // Check if they have sufficient profile data
-  const hasRequiredProfileData = !!(
-    user.bio && 
-    user.skills && 
-    user.skills.length > 0
-  );
-
+  // At this point they have enough data—so setup is done
   return {
-    shouldSetupProfile: !hasRequiredProfileData,
-    hasSkippedSetup: false,
-    hasCompletedSetup: hasRequiredProfileData
+    shouldSetupProfile: false,
+    hasSkippedSetup: Boolean(user.profile_setup_skipped),
+    hasCompletedSetup: true,
   };
 }
 
@@ -57,7 +48,7 @@ export function hasJustLoggedIn(user: User | null): boolean {
   try {
     const loginTime = new Date(user.last_login_at).getTime();
     const now = new Date().getTime();
-    
+
     // Consider "just logged in" if within the last minute
     return now - loginTime < 60000;
   } catch (err) {

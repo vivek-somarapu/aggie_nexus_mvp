@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { useAuth } from "@/lib/auth";
 import { User as UserType } from "@/lib/models/users";
+import { profileSetupStatus } from "@/lib/profile-utils";
 
 /* ────── Components: UI ────── */
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -201,6 +202,8 @@ export default function ProfilePage() {
         if (userData.skills) {
           setSelectedSkills(userData.skills);
         }
+        const { shouldSetupProfile } = profileSetupStatus(userData, true);
+        setShowCompletionBanner(shouldSetupProfile);
       } catch (err) {
         console.error(err);
       } finally {
@@ -561,6 +564,7 @@ export default function ProfilePage() {
           handleSwitchChange={handleSwitchChange}
           handleSaveProfile={handleSaveProfile}
           isSaving={isSaving}
+          showCompletionBanner={showCompletionBanner}
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
