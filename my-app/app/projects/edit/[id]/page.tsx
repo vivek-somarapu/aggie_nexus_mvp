@@ -12,6 +12,9 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  EditCard,
+  EditCardContent,
+  EditCardHeader,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -406,10 +409,11 @@ export default function EditProjectPage({
           <ChevronLeft className='mr-2 h-4 w-4' />
           Back
         </Button>
-        <h1 className='text-3xl font-bold'>Edit Project</h1>
-        <p className='text-muted-foreground mt-1'>
+        <h1 className='text-3xl font-bold text-center'>Edit Project</h1>
+        <p className='text-muted-foreground mt-1 text-center'>
           Update your project details
         </p>
+        <hr className='mt-8'></hr>
       </div>
 
       {error && (
@@ -417,236 +421,253 @@ export default function EditProjectPage({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-
       <form onSubmit={handleSubmit}>
-        <Card className='mb-6'>
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-            <CardDescription>
-              Enter the core details about your project
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='title'>Project Title *</Label>
-              <Input
-                id='title'
-                name='title'
-                value={formData.title}
-                onChange={handleChange}
-                placeholder='Enter a descriptive title'
-                required
-              />
-            </div>
+        <EditCard className='mb-6'>
+          <EditCardContent className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+            <EditCardHeader className='md:col-span-1'>
+              <CardTitle>Basic Information</CardTitle>
+              <CardDescription>
+                Enter the core details about your project
+              </CardDescription>
+            </EditCardHeader>
 
-            <div className='space-y-2'>
-              <Label htmlFor='description'>Description *</Label>
-              <Textarea
-                id='description'
-                name='description'
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Describe your project, its goals, and what you're looking to accomplish"
-                className='min-h-[120px]'
-                required
-              />
-            </div>
-
-            <div className='flex items-center space-x-2'>
-              <Switch
-                id='is_idea'
-                checked={formData.is_idea}
-                onCheckedChange={handleSwitchChange}
-              />
-              <Label htmlFor='is_idea'>
-                This is just an idea (not an active project)
-              </Label>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className='mb-6'>
-          <CardHeader>
-            <CardTitle>Project Details</CardTitle>
-            <CardDescription>
-              Provide more specific information about your project
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='project_status'>Project Status</Label>
-              <Select
-                value={formData.project_status}
-                onValueChange={(value) =>
-                  handleSelectChange('project_status', value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder='Select project status' />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectStatusOptions.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className='space-y-2'>
-              <Label htmlFor='recruitment_status'>Recruitment Status</Label>
-              <Select
-                value={formData.recruitment_status}
-                onValueChange={(value) =>
-                  handleSelectChange('recruitment_status', value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder='Select recruitment status' />
-                </SelectTrigger>
-                <SelectContent>
-                  {recruitmentStatusOptions.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className='space-y-2'>
-              <Label>Industries (Select all that apply)</Label>
-              <div className='grid grid-cols-2 md:grid-cols-3 gap-2'>
-                {industryOptions.map((industry) => (
-                  <div key={industry} className='flex items-center space-x-2'>
-                    <input
-                      type='checkbox'
-                      id={`industry-${industry}`}
-                      checked={selectedIndustries.includes(industry)}
-                      onChange={() => handleIndustrySelect(industry)}
-                      className='rounded border-gray-300 text-primary focus:ring-primary'
-                    />
-                    <Label
-                      htmlFor={`industry-${industry}`}
-                      className='text-sm font-normal cursor-pointer'
-                    >
-                      {industry}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className='space-y-2'>
-              <Label>Required Skills (Select all that apply)</Label>
-              <div className='grid grid-cols-2 md:grid-cols-3 gap-2'>
-                {skillOptions.map((skill) => (
-                  <div key={skill} className='flex items-center space-x-2'>
-                    <input
-                      type='checkbox'
-                      id={`skill-${skill}`}
-                      checked={selectedSkills.includes(skill)}
-                      onChange={() => handleSkillSelect(skill)}
-                      className='rounded border-gray-300 text-primary focus:ring-primary'
-                    />
-                    <Label
-                      htmlFor={`skill-${skill}`}
-                      className='text-sm font-normal cursor-pointer'
-                    >
-                      {skill}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className='mb-6'>
-          <CardHeader>
-            <CardTitle>Timeline & Location</CardTitle>
-            <CardDescription>
-              Set the estimated timeline and location type for your project
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='location_type'>Location Type</Label>
-              <Select
-                value={formData.location_type}
-                onValueChange={(value) =>
-                  handleSelectChange('location_type', value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder='Select location type' />
-                </SelectTrigger>
-                <SelectContent>
-                  {locationTypeOptions.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className='md:col-span-2 space-y-4'>
               <div className='space-y-2'>
-                <Label htmlFor='estimated_start'>Estimated Start Date</Label>
-                <DatePicker
-                  selected={selectedStartDate}
-                  onSelect={handleStartDateSelect}
+                <Label htmlFor='title'>Project Title *</Label>
+                <Input
+                  id='title'
+                  name='title'
+                  value={formData.title}
+                  onChange={handleChange}
+                  placeholder='Enter a descriptive title'
+                  required
                 />
               </div>
+
               <div className='space-y-2'>
-                <Label htmlFor='estimated_end'>Estimated End Date</Label>
-                <DatePicker
-                  selected={selectedEndDate}
-                  onSelect={handleEndDateSelect}
+                <Label htmlFor='description'>Description *</Label>
+                <Textarea
+                  id='description'
+                  name='description'
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Describe your project, its goals, and what you're looking to accomplish"
+                  className='min-h-[120px]'
+                  required
+                />
+              </div>
+
+              <div className='flex items-center space-x-2'>
+                <Switch
+                  id='is_idea'
+                  checked={formData.is_idea}
+                  onCheckedChange={handleSwitchChange}
+                />
+                <Label htmlFor='is_idea'>
+                  This is just an idea (not an active project)
+                </Label>
+              </div>
+            </div>
+          </EditCardContent>
+        </EditCard>
+        <hr className='pt-6'></hr>
+
+        <EditCard className='mb-6'>
+          <EditCardContent className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+            <EditCardHeader className='md:col-span-1'>
+              <CardTitle>Project Details</CardTitle>
+              <CardDescription>
+                Provide more specific information about your project
+              </CardDescription>
+            </EditCardHeader>
+
+            <div className='md:col-span-2 space-y-4'>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                <div className='space-y-2'>
+                  <Label htmlFor='project_status'>Project Status</Label>
+                  <Select
+                    value={formData.project_status}
+                    onValueChange={(value) =>
+                      handleSelectChange('project_status', value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select project status' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectStatusOptions.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className='space-y-2'>
+                  <Label htmlFor='recruitment_status'>Recruitment Status</Label>
+                  <Select
+                    value={formData.recruitment_status}
+                    onValueChange={(value) =>
+                      handleSelectChange('recruitment_status', value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder='Select recruitment status' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {recruitmentStatusOptions.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className='space-y-2'>
+                <Label>Industries (Select all that apply)</Label>
+                <div className='grid grid-cols-2 md:grid-cols-3 gap-2'>
+                  {industryOptions.map((industry) => (
+                    <div key={industry} className='flex items-center space-x-2'>
+                      <input
+                        type='checkbox'
+                        id={`industry-${industry}`}
+                        checked={selectedIndustries.includes(industry)}
+                        onChange={() => handleIndustrySelect(industry)}
+                        className='rounded border-gray-300 text-primary focus:ring-primary'
+                      />
+                      <Label
+                        htmlFor={`industry-${industry}`}
+                        className='text-sm font-normal cursor-pointer'
+                      >
+                        {industry}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className='space-y-2'>
+                <Label>Required Skills (Select all that apply)</Label>
+                <div className='grid grid-cols-2 md:grid-cols-3 gap-2'>
+                  {skillOptions.map((skill) => (
+                    <div key={skill} className='flex items-center space-x-2'>
+                      <input
+                        type='checkbox'
+                        id={`skill-${skill}`}
+                        checked={selectedSkills.includes(skill)}
+                        onChange={() => handleSkillSelect(skill)}
+                        className='rounded border-gray-300 text-primary focus:ring-primary'
+                      />
+                      <Label
+                        htmlFor={`skill-${skill}`}
+                        className='text-sm font-normal cursor-pointer'
+                      >
+                        {skill}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </EditCardContent>
+        </EditCard>
+        <hr className='pt-6'></hr>
+
+        <EditCard className='mb-6'>
+          <EditCardContent className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+            <EditCardHeader className='md:col-span-1'>
+              <CardTitle>Timeline & Location</CardTitle>
+              <CardDescription>
+                Set the estimated timeline and location type for your project
+              </CardDescription>
+            </EditCardHeader>
+
+            <div className='md:col-span-2 space-y-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='location_type'>Location Type</Label>
+                <Select
+                  value={formData.location_type}
+                  onValueChange={(value) =>
+                    handleSelectChange('location_type', value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Select location type' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locationTypeOptions.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                <div className='space-y-2'>
+                  <Label htmlFor='estimated_start'>Estimated Start Date</Label>
+                  <DatePicker
+                    selected={selectedStartDate}
+                    onSelect={handleStartDateSelect}
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='estimated_end'>Estimated End Date</Label>
+                  <DatePicker
+                    selected={selectedEndDate}
+                    onSelect={handleEndDateSelect}
+                  />
+                </div>
+              </div>
+            </div>
+          </EditCardContent>
+        </EditCard>
+        <hr className='pt-6'></hr>
+
+        <EditCard className='mb-6'>
+          <EditCardContent className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+            <EditCardHeader className='md:col-span-1'>
+              <CardTitle>Contact Information</CardTitle>
+              <CardDescription>
+                How can interested collaborators reach you?
+              </CardDescription>
+            </EditCardHeader>
+            
+            <div className='md:col-span-2 space-y-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='email'>Email Address *</Label>
+                <Input
+                  id='email'
+                  name='email'
+                  type='email'
+                  value={formData.contact_info.email}
+                  onChange={handleContactChange}
+                  placeholder='your@email.com'
+                  required
+                />
+              </div>
+
+              <div className='space-y-2'>
+                <Label htmlFor='phone'>Phone Number (Optional)</Label>
+                <Input
+                  id='phone'
+                  name='phone'
+                  type='tel'
+                  value={formData.contact_info.phone || ''}
+                  onChange={handleContactChange}
+                  placeholder='(123) 456-7890'
+                  pattern='^\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}$'
+                  title='Phone number should be in format (123) 456-7890'
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className='mb-6'>
-          <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
-            <CardDescription>
-              How can interested collaborators reach you?
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='space-y-2'>
-              <Label htmlFor='email'>Email Address *</Label>
-              <Input
-                id='email'
-                name='email'
-                type='email'
-                value={formData.contact_info.email}
-                onChange={handleContactChange}
-                placeholder='your@email.com'
-                required
-              />
-            </div>
-
-            <div className='space-y-2'>
-              <Label htmlFor='phone'>Phone Number (Optional)</Label>
-              <Input
-                id='phone'
-                name='phone'
-                type='tel'
-                value={formData.contact_info.phone || ''}
-                onChange={handleContactChange}
-                placeholder='(123) 456-7890'
-                pattern='^\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}$'
-                title='Phone number should be in format (123) 456-7890'
-              />
-            </div>
-          </CardContent>
-        </Card>
+          </EditCardContent>
+        </EditCard>
+        <hr className='py-6'></hr>
 
         <div className='flex justify-end gap-4'>
           <Button
