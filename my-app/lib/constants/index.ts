@@ -44,10 +44,11 @@ export const itemVariants = {
   },
 };
 export const stepVariants = {
-  initial: { opacity: 0, x: 50 },
+  initial: { opacity: 0, x: 50, y: 20 }, // start slightly below
   animate: {
     opacity: 1,
     x: 0,
+    y: 0,
     transition: {
       duration: 0.4,
       ease: "easeOut",
@@ -55,7 +56,8 @@ export const stepVariants = {
   },
   exit: {
     opacity: 0,
-    x: -50,
+    x: 0,
+    y: 20, // exit slightly below again
     transition: {
       duration: 0.3,
       ease: "easeIn",

@@ -5,10 +5,18 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { User as UserType } from "@/lib/models/users";
 import { userService } from "@/lib/services/user-service";
-import { Switch } from "@/components/ui/switch";
-import { InputFile } from "@/components/ui/input";
 import { v4 as uuid } from "uuid";
 import { motion, AnimatePresence } from "framer-motion";
+import { ProfileSetupForm } from "@/components/profile/profile-card";
+import Image from "next/image";
+import {
+  containerVariants,
+  itemVariants,
+  industryOptions,
+  skillOptions,
+  stepVariants,
+} from "@/lib/constants";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -19,6 +27,10 @@ import {
 } from "@/components/ui/card";
 import { TagSelector } from "@/components/profile/tag-selector";
 import {
+  TexasAMAffiliation,
+  type TexasAMAffiliationData,
+} from "@/components/profile/tamu-affiliate";
+import {
   ProfileAvatar,
   ProfileAvatarEdit,
 } from "@/components/profile/profile-avatar";
@@ -26,8 +38,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import Image from "next/image";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Loader2,
   ChevronRight,
@@ -36,11 +46,10 @@ import {
   Check,
   Download,
   Trash2,
+  GraduationCap,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
-
-import { industryOptions, skillOptions, stepVariants } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -58,6 +67,7 @@ export default function ProfileSetupPage() {
   const [isFromAuthError, setIsFromAuthError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<UserType | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
     full_name: "",
@@ -156,13 +166,6 @@ export default function ProfileSetupPage() {
     }));
   };
 
-  const handleSwitchChange = (checked: boolean, name: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-  };
-
   const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -188,10 +191,6 @@ export default function ProfileSetupPage() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const nextStep = () => {
-    setCurrentStep((prev) => prev + 1);
   };
 
   const prevStep = () => {
@@ -229,14 +228,21 @@ export default function ProfileSetupPage() {
       }
 
       // Redirect to home page or profile
-      window.location.reload();
-      router.push("/");
+      window.location.href = "/profile";
     } catch (err: any) {
       console.error("Error updating profile:", err);
       setError(err.message || "Failed to update profile. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAffiliationChange = (data: TexasAMAffiliationData) => {
+    setFormData({
+      ...formData,
+      is_texas_am_affiliate: data.is_texas_am_affiliate,
+      graduation_year: data.graduation_year,
+    });
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -341,584 +347,350 @@ export default function ProfileSetupPage() {
 
   return (
     <div className="w-full">
-      {/* Desktop: step-by-step cards */}
-      <AnimatePresence initial={false}>
-        {currentStep >= 1 && (
-          <motion.div
-            key={currentStep}
-            variants={stepVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="hidden lg:flex items-center justify-center h-[calc(100vh-7rem)]"
-          >
-            <div className="w-full max-w-md">
-              {currentStep === 1 && (
-                <Card>
-                  <CardHeader className="text-center">
-                    <CardTitle className="text-2xl">
-                      Welcome to Aggie Nexus!
-                    </CardTitle>
-                    <CardDescription>
-                      Would you like to set up your profile now or continue to
-                      the platform?
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Avatar */}
-                    <div className="flex justify-center">
-                      <ProfileAvatarEdit
-                        avatar={formData.avatar}
-                        fullName={formData.full_name}
-                        onAvatarChange={handleAvatarChange}
-                        onAvatarDelete={handleDeleteAvatar}
-                      />
-                    </div>
-
-                    <p className="text-center text-muted-foreground">
-                      Setting up your profile helps others find you and makes it
-                      easier to connect with like-minded individuals.
-                    </p>
-                    {message && (
-                      <Alert className="mt-4">
-                        <AlertDescription>{message}</AlertDescription>
-                      </Alert>
-                    )}
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="outline" onClick={skipToHome}>
-                      Skip for now
-                    </Button>
-                    <Button onClick={nextStep}>
-                      Set up profile <ChevronRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              )}
-
-              {/* Step 2 */}
-              {currentStep === 2 && (
-                <Card className="w-full max-w-md mx-auto">
-                  <CardHeader>
-                    <CardTitle>Basic Information</CardTitle>
-                    <CardDescription>
-                      Let's start with the basics
-                    </CardDescription>
-                    {isFromAuthError && (
-                      <Alert className="mt-4">
-                        <AlertDescription>{message}</AlertDescription>
-                      </Alert>
-                    )}
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="full_name">Full Name</Label>
-                      <Input
-                        id="full_name"
-                        name="full_name"
-                        value={formData.full_name}
-                        onChange={handleChange}
-                        placeholder="Enter your full name"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        placeholder="Enter your email"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        name="bio"
-                        value={formData.bio || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            bio: e.target.value.slice(0, 250),
-                          }))
-                        }
-                        placeholder="Tell us about yourself"
-                        rows={4}
-                      />
-                      <div className="text-sm text-muted-foreground text-right">
-                        {formData.bio?.length || 0} / 250
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="is_texas_am_affiliate"
-                        checked={formData.is_texas_am_affiliate}
-                        onCheckedChange={(checked) =>
-                          handleSwitchChange(checked, "is_texas_am_affiliate")
-                        }
-                      />
-                      <Label htmlFor="is_texas_am_affiliate">
-                        I am a Texas A&M affiliate (student, alumni, staff)
-                      </Label>
-                    </div>
-
-                    {formData.is_texas_am_affiliate && (
-                      <div className="space-y-2 max-w-xs">
-                        <Label htmlFor="graduation_year">
-                          Graduation Year (if applicable)
-                        </Label>
-                        <Input
-                          id="graduation_year"
-                          name="graduation_year"
-                          type="number"
-                          value={formData.graduation_year || ""}
-                          onChange={(e) => {
-                            const value = e.target.value
-                              ? parseInt(e.target.value)
-                              : undefined;
-                            setFormData((prev) => ({
-                              ...prev,
-                              graduation_year: value,
-                            }));
-                          }}
-                          placeholder="YYYY"
-                        />
-                      </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="outline" onClick={prevStep}>
-                      <ChevronLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <Button onClick={nextStep}>
-                      Continue <ChevronRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              )}
-
-              {/* Steps 3 */}
-              {currentStep === 3 && (
-                <Card className="w-full max-w-md mx-auto">
-                  <CardHeader>
-                    <CardTitle>Skills & Industries</CardTitle>
-                    <CardDescription>
-                      Select your skills and industries of interest
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <Label>Industries (Select all that apply)</Label>
-                      <div className=" mt-2">
-                        <Label>Industries</Label>
-                        <TagSelector
-                          label="Industries"
-                          options={industryOptions}
-                          selected={selectedIndustries}
-                          onChange={setSelectedIndustries}
-                        />
-
-                        <Label>Skills</Label>
-                        <TagSelector
-                          label="Skills"
-                          options={skillOptions}
-                          selected={selectedSkills}
-                          onChange={setSelectedSkills}
-                          maxTags={15}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="outline" onClick={prevStep}>
-                      <ChevronLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <Button onClick={nextStep}>
-                      Continue <ChevronRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              )}
-
-              {/* Steps 4 */}
-              {currentStep === 4 && (
-                <Card className="w-full max-w-md mx-auto">
-                  <CardHeader>
-                    <CardTitle>Contact & Links</CardTitle>
-                    <CardDescription>How can others reach you?</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="contact_email">Contact Email</Label>
-                      <Input
-                        id="contact_email"
-                        name="email"
-                        type="email"
-                        value={formData.contact.email}
-                        onChange={handleContactChange}
-                        placeholder="Enter contact email"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="contact_phone">
-                        Contact Phone (Optional)
-                      </Label>
-                      <Input
-                        id="contact_phone"
-                        name="phone"
-                        value={formData.contact.phone || ""}
-                        onChange={handleContactChange}
-                        placeholder="Enter contact phone"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-                      <Input
-                        id="linkedin_url"
-                        name="linkedin_url"
-                        value={formData.linkedin_url}
-                        onChange={handleChange}
-                        placeholder="https://linkedin.com/in/yourprofile"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="website_url">Website URL</Label>
-                      <Input
-                        id="website_url"
-                        name="website_url"
-                        value={formData.website_url}
-                        onChange={handleChange}
-                        placeholder="https://yourwebsite.com"
-                      />
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="outline" onClick={prevStep}>
-                      <ChevronLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <Button onClick={nextStep}>
-                      Review <ChevronRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              )}
-
-              {/* Steps 5 */}
-              {currentStep === 5 && (
-                <Card className="w-full max-w-md mx-auto">
-                  <CardHeader>
-                    <CardTitle>Review Your Profile</CardTitle>
-                    <CardDescription>
-                      Make sure everything looks good
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    {/* Avatar */}
-                    <div className="flex justify-center">
-                      <ProfileAvatar
-                        avatar={formData.avatar}
-                        fullName={formData.full_name}
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Name</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formData.full_name}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Email</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formData.email}
-                      </p>
-                    </div>
-
-                    {formData.bio && (
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Bio</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formData.bio}
-                        </p>
-                      </div>
-                    )}
-
-                    {formData.graduation_year && (
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Graduation Year</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formData.graduation_year}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Texas A&M Affiliate</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formData.is_texas_am_affiliate ? "Yes" : "No"}
-                      </p>
-                    </div>
-
-                    {selectedIndustries.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Industries</p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedIndustries.join(", ")}
-                        </p>
-                      </div>
-                    )}
-
-                    {selectedSkills.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Skills</p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedSkills.join(", ")}
-                        </p>
-                      </div>
-                    )}
-
-                    {formData.linkedin_url && (
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">LinkedIn</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formData.linkedin_url}
-                        </p>
-                      </div>
-                    )}
-
-                    {formData.website_url && (
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Website</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formData.website_url}
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <Button variant="outline" onClick={prevStep}>
-                      <ChevronLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <Button onClick={handleSubmit} disabled={isSubmitting}>
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="mr-2 h-4 w-4" /> Complete Setup
-                        </>
-                      )}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Mobile/Tablet: single-page form */}
-      <div className="lg:hidden space-y-6 px-5 mx-auto">
-        <h1 className="text-2xl font-semibold text-center">Profile Setup</h1>
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Avatar */}
-            <div className="flex justify-center">
-              <ProfileAvatarEdit
-                avatar={formData.avatar}
-                fullName={formData.full_name}
-                onAvatarChange={handleAvatarChange}
-                onAvatarDelete={handleDeleteAvatar}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input
-                id="full_name"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="contact_email">Contact Email</Label>
-              <Input
-                id="contact_email"
-                name="email"
-                type="email"
-                value={formData.contact.email || ""}
-                onChange={handleContactChange}
-                placeholder="public@example.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-              <Input
-                id="linkedin_url"
-                name="linkedin_url"
-                value={formData.linkedin_url || ""}
-                onChange={handleChange}
-                placeholder="https://linkedin.com/in/username"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="website_url">Website URL</Label>
-              <Input
-                id="website_url"
-                name="website_url"
-                value={formData.website_url || ""}
-                onChange={handleChange}
-                placeholder="https://example.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contact_phone">Contact Phone</Label>
-              <Input
-                id="contact_phone"
-                name="phone"
-                value={formData.contact.phone || ""}
-                onChange={handleContactChange}
-                placeholder="(123) 456-7890"
-              />
-            </div>
-
-            <div className="space-y-2 sm:col-span-2">
-              <InputFile
-                label="Upload resume"
-                accept=".pdf"
-                onChange={handleResumeChange}
-              />
-              <div className="mt-auto flex justify-end">
-                {formData.resume_url ? (
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="text-sm py-4"
-                  >
-                    <a
-                      href={formData.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Download className="mr-1 h-4 w-4" />
-                      Resume
-                    </a>
-                  </Button>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">
-                    No resume uploaded
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                name="bio"
-                value={formData.bio || ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    bio: e.target.value.slice(0, 250),
-                  }))
-                }
-                placeholder="Tell us about yourself"
-                rows={4}
-              />
-              <div className="text-sm text-muted-foreground text-right">
-                {formData.bio?.length || 0} / 250
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={formData.is_texas_am_affiliate}
-              onCheckedChange={(val) =>
-                setFormData({ ...formData, is_texas_am_affiliate: val })
-              }
+      {/* Mobile only version */}
+      <div className="block md:hidden">
+        <ProfileSetupForm
+          formData={formData}
+          setFormData={setFormData}
+          selectedIndustries={selectedIndustries}
+          setSelectedIndustries={setSelectedIndustries}
+          handleAvatarChange={handleAvatarChange}
+          handleDeleteAvatar={handleDeleteAvatar}
+          handleAffiliationChange={handleAffiliationChange}
+          handleContactChange={handleContactChange}
+          handleChange={handleChange}
+          handleResumeChange={handleResumeChange}
+        />
+        <div className="px-6 md:hidden">
+          <div className="space-y-2">
+            <Label>Industries</Label>
+            <TagSelector
+              label="Industries"
+              options={industryOptions}
+              selected={selectedIndustries}
+              onChange={setSelectedIndustries}
             />
-            <Label htmlFor="is_texas_am_affiliate">Texas A&M affiliate?</Label>
           </div>
-          {formData.is_texas_am_affiliate && (
-            <div className="space-y-2">
-              <Label htmlFor="graduation_year">Graduation Year</Label>
-              <Input
-                id="graduation_year"
-                type="number"
-                value={formData.graduation_year || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    graduation_year: parseInt(e.target.value),
-                  })
-                }
-              />
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Industries</Label>
-              <TagSelector
-                label="Industries"
-                options={industryOptions}
-                selected={selectedIndustries}
-                onChange={setSelectedIndustries}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Skills</Label>
-              <TagSelector
-                label="Skills"
-                options={skillOptions}
-                selected={selectedSkills}
-                onChange={setSelectedSkills}
-                maxTags={15}
-              />
-            </div>
+          <div className="space-y-2 md:hidden">
+            <Label>Skills</Label>
+            <TagSelector
+              label="Skills"
+              options={skillOptions}
+              selected={selectedSkills}
+              onChange={setSelectedSkills}
+              maxTags={15}
+            />
           </div>
         </div>
-        <Button
-          className="w-full"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <Loader2 className="animate-spin" />
-          ) : (
-            "Complete Setup"
+        {/* Save Button */}
+        <div className="flex justify-end mt-4">
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Save profile"
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Desktop/Tablet: step-by-step cards */}
+      <div className="hidden md:block">
+        <AnimatePresence mode="wait">
+          {currentStep >= 1 && (
+            <motion.div
+              key={currentStep}
+              className="absolute inset-0 flex items-center justify-center"
+              variants={stepVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              {/* Background animated circles */}
+              <motion.div
+                className="
+              hidden lg:block
+              absolute
+              right-0
+              top-30
+              z-0
+              transform
+              rotate-[220deg]
+              pointer-events-none
+              opacity-60
+            "
+                initial={{ opacity: 0, scale: 0.8, rotate: 205 }}
+                animate={{
+                  opacity: 0.6,
+                  scale: 1,
+                  rotate: 220,
+                  transition: {
+                    duration: 0.8,
+                    ease: "easeOut",
+                  },
+                }}
+                whileInView={{
+                  x: [0, 10, 0],
+                  transition: {
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    duration: 8,
+                  },
+                }}
+              >
+                <Image
+                  src="/images/circles-logo.png"
+                  alt="Decorative circles"
+                  width={700}
+                  height={500}
+                  className="object-contain"
+                  priority
+                />
+              </motion.div>
+
+              <div className="relative z-10 w-full max-w-3xl">
+                {currentStep === 1 && (
+                  <>
+                    <ProfileSetupForm
+                      formData={formData}
+                      setFormData={setFormData}
+                      selectedIndustries={selectedIndustries}
+                      setSelectedIndustries={setSelectedIndustries}
+                      handleAvatarChange={handleAvatarChange}
+                      handleDeleteAvatar={handleDeleteAvatar}
+                      handleAffiliationChange={handleAffiliationChange}
+                      handleContactChange={handleContactChange}
+                      handleChange={handleChange}
+                      handleResumeChange={handleResumeChange}
+                    />
+
+                    <div className="flex justify-between mt-2">
+                      <Button variant="outline" onClick={skipToHome}>
+                        Skip for now
+                      </Button>
+                      <Button
+                        onClick={() => setCurrentStep(2)}
+                        disabled={isSaving}
+                      >
+                        Set up profile <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {/* Step 2 */}
+                {currentStep === 2 && (
+                  <>
+                    <Card className="w-full">
+                      <CardHeader>
+                        <CardTitle>Skills & Industries</CardTitle>
+                        <CardDescription>
+                          Select your skills and industries of interest
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label>Industries</Label>
+                          <TagSelector
+                            label="Industries"
+                            options={industryOptions}
+                            selected={selectedIndustries}
+                            onChange={setSelectedIndustries}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Skills</Label>
+                          <TagSelector
+                            label="Skills"
+                            options={skillOptions}
+                            selected={selectedSkills}
+                            onChange={setSelectedSkills}
+                            maxTags={15}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <div className="flex justify-between gap-4 mt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentStep(1)}
+                      >
+                        <ChevronLeft className="mr-2 h-4 w-4" /> Back
+                      </Button>
+
+                      <Button
+                        onClick={() => setCurrentStep(3)}
+                        disabled={isSaving}
+                      >
+                        Next Step
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {/* Steps 3 */}
+                {currentStep === 3 && (
+                  <Card className="w-full mx-auto">
+                    <CardHeader>
+                      <CardTitle>Review Your Profile</CardTitle>
+                      <CardDescription>
+                        Make sure everything looks good
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-1 max-h-[60vh] overflow-y-auto">
+                      {error && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="flex items-start gap-6">
+                        {/* Avatar */}
+                        <div className="flex-1 flex justify-center">
+                          <div className="shrink-0">
+                            <ProfileAvatar
+                              avatar={formData.avatar}
+                              fullName={formData.full_name}
+                              is_texas_am_affiliate={
+                                formData.is_texas_am_affiliate
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        {/* Name / Email / Affiliation */}
+                        <div className="flex-1 flex flex-col gap-3">
+                          <div className="">
+                            <p className="text-sm font-medium">Name</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formData.full_name}
+                            </p>
+                          </div>
+                          <div className="">
+                            <p className="text-sm font-medium">Email</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formData.email}
+                            </p>
+                          </div>
+                          <div className="">
+                            <p className="text-sm font-medium">
+                              Texas A&M Affiliate
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {formData.is_texas_am_affiliate ? "Yes" : "No"}
+                              {formData.is_texas_am_affiliate &&
+                              formData.graduation_year
+                                ? ` - ${formData.graduation_year}`
+                                : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* LinkedIn / Website */}
+                        <div className="flex-1 flex flex-col gap-3">
+                          {formData.linkedin_url && (
+                            <div className="">
+                              <p className="text-sm font-medium">LinkedIn</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formData.linkedin_url}
+                              </p>
+                            </div>
+                          )}
+                          {formData.website_url && (
+                            <div className="">
+                              <p className="text-sm font-medium">Website</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formData.website_url}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Skills and industries */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {selectedIndustries.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Industries</p>
+                            <motion.div
+                              className="flex flex-wrap gap-2 mt-2"
+                              variants={containerVariants}
+                            >
+                              {selectedIndustries.map((tag) => (
+                                <motion.div key={tag} variants={itemVariants}>
+                                  <Badge
+                                    variant="secondary"
+                                    className="px-2 py-1"
+                                  >
+                                    {tag}
+                                  </Badge>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                          </div>
+                        )}
+
+                        {selectedSkills.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Skills</p>
+                            <motion.div
+                              className="flex flex-wrap gap-2 mt-2"
+                              variants={containerVariants}
+                            >
+                              {selectedSkills.map((tag) => (
+                                <motion.div key={tag} variants={itemVariants}>
+                                  <Badge
+                                    variant="secondary"
+                                    className="px-2 py-1"
+                                  >
+                                    {tag}
+                                  </Badge>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bio */}
+                      {formData.bio && (
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Bio</p>
+                          <p className="text-sm text-muted-foreground break-words max-w-full">
+                            {formData.bio}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+
+                    <CardFooter className="flex justify-between mt-2">
+                      <Button variant="outline" onClick={prevStep}>
+                        <ChevronLeft className="mr-2 h-4 w-4" /> Back
+                      </Button>
+                      <Button onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="mr-2 h-4 w-4" /> Complete Setup
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                )}
+              </div>
+            </motion.div>
           )}
-        </Button>
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -19,10 +19,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { InputFile } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TagSelector } from "@/components/profile/tag-selector";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Card,
   CardContent,
@@ -31,14 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+
 import {
   Select,
   SelectContent,
@@ -49,7 +40,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /* ────── Components: Custom ────── */
-import { LinkWithPreview } from "@/components/link-preview";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { ProfileTab } from "@/components/profile/profile-tab";
 import ProfileCompletionBanner from "@/components/profile/completion-banner";
@@ -92,7 +82,6 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import { Label } from "@/components/ui/label";
 
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -521,20 +510,6 @@ export default function ProfilePage() {
     >
       {/* Profile Completion Banner - only shown if needed */}
       <ProfileCompletionBanner visible={showCompletionBanner} />
-
-      <motion.div
-        className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.4 }}
-      >
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
-          <p className="text-muted-foreground">
-            Manage your profile, projects, inquiries and bookmarks
-          </p>
-        </div>
-      </motion.div>
 
       {/* error message */}
       <AnimatePresence>

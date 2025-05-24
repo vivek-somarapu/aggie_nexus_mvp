@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-
 interface ProfileCompletionBannerProps {
   visible: boolean;
 }
@@ -20,17 +19,16 @@ export default function ProfileCompletionBanner({
 
   return (
     <AnimatePresence initial={false}>
-      {" "}
-      {/* prevents re‑animation on mount */}
       {visible && (
         <motion.div
           key="completion-banner"
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -40 }}
           transition={{ duration: 0.3 }}
+          className="fixed top-20 right-6 z-50 max-w-md w-full"
         >
-          <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+          <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg rounded-lg">
             <AlertDescription className="flex justify-between items-center gap-4">
               <div className="flex-1">
                 <p className="font-medium text-blue-800 dark:text-blue-300">
@@ -46,7 +44,7 @@ export default function ProfileCompletionBanner({
                 className="bg-blue-600 hover:bg-blue-700"
                 onClick={() => router.push("/profile/setup")}
               >
-                Complete Profile
+                Complete
               </Button>
             </AlertDescription>
           </Alert>

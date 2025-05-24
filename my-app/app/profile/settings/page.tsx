@@ -8,13 +8,17 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { userService } from "@/lib/services/user-service";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import { InputFile } from "@/components/ui/input";
+import { ProfileAvatarEdit } from "@/components/profile/profile-avatar";
+import { ProfileSetupForm } from "@/components/profile/profile-card";
+import {
+  TexasAMAffiliation,
+  type TexasAMAffiliationData,
+} from "@/components/profile/tamu-affiliate";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -32,7 +36,6 @@ import {
   Download,
   Trash2,
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -167,6 +170,14 @@ export default function SettingsPage() {
         [name]: value,
       },
     }));
+  };
+
+  const handleAffiliationChange = (data: TexasAMAffiliationData) => {
+    setFormData({
+      ...formData,
+      is_texas_am_affiliate: data.is_texas_am_affiliate,
+      graduation_year: data.graduation_year,
+    });
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -404,120 +415,20 @@ export default function SettingsPage() {
             </Alert>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Picture</CardTitle>
-              <CardDescription>Update your profile picture</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-border/40 shadow-md">
-                  <AvatarImage src={formData.avatar} alt={formData.full_name} />
-                  {formData?.avatar ? (
-                    <Image
-                      src={formData.avatar}
-                      alt={formData.full_name ?? "User"}
-                      width={128}
-                      height={128}
-                      className="object-cover rounded-full"
-                      priority
-                    />
-                  ) : (
-                    <AvatarFallback className="text-3xl bg-muted">
-                      {formData.full_name ? (
-                        formData.full_name.charAt(0).toUpperCase()
-                      ) : (
-                        <User className="h-16 w-16" />
-                      )}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
+          <ProfileSetupForm
+            formData={formData}
+            setFormData={setFormData}
+            selectedIndustries={selectedIndustries}
+            setSelectedIndustries={setSelectedIndustries}
+            handleAvatarChange={handleAvatarChange}
+            handleDeleteAvatar={handleDeleteAvatar}
+            handleAffiliationChange={handleAffiliationChange}
+            handleContactChange={handleContactChange}
+            handleChange={handleChange}
+            handleResumeChange={handleResumeChange}
+          />
 
-                <div className="flex-1">
-                  <div>
-                    <Label htmlFor="avatar-upload" className="block mb-2">
-                      Upload New Picture
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="avatar-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        className="max-w-xs"
-                      />
-                      {formData.avatar && (
-                        <Button type="button" onClick={handleDeleteAvatar}>
-                          <Trash2 /> Delete
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Recommended: Square image, at least 200x200px
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Update your personal details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
-                  <Input
-                    id="full_name"
-                    name="full_name"
-                    value={formData.full_name}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    disabled
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Email cannot be changed directly. Contact support for
-                    assistance.
-                  </p>
-                </div>
-
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    name="bio"
-                    value={formData.bio || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        bio: e.target.value.slice(0, 250),
-                      }))
-                    }
-                    placeholder="Tell us about yourself"
-                    rows={4}
-                  />
-                  <div className="text-sm text-muted-foreground text-right">
-                    {formData.bio?.length || 0} / 250
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
+          <Card className="border-0 md:border shadow-none md:shadow">
             <CardHeader>
               <CardTitle>Skills & Industries</CardTitle>
               <CardDescription>
@@ -547,130 +458,6 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Professional Information</CardTitle>
-              <CardDescription>
-                Update your professional details and links
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-                  <Input
-                    id="linkedin_url"
-                    name="linkedin_url"
-                    value={formData.linkedin_url || ""}
-                    onChange={handleChange}
-                    placeholder="https://linkedin.com/in/username"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="website_url">Website URL</Label>
-                  <Input
-                    id="website_url"
-                    name="website_url"
-                    value={formData.website_url || ""}
-                    onChange={handleChange}
-                    placeholder="https://example.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="contact_email">Contact Email</Label>
-                  <Input
-                    id="contact_email"
-                    name="email"
-                    type="email"
-                    value={formData.contact.email || ""}
-                    onChange={handleContactChange}
-                    placeholder="public@example.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="contact_phone">Contact Phone</Label>
-                  <Input
-                    id="contact_phone"
-                    name="phone"
-                    value={formData.contact.phone || ""}
-                    onChange={handleContactChange}
-                    placeholder="(123) 456-7890"
-                  />
-                </div>
-                <div className="flex items-center gap-4">
-                  <InputFile
-                    label="Upload resume"
-                    accept=".pdf"
-                    onChange={handleResumeChange}
-                  />
-                  <div className="mt-auto flex justify-end">
-                    {formData.resume_url ? (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="text-sm py-4"
-                      >
-                        <a
-                          href={formData.resume_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Download className="mr-1 h-4 w-4" />
-                          Resume
-                        </a>
-                      </Button>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        No resume uploaded
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_texas_am_affiliate"
-                  checked={formData.is_texas_am_affiliate}
-                  onCheckedChange={(checked) =>
-                    handleSwitchChange(checked, "is_texas_am_affiliate")
-                  }
-                />
-                <Label htmlFor="is_texas_am_affiliate">
-                  I am a Texas A&M affiliate (student, alumni, staff)
-                </Label>
-              </div>
-
-              {formData.is_texas_am_affiliate && (
-                <div className="space-y-2 max-w-xs">
-                  <Label htmlFor="graduation_year">
-                    Graduation Year (if applicable)
-                  </Label>
-                  <Input
-                    id="graduation_year"
-                    name="graduation_year"
-                    type="number"
-                    value={formData.graduation_year || ""}
-                    onChange={(e) => {
-                      const value = e.target.value
-                        ? parseInt(e.target.value)
-                        : undefined;
-                      setFormData((prev) => ({
-                        ...prev,
-                        graduation_year: value,
-                      }));
-                    }}
-                    placeholder="YYYY"
-                  />
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -731,7 +518,10 @@ export default function SettingsPage() {
                   }
                 />
               </div>
-              <div className="flex items-center justify-between">
+
+              {/* The platform does not have any followers so far */}
+
+              {/* <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>New Followers</Label>
                   <p className="text-sm text-muted-foreground">
@@ -747,7 +537,7 @@ export default function SettingsPage() {
                     }))
                   }
                 />
-              </div>
+              </div> */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Marketing Updates</Label>
@@ -773,24 +563,49 @@ export default function SettingsPage() {
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Password</CardTitle>
+              <CardTitle>Password and Account Email</CardTitle>
               <CardDescription>
                 Change your password and security settings
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Email field */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    disabled
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Email cannot be changed directly. Contact support for
+                    assistance.
+                  </p>
+                </div>
+
+                {/* Current Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input id="current-password" type="password" />
+                </div>
+
+                {/* New Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input id="new-password" type="password" />
+                </div>
+
+                {/* Confirm Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input id="confirm-password" type="password" />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input id="confirm-password" type="password" />
-              </div>
+
               <Button>Update Password</Button>
             </CardContent>
           </Card>

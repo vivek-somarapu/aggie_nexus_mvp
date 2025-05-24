@@ -1,16 +1,26 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
+
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import {
+  TexasAMAffiliation,
+  type TexasAMAffiliationData,
+} from "@/components/profile/tamu-affiliate";
 import { User as UserType } from "@/lib/models/users";
 import {
   containerVariants,
   itemVariants,
   industryOptions,
 } from "@/lib/constants";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 import {
   ProfileAvatar,
@@ -25,15 +35,14 @@ import {
   Trash2,
   User,
   Loader2,
+  Download,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, InputFile } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -44,13 +53,198 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { TagSelector } from "@/components/profile/tag-selector";
+import { Textarea } from "../ui/textarea";
 
 type MinimalFormData = {
   full_name: string;
   avatar: string;
   is_texas_am_affiliate: boolean;
   graduation_year?: number;
+  contact: { email?: string; phone?: string };
+  linkedin_url?: string;
+  website_url?: string;
+  resume_url?: string;
+  bio?: string;
 };
+
+/**
+ * Profile edit form component used in /profile/settings and /profile/settings pages
+ */
+
+export interface ProfileSetupFormProps<T extends MinimalFormData> {
+  formData: T;
+  setFormData: React.Dispatch<React.SetStateAction<T>>;
+  selectedIndustries: string[];
+  setSelectedIndustries: React.Dispatch<React.SetStateAction<string[]>>;
+  handleAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleDeleteAvatar: () => void;
+  handleAffiliationChange: (data: TexasAMAffiliationData) => void;
+  handleContactChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => void;
+  handleResumeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+export function ProfileSetupForm<T extends MinimalFormData>({
+  formData,
+  setFormData,
+  selectedIndustries,
+  setSelectedIndustries,
+  handleAvatarChange,
+  handleDeleteAvatar,
+  handleAffiliationChange,
+  handleContactChange,
+  handleChange,
+  handleResumeChange,
+}: ProfileSetupFormProps<T>) {
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <Card className="w-full border-0 md:border shadow-none md:shadow">
+      <CardHeader>
+        <CardTitle>Personal & Professional Information</CardTitle>
+        <CardDescription>
+          Update your personal & professional details and links
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Avatar + Name + Affiliation */}
+        <div className="flex flex-col sm:flex-row gap-6">
+          <div className="w-full flex justify-center sm:w-auto sm:shrink-0">
+            <ProfileAvatarEdit
+              avatar={formData.avatar}
+              fullName={formData.full_name}
+              onAvatarChange={handleAvatarChange}
+              onAvatarDelete={handleDeleteAvatar}
+            />
+          </div>
+          <div className="w-full sm:flex-1 space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                name="full_name"
+                value={formData.full_name}
+                onChange={handleChange}
+              />
+            </div>
+            <TexasAMAffiliation
+              value={{
+                is_texas_am_affiliate: formData.is_texas_am_affiliate,
+                graduation_year: formData.graduation_year,
+              }}
+              onChange={handleAffiliationChange}
+            />
+          </div>
+        </div>
+
+        {/* Contacts and links */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="contact_email">Contact Email</Label>
+            <Input
+              id="contact_email"
+              name="email"
+              type="email"
+              value={formData.contact.email || ""}
+              onChange={handleContactChange}
+              placeholder="public@example.com"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="linkedin_url">LinkedIn URL</Label>
+            <Input
+              id="linkedin_url"
+              name="linkedin_url"
+              value={formData.linkedin_url || ""}
+              onChange={handleChange}
+              placeholder="https://linkedin.com/in/username"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_phone">Contact Phone</Label>
+            <Input
+              id="contact_phone"
+              name="phone"
+              value={formData.contact.phone || ""}
+              onChange={handleContactChange}
+              placeholder="(123) 456-7890"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="website_url">Website URL</Label>
+            <Input
+              id="website_url"
+              name="website_url"
+              value={formData.website_url || ""}
+              onChange={handleChange}
+              placeholder="https://example.com"
+            />
+          </div>
+        </div>
+
+        {/* Resume */}
+        <div className=" sm:col-span-2">
+          <InputFile
+            label="Upload resume"
+            accept=".pdf"
+            onChange={handleResumeChange}
+          />
+          <div className="mt-auto flex justify-end">
+            {formData.resume_url ? (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="text-sm py-4"
+              >
+                <a
+                  href={formData.resume_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download className="mr-1 h-4 w-4" /> Resume
+                </a>
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No resume uploaded
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Bio */}
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="bio">Bio</Label>
+          <Textarea
+            id="bio"
+            name="bio"
+            className="max-h-[80px] overflow-y-auto"
+            value={formData.bio || ""}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                bio: e.target.value.slice(0, 250),
+              }))
+            }
+            placeholder="Tell us about yourself"
+            rows={4}
+          />
+          <div className="text-sm text-muted-foreground text-right">
+            {formData.bio?.length || 0} / 250
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Profile view/edit component used in /profile page
+ */
 
 interface ProfileCardProps<T extends MinimalFormData = MinimalFormData> {
   user: UserType | null;
@@ -83,6 +277,13 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
   isSaving,
 }: ProfileCardProps<T>) {
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const handleAffiliationChange = (data: TexasAMAffiliationData) => {
+    setFormData({
+      ...formData,
+      is_texas_am_affiliate: data.is_texas_am_affiliate,
+      graduation_year: data.graduation_year,
+    });
+  };
 
   return (
     <Card className="shadow-none border border-border/50 overflow-hidden md:shadow-md md:border-0">
@@ -99,45 +300,19 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
 
       <CardContent className="px-6 -mt-16 relative">
         <motion.div
-          className="flex flex-col md:flex-row gap-6 mb-6"
+          className="flex flex-col sm:flex-row gap-6 mb-6"
           initial="hidden"
           animate="visible"
           variants={containerVariants}
         >
           {/* Avatar */}
-          <motion.div
-            variants={itemVariants}
-            whileHover={{ scale: 1.05 }}
-            transition={{ type: "spring", stiffness: 400, damping: 10 }}
-          >
-            <Avatar
-              className={cn(
-                "h-32 w-32 relative ring-2 shadow-md overflow-hidden",
-                user?.is_texas_am_affiliate
-                  ? "border-4 border-[#500000]"
-                  : "border-4 border-background ring-border/40"
-              )}
-            >
-              {user?.avatar ? (
-                <Image
-                  src={user.avatar}
-                  alt={user.full_name ?? "User"}
-                  width={128}
-                  height={128}
-                  className="object-cover rounded-full"
-                  priority
-                />
-              ) : (
-                <AvatarFallback className="text-3xl bg-muted">
-                  {user?.full_name ? (
-                    user.full_name.charAt(0)
-                  ) : (
-                    <User className="h-16 w-16" />
-                  )}
-                </AvatarFallback>
-              )}
-            </Avatar>
-          </motion.div>
+          <div className="flex justify-center">
+            <ProfileAvatar
+              avatar={formData.avatar}
+              fullName={formData.full_name}
+              is_texas_am_affiliate={formData.is_texas_am_affiliate}
+            />
+          </div>
 
           {/* Info block */}
           <motion.div className="flex-1 space-y-4" variants={itemVariants}>
@@ -165,78 +340,44 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
 
                   <div className="space-y-4 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-muted flex-1">
                     {/* Avatar edit */}
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                      <Avatar className="h-32 w-32 border-4 border-background ring-2 ring-border/40 shadow-md">
-                        <AvatarImage
-                          src={formData.avatar}
-                          alt={formData.full_name}
+                    <div className="flex flex-col sm:flex-row gap-6">
+                      {/* ── Avatar ───────────────────────────── */}
+                      <div className="w-full flex justify-center sm:w-auto sm:shrink-0">
+                        <ProfileAvatarEdit
+                          avatar={formData.avatar}
+                          fullName={formData.full_name}
+                          onAvatarChange={handleAvatarChange}
+                          onAvatarDelete={handleDeleteAvatar}
                         />
-                        {formData.avatar ? (
-                          <Image
-                            src={formData.avatar}
-                            alt={formData.full_name ?? "User"}
-                            width={128}
-                            height={128}
-                            className="object-cover rounded-full"
-                            priority
-                          />
-                        ) : (
-                          <AvatarFallback className="text-3xl bg-muted">
-                            {formData.full_name ? (
-                              formData.full_name.charAt(0).toUpperCase()
-                            ) : (
-                              <User className="h-16 w-16" />
-                            )}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
+                      </div>
 
-                      <div className="flex-1 space-y-2">
-                        <div>
-                          <Label htmlFor="avatar-upload" className="block mb-2">
-                            Upload New Picture
-                          </Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="avatar-upload"
-                              type="file"
-                              accept="image/*"
-                              onChange={handleAvatarChange}
-                              className="max-w-xs"
-                            />
-                            {formData.avatar && (
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                onClick={handleDeleteAvatar}
-                              >
-                                <Trash2 className="mr-1 h-4 w-4" />
-                                Delete
-                              </Button>
-                            )}
-                          </div>
+                      <div className="w-full sm:flex-1 space-y-4 pt-2">
+                        {/* Full Name */}
+                        <div className="space-y-2">
+                          <Label htmlFor="full_name">Full Name</Label>
+                          <Input
+                            id="full_name"
+                            name="full_name"
+                            value={formData.full_name}
+                            onChange={(e) =>
+                              setFormData((p) => ({
+                                ...p,
+                                full_name: e.target.value,
+                              }))
+                            }
+                          />
                         </div>
 
-                        <p className="text-xs text-muted-foreground">
-                          Recommended: square ≥ 200 × 200 px
-                        </p>
+                        {/* A&M Affiliation */}
+                        <TexasAMAffiliation
+                          value={{
+                            is_texas_am_affiliate:
+                              formData.is_texas_am_affiliate,
+                            graduation_year: formData.graduation_year,
+                          }}
+                          onChange={handleAffiliationChange}
+                        />
                       </div>
-                    </div>
-
-                    {/* Name edit */}
-                    <div className="space-y-2">
-                      <Label htmlFor="full_name">Full Name</Label>
-                      <Input
-                        id="full_name"
-                        name="full_name"
-                        value={formData.full_name}
-                        onChange={(e) =>
-                          setFormData((p) => ({
-                            ...p,
-                            full_name: e.target.value,
-                          }))
-                        }
-                      />
                     </div>
 
                     {/* Industry edit */}
@@ -249,40 +390,6 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                         onChange={setSelectedIndustries}
                       />
                     </div>
-
-                    {/* Texas A&M edit */}
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="is_texas_am_affiliate"
-                        checked={formData.is_texas_am_affiliate}
-                        onCheckedChange={(checked) =>
-                          handleSwitchChange(checked, "is_texas_am_affiliate")
-                        }
-                      />
-                      <Label htmlFor="is_texas_am_affiliate">
-                        I am a Texas A&M affiliate
-                      </Label>
-                    </div>
-
-                    {formData.is_texas_am_affiliate && (
-                      <div className="space-y-2 max-w-xs">
-                        <Label htmlFor="graduation_year">Graduation Year</Label>
-                        <Input
-                          id="graduation_year"
-                          type="number"
-                          value={formData.graduation_year ?? ""}
-                          onChange={(e) =>
-                            setFormData((p) => ({
-                              ...p,
-                              graduation_year: e.target.value
-                                ? parseInt(e.target.value)
-                                : undefined,
-                            }))
-                          }
-                          placeholder="YYYY"
-                        />
-                      </div>
-                    )}
                   </div>
 
                   <DialogFooter>
