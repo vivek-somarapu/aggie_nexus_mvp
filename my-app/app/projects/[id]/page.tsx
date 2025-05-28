@@ -1,15 +1,30 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useParams, notFound } from "next/navigation"
-import Link from "next/link"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
+import { useState, useEffect } from "react";
+import { useParams, notFound } from "next/navigation";
+import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Bookmark,
   Calendar,
@@ -24,156 +39,167 @@ import {
   MessageSquare,
   Share2,
   User,
-} from "lucide-react"
-import { formatDate } from "@/lib/utils"
-import { projectService, Project } from "@/lib/services/project-service"
-import { userService } from "@/lib/services/user-service"
-import { User as UserType } from "@/lib/models/users"
-import { bookmarkService } from "@/lib/services/bookmark-service"
-import { useAuth } from "@/lib"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { createClient } from "@/lib/supabase/client"
+} from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import { projectService, Project } from "@/lib/services/project-service";
+import { userService } from "@/lib/services/user-service";
+import { User as UserType } from "@/lib/models/users";
+import { bookmarkService } from "@/lib/services/bookmark-service";
+import { useAuth } from "@/lib";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ProjectPage() {
-  const { id } = useParams() as { id: string }
-  const { user: currentUser } = useAuth()
-  
-  const [project, setProject] = useState<Project | null>(null)
-  const [owner, setOwner] = useState<UserType | null>(null)
-  const [isBookmarked, setIsBookmarked] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [similarProjects, setSimilarProjects] = useState<Project[]>([])
-  
+  const { id } = useParams() as { id: string };
+  const { authUser: currentUser } = useAuth();
+
+  const [project, setProject] = useState<Project | null>(null);
+  const [owner, setOwner] = useState<UserType | null>(null);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [similarProjects, setSimilarProjects] = useState<Project[]>([]);
+
   // Inquiry dialog state
-  const [inquiryNote, setInquiryNote] = useState("")
-  const [isInquiryOpen, setIsInquiryOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [inquiryError, setInquiryError] = useState<string | null>(null)
-  const [inquirySuccess, setInquirySuccess] = useState(false)
+  const [inquiryNote, setInquiryNote] = useState("");
+  const [isInquiryOpen, setIsInquiryOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
+  const [inquirySuccess, setInquirySuccess] = useState(false);
 
   // Fetch project data
   useEffect(() => {
     const fetchProjectData = async () => {
       try {
-        setIsLoading(true)
-        setError(null)
-        
+        setIsLoading(true);
+        setError(null);
+
         // Fetch project
-        const fetchedProject = await projectService.getProject(id)
+        const fetchedProject = await projectService.getProject(id);
         if (!fetchedProject) {
-          notFound()
+          notFound();
         }
-        setProject(fetchedProject)
-        
+        setProject(fetchedProject);
+
         // Fetch project owner
         if (fetchedProject.owner_id) {
-          const fetchedOwner = await userService.getUser(fetchedProject.owner_id)
-          setOwner(fetchedOwner)
+          const fetchedOwner = await userService.getUser(
+            fetchedProject.owner_id
+          );
+          setOwner(fetchedOwner);
         }
-        
+
         // Fetch similar projects
-        const allProjects = await projectService.getProjects()
+        const allProjects = await projectService.getProjects();
         const similar = allProjects
-          .filter(p => 
-            p.id !== id && 
-            p.industry.some(i => fetchedProject.industry.includes(i))
+          .filter(
+            (p) =>
+              p.id !== id &&
+              p.industry.some((i) => fetchedProject.industry.includes(i))
           )
-          .slice(0, 3)
-        setSimilarProjects(similar)
-        
+          .slice(0, 3);
+        setSimilarProjects(similar);
+
         // Check if project is bookmarked
         if (currentUser) {
-          const bookmarks = await bookmarkService.getProjectBookmarks(currentUser.id)
-          const isProjectBookmarked = bookmarks.some(b => b.project_id === id)
-          setIsBookmarked(isProjectBookmarked)
+          const bookmarks = await bookmarkService.getProjectBookmarks(
+            currentUser.id
+          );
+          const isProjectBookmarked = bookmarks.some(
+            (b) => b.project_id === id
+          );
+          setIsBookmarked(isProjectBookmarked);
         }
       } catch (err) {
-        console.error("Error fetching project:", err)
-        setError("Failed to load project details. Please try again later.")
+        console.error("Error fetching project:", err);
+        setError("Failed to load project details. Please try again later.");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
-    
-    fetchProjectData()
-  }, [id, currentUser])
-  
+    };
+
+    fetchProjectData();
+  }, [id, currentUser]);
+
   const handleBookmarkToggle = async () => {
-    if (!currentUser || !project) return
-    
+    if (!currentUser || !project) return;
+
     try {
-      setIsBookmarkLoading(true)
-      const result = await bookmarkService.toggleProjectBookmark(currentUser.id, project.id)
-      setIsBookmarked(result.action === 'added')
+      setIsBookmarkLoading(true);
+      const result = await bookmarkService.toggleProjectBookmark(
+        currentUser.id,
+        project.id
+      );
+      setIsBookmarked(result.action === "added");
     } catch (err) {
-      console.error("Error toggling bookmark:", err)
+      console.error("Error toggling bookmark:", err);
     } finally {
-      setIsBookmarkLoading(false)
+      setIsBookmarkLoading(false);
     }
-  }
-  
+  };
+
   // Handle inquiry submission
   const handleInquirySubmit = async () => {
     if (!currentUser || !project) {
-      setInquiryError("You must be logged in to submit an inquiry")
-      return
+      setInquiryError("You must be logged in to submit an inquiry");
+      return;
     }
-    
+
     if (!inquiryNote.trim()) {
-      setInquiryError("Please provide a note about your interest")
-      return
+      setInquiryError("Please provide a note about your interest");
+      return;
     }
-    
+
     try {
-      setIsSubmitting(true)
-      setInquiryError(null)
-      
-      const supabase = createClient()
-      
+      setIsSubmitting(true);
+      setInquiryError(null);
+
+      const supabase = createClient();
+
       // Check if user already applied to this project
       const { data: existingApplications } = await supabase
-        .from('project_applications')
-        .select('id')
-        .eq('project_id', project.id)
-        .eq('user_id', currentUser.id)
-        .single()
-      
+        .from("project_applications")
+        .select("id")
+        .eq("project_id", project.id)
+        .eq("user_id", currentUser.id)
+        .single();
+
       if (existingApplications) {
-        setInquiryError("You have already submitted an inquiry for this project")
-        return
+        setInquiryError(
+          "You have already submitted an inquiry for this project"
+        );
+        return;
       }
-      
+
       // Submit new application
-      const { error } = await supabase
-        .from('project_applications')
-        .insert({
-          project_id: project.id,
-          user_id: currentUser.id,
-          note: inquiryNote,
-          status: 'pending'
-        })
-      
-      if (error) throw error
-      
+      const { error } = await supabase.from("project_applications").insert({
+        project_id: project.id,
+        user_id: currentUser.id,
+        note: inquiryNote,
+        status: "pending",
+      });
+
+      if (error) throw error;
+
       // Show success message and reset form
-      setInquirySuccess(true)
-      setInquiryNote("")
-      
+      setInquirySuccess(true);
+      setInquiryNote("");
+
       // Close dialog after a delay
       setTimeout(() => {
-        setIsInquiryOpen(false)
-        setInquirySuccess(false)
-      }, 2000)
-      
+        setIsInquiryOpen(false);
+        setInquirySuccess(false);
+      }, 2000);
     } catch (err: any) {
-      console.error("Error submitting inquiry:", err)
-      setInquiryError(err?.message || "Failed to submit inquiry. Please try again.")
+      console.error("Error submitting inquiry:", err);
+      setInquiryError(
+        err?.message || "Failed to submit inquiry. Please try again."
+      );
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -181,7 +207,7 @@ export default function ProjectPage() {
         <Loader2 className="h-8 w-8 text-primary animate-spin" />
         <span className="ml-2">Loading project details...</span>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -189,14 +215,14 @@ export default function ProjectPage() {
       <Alert variant="destructive" className="my-6">
         <AlertDescription>{error}</AlertDescription>
       </Alert>
-    )
+    );
   }
 
   if (!project) {
-    return notFound()
+    return notFound();
   }
 
-  const isOwner = currentUser?.id === project.owner_id
+  const isOwner = currentUser?.id === project.owner_id;
 
   return (
     <div className="space-y-6">
@@ -218,16 +244,14 @@ export default function ProjectPage() {
                 <div>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {project.is_idea ? (
-                      <Badge variant="outline">
-                        Idea
-                      </Badge>
+                      <Badge variant="outline">Idea</Badge>
                     ) : (
-                      <Badge variant="outline">
-                        Project
-                      </Badge>
+                      <Badge variant="outline">Project</Badge>
                     )}
                     <Badge variant="outline">{project.project_status}</Badge>
-                    <Badge variant="outline">{project.recruitment_status}</Badge>
+                    <Badge variant="outline">
+                      {project.recruitment_status}
+                    </Badge>
                   </div>
                   <CardTitle className="text-2xl">{project.title}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-2">
@@ -239,18 +263,24 @@ export default function ProjectPage() {
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
+                  <Button
+                    variant="outline"
+                    size="icon"
                     onClick={handleBookmarkToggle}
                     disabled={isBookmarkLoading || !currentUser}
                   >
                     {isBookmarkLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
+                      <Bookmark
+                        className={`h-4 w-4 ${
+                          isBookmarked ? "fill-current" : ""
+                        }`}
+                      />
                     )}
-                    <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Bookmark project"}</span>
+                    <span className="sr-only">
+                      {isBookmarked ? "Remove bookmark" : "Bookmark project"}
+                    </span>
                   </Button>
                   <Button variant="outline" size="icon">
                     <Share2 className="h-4 w-4" />
@@ -262,7 +292,9 @@ export default function ProjectPage() {
             <CardContent className="space-y-6">
               <div>
                 <h3 className="font-semibold mb-2">Description</h3>
-                <p className="text-muted-foreground whitespace-pre-line">{project.description}</p>
+                <p className="text-muted-foreground whitespace-pre-line">
+                  {project.description}
+                </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -321,7 +353,7 @@ export default function ProjectPage() {
                   </Link>
                 </Button>
               )}
-              
+
               {/* Replace contact buttons with Inquire dialog */}
               {!isOwner && (
                 <Dialog open={isInquiryOpen} onOpenChange={setIsInquiryOpen}>
@@ -335,14 +367,17 @@ export default function ProjectPage() {
                     <DialogHeader>
                       <DialogTitle>Inquire About {project.title}</DialogTitle>
                       <DialogDescription>
-                        Send a note to the project owner about your interest. They will be able to see your profile details and contact you back.
+                        Send a note to the project owner about your interest.
+                        They will be able to see your profile details and
+                        contact you back.
                       </DialogDescription>
                     </DialogHeader>
-                    
+
                     {inquirySuccess ? (
                       <Alert className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
                         <AlertDescription>
-                          Your inquiry has been submitted successfully! The project owner will review it soon.
+                          Your inquiry has been submitted successfully! The
+                          project owner will review it soon.
                         </AlertDescription>
                       </Alert>
                     ) : (
@@ -352,7 +387,7 @@ export default function ProjectPage() {
                             <AlertDescription>{inquiryError}</AlertDescription>
                           </Alert>
                         )}
-                        
+
                         <Textarea
                           placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
                           value={inquiryNote}
@@ -360,18 +395,22 @@ export default function ProjectPage() {
                           rows={5}
                           className="resize-none"
                         />
-                        
+
                         <DialogFooter>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             onClick={() => setIsInquiryOpen(false)}
                             disabled={isSubmitting}
                           >
                             Cancel
                           </Button>
-                          <Button 
+                          <Button
                             onClick={handleInquirySubmit}
-                            disabled={isSubmitting || !inquiryNote.trim() || !currentUser}
+                            disabled={
+                              isSubmitting ||
+                              !inquiryNote.trim() ||
+                              !currentUser
+                            }
                           >
                             {isSubmitting ? (
                               <>
@@ -379,7 +418,7 @@ export default function ProjectPage() {
                                 Submitting...
                               </>
                             ) : (
-                              'Submit Inquiry'
+                              "Submit Inquiry"
                             )}
                           </Button>
                         </DialogFooter>
@@ -388,7 +427,7 @@ export default function ProjectPage() {
                   </DialogContent>
                 </Dialog>
               )}
-              
+
               {/* Show manage inquiries button for project owner */}
               {isOwner && (
                 <Button asChild>
@@ -400,7 +439,7 @@ export default function ProjectPage() {
               )}
             </CardFooter>
           </Card>
-          
+
           {/* Similar Projects - Moved below main content on mobile, right column on desktop */}
           <Card className="shadow-sm md:hidden">
             <CardHeader className="pb-3">
@@ -410,16 +449,26 @@ export default function ProjectPage() {
               {similarProjects.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {similarProjects.map((p) => (
-                    <div key={p.id} className="border rounded-lg p-3 hover:bg-muted/30 transition-colors">
-                      <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
+                    <div
+                      key={p.id}
+                      className="border rounded-lg p-3 hover:bg-muted/30 transition-colors"
+                    >
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="font-medium hover:underline"
+                      >
                         {p.title}
                       </Link>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{p.description}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                        {p.description}
+                      </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-center">No similar projects found</p>
+                <p className="text-muted-foreground text-center">
+                  No similar projects found
+                </p>
               )}
             </CardContent>
           </Card>
@@ -435,23 +484,30 @@ export default function ProjectPage() {
               {owner ? (
                 <div className="flex flex-col items-center text-center">
                   <Avatar className="h-20 w-20 mb-4">
-                    <AvatarImage src={owner.avatar ?? ''} alt={owner.full_name} />
+                    <AvatarImage
+                      src={owner.avatar ?? ""}
+                      alt={owner.full_name}
+                    />
                     <AvatarFallback>{owner.full_name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <h3 className="font-semibold text-lg">{owner.full_name}</h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     {owner.bio && owner.bio.substring(0, 100)}
-                    {owner.bio && owner.bio.length > 100 ? '...' : ''}
+                    {owner.bio && owner.bio.length > 100 ? "..." : ""}
                   </p>
                   <div className="flex gap-2 mb-4">
-                    {owner.is_texas_am_affiliate && <Badge variant="secondary">Texas A&M Affiliate</Badge>}
+                    {owner.is_texas_am_affiliate && (
+                      <Badge variant="secondary">Texas A&M Affiliate</Badge>
+                    )}
                   </div>
                   <Button variant="outline" className="w-full" asChild>
                     <Link href={`/users/${owner.id}`}>View Full Profile</Link>
                   </Button>
                 </div>
               ) : (
-                <p className="text-muted-foreground text-center">Owner information not available</p>
+                <p className="text-muted-foreground text-center">
+                  Owner information not available
+                </p>
               )}
             </CardContent>
           </Card>
@@ -473,7 +529,11 @@ export default function ProjectPage() {
                 </div>
               )}
               {!isOwner && (
-                <Button className="w-full" onClick={() => setIsInquiryOpen(true)} disabled={!currentUser}>
+                <Button
+                  className="w-full"
+                  onClick={() => setIsInquiryOpen(true)}
+                  disabled={!currentUser}
+                >
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Inquire About Project
                 </Button>
@@ -490,22 +550,31 @@ export default function ProjectPage() {
               {similarProjects.length > 0 ? (
                 <div className="space-y-3">
                   {similarProjects.map((p) => (
-                    <div key={p.id} className="border-b pb-3 last:border-0 last:pb-0">
-                      <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
+                    <div
+                      key={p.id}
+                      className="border-b pb-3 last:border-0 last:pb-0"
+                    >
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="font-medium hover:underline"
+                      >
                         {p.title}
                       </Link>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{p.description}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                        {p.description}
+                      </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-center">No similar projects found</p>
+                <p className="text-muted-foreground text-center">
+                  No similar projects found
+                </p>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
-  )
+  );
 }
-

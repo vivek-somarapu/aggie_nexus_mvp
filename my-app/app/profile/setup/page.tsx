@@ -1,22 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
-import { User as UserType } from "@/lib/models/users";
-import { userService } from "@/lib/services/user-service";
-import { v4 as uuid } from "uuid";
-import { motion, AnimatePresence } from "framer-motion";
+import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { ProfileSetupForm } from "@/components/profile/profile-card";
-import Image from "next/image";
-import {
-  containerVariants,
-  itemVariants,
-  industryOptions,
-  skillOptions,
-  stepVariants,
-} from "@/lib/constants";
+import { TagSelector } from "@/components/profile/tag-selector";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -25,48 +14,43 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { TagSelector } from "@/components/profile/tag-selector";
-import {
-  TexasAMAffiliation,
-  type TexasAMAffiliationData,
-} from "@/components/profile/tamu-affiliate";
-import {
-  ProfileAvatar,
-  ProfileAvatarEdit,
-} from "@/components/profile/profile-avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/lib/auth";
 import {
-  Loader2,
-  ChevronRight,
-  ChevronLeft,
-  User as UserIcon,
-  Check,
-  Download,
-  Trash2,
-  GraduationCap,
-} from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+  containerVariants,
+  industryOptions,
+  itemVariants,
+  skillOptions,
+  stepVariants,
+} from "@/lib/constants";
+import { userService } from "@/lib/services/user-service";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export default function ProfileSetupPage() {
-  const { user: authUser, isLoading: authLoading } = useAuth();
+  const { profile, refreshProfile, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const supabase = createClient();
   const [isSaving, setIsSaving] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [isFromAuthError, setIsFromAuthError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<UserType | null>(null);
+
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [pendingResumeFile, setPendingResumeFile] = useState<File | null>(null);
+  const [resumeFileInfo, setResumeFileInfo] = useState<{
+    name: string;
+    size: number;
+    type: string;
+    uploadedAt: Date;
+  } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -84,67 +68,40 @@ export default function ProfileSetupPage() {
     contact: { email: "", phone: "" } as { email: string; phone: string },
   });
 
-  // Initialize form with user data if available
+  // fetch user and check if profile is complete
   useEffect(() => {
-    if (!authUser?.id) return;
-    const fetchUser = async () => {
-      try {
-        setIsLoading(true);
-        const userData = await userService.getUser(authUser.id);
-        if (!userData) {
-          throw new Error("User not found");
-        }
-        setUser(userData);
-        setFormData({
-          full_name: userData.full_name || "",
-          email: userData.email || "",
-          bio: userData.bio || "",
-          industry: userData.industry || [],
-          skills: userData.skills || [],
-          linkedin_url: userData.linkedin_url || "",
-          website_url: userData.website_url || "",
-          is_texas_am_affiliate: userData.is_texas_am_affiliate || false,
-          graduation_year: userData.graduation_year ?? undefined,
-          avatar: userData.avatar || "",
-          resume_url: userData.resume_url || "",
-          contact: {
-            email: userData.contact?.email || userData.email || "",
-            phone: userData.contact?.phone || "",
-          },
-        });
-        if (userData.industry) {
-          setSelectedIndustries(userData.industry);
-        }
-
-        if (userData.skills) {
-          setSelectedSkills(userData.skills);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchUser();
-  }, [authUser?.id]);
-
-  // Check if user was redirected from auth error
-  useEffect(() => {
-    // Check localStorage for auth error flag
-    const authErrorFlag = localStorage.getItem("auth_profile_error");
-    if (authErrorFlag === "true") {
-      setIsFromAuthError(true);
-      setMessage(
-        "We detected an issue with your profile during signup. Please complete your profile setup now."
-      );
-      // Jump directly to step 2 (basic information)
-      setCurrentStep(2);
-      // Clear the flag
-      localStorage.removeItem("auth_profile_error");
+    if (!profile) {
+      setIsLoading(true);
+      return;
     }
-  }, []);
+    setFormData({
+      full_name: profile.full_name || "",
+      email: profile.email || "",
+      bio: profile.bio || "",
+      industry: profile.industry || [],
+      skills: profile.skills || [],
+      linkedin_url: profile.linkedin_url || "",
+      website_url: profile.website_url || "",
+      is_texas_am_affiliate: profile.is_texas_am_affiliate || false,
+      graduation_year: profile.graduation_year ?? undefined,
+      avatar: profile.avatar || "",
+      resume_url: profile.resume_url || "",
+      contact: {
+        email: profile.contact?.email || profile.email || "",
+        phone: profile.contact?.phone || "",
+      },
+    });
 
-  // Handle user interaction
+    setSelectedSkills(profile.skills || []);
+    setSelectedIndustries(profile.industry || []);
+
+    setIsLoading(false);
+  }, [profile]);
+
+  const prevStep = () => {
+    setCurrentStep((prev) => prev - 1);
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -166,148 +123,175 @@ export default function ProfileSetupPage() {
     }));
   };
 
-  const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleSaveProfile = async () => {
+    if (!profile) return;
 
     try {
       setIsSaving(true);
-      const ext = file.name.split(".").pop();
-      const filename = `${uuid()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("resumes")
-        .upload(filename, file, { cacheControl: "3600", upsert: false });
-      if (uploadError) throw uploadError;
+      setError(null);
 
-      const { data } = supabase.storage.from("resumes").getPublicUrl(filename);
-      setFormData((prev) => ({
-        ...prev,
-        resume_url: data.publicUrl,
-      }));
-      toast.success("Resume uploaded");
+      // 1) upload avatar
+      let avatarUrl = formData.avatar;
+      if (pendingAvatarFile) {
+        avatarUrl = await uploadToBucket("avatars", pendingAvatarFile);
+      }
+
+      // 2) upload resume
+      let resumeUrl = formData.resume_url;
+      if (pendingResumeFile) {
+        resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
+      }
+      // 3) collect form data
+      const payload = {
+        full_name: formData.full_name.trim(),
+        bio: formData.bio.trim(),
+        linkedin_url: formData.linkedin_url.trim() || null,
+        website_url: formData.website_url.trim() || null,
+        is_texas_am_affiliate: formData.is_texas_am_affiliate,
+        graduation_year: formData.graduation_year ?? null,
+        avatar: avatarUrl || null,
+        resume_url: resumeUrl || null,
+        industry: selectedIndustries,
+        skills: selectedSkills,
+        contact: formData.contact,
+      };
+
+      // 4) update user profile
+      await userService.updateUser(profile.id, payload);
+      await refreshProfile();
+
+      // 5) reset form state
+      setPendingAvatarFile(null);
+      setPendingResumeFile(null);
+
+      toast.success("Profile updated!");
+      router.push("/profile");
     } catch (err) {
-      console.error("Error uploading resume:", err);
-      toast.error("Failed to upload resume. Please try again.");
+      console.error("Error updating profile:", err);
+      toast.error("Failed to update profile, please try again.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const prevStep = () => {
-    setCurrentStep((prev) => prev - 1);
+  /* -------------------------------------------------
+   Helpers that talk to the new API route
+--------------------------------------------------*/
+  async function uploadToBucket(
+    bucket: "avatars" | "resumes",
+    file: File
+  ): Promise<string> {
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error || "Upload failed");
+    }
+    return (await res.json()).publicUrl as string;
+  }
+
+  async function deleteFromBucket(bucket: "avatars" | "resumes", url: string) {
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error || "Delete failed");
+    }
+  }
+
+  /* -------------------------------------------------
+   Avatar upload  (POST)
+--------------------------------------------------*/
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingAvatarFile(file);
+    // preview
+    setFormData((prev) => ({
+      ...prev,
+      avatar: URL.createObjectURL(file),
+    }));
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  /* -------------------------------------------------
+   Résumé upload  (POST)
+--------------------------------------------------*/
+  const handleResumeChange = (file: File | null) => {
+    if (file) {
+      const blobUrl = URL.createObjectURL(file);
+      setPendingResumeFile(file);
+      setFormData((prev) => ({ ...prev, resume_url: blobUrl }));
+      setResumeFileInfo({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date(),
+      });
+    }
+  };
 
-    if (!user) {
-      setError("You must be logged in to update your profile");
+  /* -------------------------------------------------
+   Avatar delete  (DELETE)
+--------------------------------------------------*/
+  const handleDeleteAvatar = async () => {
+    if (pendingAvatarFile) {
+      URL.revokeObjectURL(formData.avatar);
+      setPendingAvatarFile(null);
+      setFormData((prev) => ({ ...prev, avatar: "" }));
+      toast.success("Avatar preview removed");
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setError(null);
-
-      const result = await userService.updateUser(user.id, {
-        full_name: formData.full_name,
-        bio: formData.bio,
-        linkedin_url: formData.linkedin_url,
-        website_url: formData.website_url,
-        is_texas_am_affiliate: formData.is_texas_am_affiliate,
-        graduation_year: formData.graduation_year,
-        avatar: formData.avatar || "",
-        resume_url: formData.resume_url,
-        industry: selectedIndustries,
-        contact: formData.contact,
-        skills: selectedSkills,
-      });
-
-      if (isFromAuthError) {
-        setMessage("Your profile has been successfully created!");
-      }
-
-      // Redirect to home page or profile
-      window.location.href = "/profile";
-    } catch (err: any) {
-      console.error("Error updating profile:", err);
-      setError(err.message || "Failed to update profile. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleAffiliationChange = (data: TexasAMAffiliationData) => {
-    setFormData({
-      ...formData,
-      is_texas_am_affiliate: data.is_texas_am_affiliate,
-      graduation_year: data.graduation_year,
-    });
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const localUrl = URL.createObjectURL(file);
-    setFormData((prev) => ({ ...prev, avatar: localUrl }));
+    if (!formData.avatar) return;
 
     try {
       setIsSaving(true);
-
-      // 1) upload file to bucket
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${uuid()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 2) get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(fileName);
-
-      // 3) update user profile with new avatar URL
-      setFormData((prev) => ({
-        ...prev,
-        avatar: publicUrl,
-      }));
-    } catch (error) {
-      console.error("Error uploading avatar:", error);
-      toast.error("Failed to upload avatar. Please try again.");
+      await deleteFromBucket("avatars", formData.avatar);
+      setFormData((p) => ({ ...p, avatar: "" }));
+      toast.success("Avatar removed");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not delete avatar");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteAvatar = async () => {
-    if (!formData.avatar) return;
+  /* -------------------------------------------------
+   Résumé delete  (DELETE)
+--------------------------------------------------*/
+  const handleResumeDelete = async () => {
+    if (pendingResumeFile) {
+      URL.revokeObjectURL(formData.resume_url);
+      setPendingResumeFile(null);
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
+      return;
+    }
 
-    try {
-      const filePath = formData.avatar.split(
-        "/storage/v1/object/public/avatars/"
-      )[1];
-      if (filePath) {
-        await supabase.storage.from("avatars").remove([filePath]);
-      }
-
-      setFormData((prev) => ({ ...prev, avatar: "" }));
-    } catch (err) {
-      console.error("Failed to delete avatar from storage:", err);
-      toast.error("Could not delete avatar from storage.");
+    if (formData.resume_url) {
+      await deleteFromBucket("resumes", formData.resume_url);
+      await userService.updateUser(profile!.id, { resume_url: null });
+      await refreshProfile();
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
     }
   };
 
   const skipToHome = async () => {
     try {
       // Record that the user has chosen to skip profile setup
-      if (user) {
-        await userService.updateUser(user.id, {
+      if (profile) {
+        await userService.updateUser(profile.id, {
           profile_setup_skipped: true,
           // Add a timestamp to record when setup was skipped
           profile_setup_skipped_at: new Date().toISOString(),
@@ -330,7 +314,7 @@ export default function ProfileSetupPage() {
     );
   }
 
-  if (!user) {
+  if (!profile) {
     return (
       <div className="container py-8">
         <Alert className="mb-6">
@@ -356,10 +340,12 @@ export default function ProfileSetupPage() {
           setSelectedIndustries={setSelectedIndustries}
           handleAvatarChange={handleAvatarChange}
           handleDeleteAvatar={handleDeleteAvatar}
-          handleAffiliationChange={handleAffiliationChange}
           handleContactChange={handleContactChange}
           handleChange={handleChange}
-          handleResumeChange={handleResumeChange}
+          resumeUrl={formData.resume_url || null}
+          fileInfo={resumeFileInfo || undefined}
+          onResumeChange={handleResumeChange}
+          onResumeDelete={handleResumeDelete}
         />
         <div className="px-6 md:hidden">
           <div className="space-y-2">
@@ -367,7 +353,7 @@ export default function ProfileSetupPage() {
             <TagSelector
               label="Industries"
               options={industryOptions}
-              selected={selectedIndustries}
+              selected={profile.industry || []}
               onChange={setSelectedIndustries}
             />
           </div>
@@ -376,7 +362,7 @@ export default function ProfileSetupPage() {
             <TagSelector
               label="Skills"
               options={skillOptions}
-              selected={selectedSkills}
+              selected={profile.skills || []}
               onChange={setSelectedSkills}
               maxTags={15}
             />
@@ -384,7 +370,7 @@ export default function ProfileSetupPage() {
         </div>
         {/* Save Button */}
         <div className="flex justify-end mt-4">
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button onClick={handleSaveProfile} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -398,12 +384,12 @@ export default function ProfileSetupPage() {
       </div>
 
       {/* Desktop/Tablet: step-by-step cards */}
-      <div className="hidden md:block">
+      <div className="hidden md:block ">
         <AnimatePresence mode="wait">
           {currentStep >= 1 && (
             <motion.div
               key={currentStep}
-              className="absolute inset-0 flex items-center justify-center"
+              className="flex items-center justify-center"
               variants={stepVariants}
               initial="initial"
               animate="animate"
@@ -415,7 +401,7 @@ export default function ProfileSetupPage() {
               hidden lg:block
               absolute
               right-0
-              top-30
+              top-50
               z-0
               transform
               rotate-[220deg]
@@ -461,10 +447,12 @@ export default function ProfileSetupPage() {
                       setSelectedIndustries={setSelectedIndustries}
                       handleAvatarChange={handleAvatarChange}
                       handleDeleteAvatar={handleDeleteAvatar}
-                      handleAffiliationChange={handleAffiliationChange}
                       handleContactChange={handleContactChange}
                       handleChange={handleChange}
-                      handleResumeChange={handleResumeChange}
+                      resumeUrl={formData.resume_url || null}
+                      fileInfo={resumeFileInfo || undefined}
+                      onResumeChange={handleResumeChange}
+                      onResumeDelete={handleResumeDelete}
                     />
 
                     <div className="flex justify-between mt-2">
@@ -672,7 +660,10 @@ export default function ProfileSetupPage() {
                       <Button variant="outline" onClick={prevStep}>
                         <ChevronLeft className="mr-2 h-4 w-4" /> Back
                       </Button>
-                      <Button onClick={handleSubmit} disabled={isSubmitting}>
+                      <Button
+                        onClick={handleSaveProfile}
+                        disabled={isSubmitting}
+                      >
                         {isSubmitting ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

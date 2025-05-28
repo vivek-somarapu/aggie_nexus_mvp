@@ -1,25 +1,23 @@
 "use client";
 
-import { v4 as uuid } from "uuid";
 /* ────── React & Next ────── */
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { AnimatePresence, motion } from "framer-motion";
-
+import type { Profile } from "@/lib/auth";
 /* ────── Auth & Types ────── */
 
-import { useAuth } from "@/lib/auth";
-import { User as UserType } from "@/lib/models/users";
+import { Profile as ProfileType, useAuth } from "@/lib/auth";
 import { profileSetupStatus } from "@/lib/profile-utils";
 
 /* ────── Components: UI ────── */
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import {
   Card,
@@ -40,58 +38,40 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /* ────── Components: Custom ────── */
+import ProfileCompletionBanner from "@/components/profile/completion-banner";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { ProfileTab } from "@/components/profile/profile-tab";
-import ProfileCompletionBanner from "@/components/profile/completion-banner";
 
 /* ────── Libs ────── */
-import { useIsMobile } from "@/lib/is-mobile";
 
 import { formatDate } from "@/lib/utils";
 
 /* ────── Services ────── */
-import { userService } from "@/lib/services/user-service";
 import { bookmarkService } from "@/lib/services/bookmark-service";
 import { ProjectInquiry, inquiryService } from "@/lib/services/inquiry-service";
 import { Project, projectService } from "@/lib/services/project-service";
+import { userService } from "@/lib/services/user-service";
 
 /* ────── Constants ────── */
-import {
-  cardVariants,
-  containerVariants,
-  itemVariants,
-  pageVariants,
-  skillOptions,
-} from "@/lib/constants";
+import { cardVariants, containerVariants, pageVariants } from "@/lib/constants";
 
 /* ────── Icons ────── */
 import {
   CalendarIcon,
-  ExternalLink,
-  FileText,
   Filter,
-  Linkedin,
-  Download,
   Loader2,
-  Mail,
   MessageSquare,
   PenLine,
-  Pencil,
   Plus,
   Search,
   Trash2,
   User,
 } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 export default function ProfilePage() {
-  const { user: currentUser } = useAuth();
-  const { refreshProfile } = useAuth();
-  const supabase = createClient();
-  const router = useRouter();
-  const isMobile = useIsMobile();
+  const { profile, refreshProfile } = useAuth();
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
 
@@ -103,14 +83,13 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([]);
-  const [bookmarkedUsers, setBookmarkedUsers] = useState<UserType[]>([]);
+  const [bookmarkedUsers, setBookmarkedUsers] = useState<ProfileType[]>([]);
   const [userProjects, setUserProjects] = useState<Project[]>([]);
   const [receivedInquiries, setReceivedInquiries] = useState<ProjectInquiry[]>(
     []
   );
   const [sentInquiries, setSentInquiries] = useState<ProjectInquiry[]>([]);
 
-  const [isEditOpen, setIsEditOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCompletionBanner, setShowCompletionBanner] = useState(false);
 
@@ -128,8 +107,13 @@ export default function ProfilePage() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
 
-  // Full user data
-  const [user, setUser] = useState<UserType | null>(null);
+  const [pendingResumeFile, setPendingResumeFile] = useState<File | null>(null);
+  const [resumeFileInfo, setResumeFileInfo] = useState<{
+    name: string;
+    size: number;
+    type: string;
+    uploadedAt: Date;
+  } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -147,6 +131,8 @@ export default function ProfilePage() {
     contact: { email: "", phone: "" } as { email: string; phone: string },
   });
 
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+
   useEffect(() => {
     if (tabFromUrl) {
       const validTabs = ["profile", "projects", "inquiries", "bookmarks"];
@@ -158,60 +144,46 @@ export default function ProfilePage() {
 
   // fetch user and check if profile is complete
   useEffect(() => {
-    if (!currentUser?.id) return;
-    const fetchUser = async () => {
-      try {
-        setIsLoading(true);
-        const userData = await userService.getUser(currentUser.id);
-        if (!userData) {
-          throw new Error("User not found");
-        }
-        console.log("Raw userData:", userData);
-        setUser(userData);
-        setFormData({
-          full_name: userData.full_name || "",
-          email: userData.email || "",
-          bio: userData.bio || "",
-          industry: userData.industry || [],
-          skills: userData.skills || [],
-          linkedin_url: userData.linkedin_url || "",
-          website_url: userData.website_url || "",
-          is_texas_am_affiliate: userData.is_texas_am_affiliate || false,
-          graduation_year: userData.graduation_year ?? undefined,
-          avatar: userData.avatar || "",
-          resume_url: userData.resume_url || "",
-          contact: {
-            email: userData.contact?.email || userData.email || "",
-            phone: userData.contact?.phone || "",
-          },
-        });
-        if (userData.industry) {
-          setSelectedIndustries(userData.industry);
-        }
-        if (userData.skills) {
-          setSelectedSkills(userData.skills);
-        }
-        const { shouldSetupProfile } = profileSetupStatus(userData, true);
-        setShowCompletionBanner(shouldSetupProfile);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchUser();
-  }, [currentUser?.id]);
+    if (!profile) {
+      setIsLoading(true);
+      return;
+    }
+    setFormData({
+      full_name: profile.full_name || "",
+      email: profile.email || "",
+      bio: profile.bio || "",
+      industry: profile.industry || [],
+      skills: profile.skills || [],
+      linkedin_url: profile.linkedin_url || "",
+      website_url: profile.website_url || "",
+      is_texas_am_affiliate: profile.is_texas_am_affiliate || false,
+      graduation_year: profile.graduation_year ?? undefined,
+      avatar: profile.avatar || "",
+      resume_url: profile.resume_url || "",
+      contact: {
+        email: profile.contact?.email || profile.email || "",
+        phone: profile.contact?.phone || "",
+      },
+    });
+
+    setSelectedSkills(profile.skills || []);
+    setSelectedIndustries(profile.industry || []);
+
+    const { shouldSetupProfile } = profileSetupStatus(profile, true);
+    setShowCompletionBanner(shouldSetupProfile);
+    setIsLoading(false);
+  }, [profile]);
 
   // Load bookmarks
   useEffect(() => {
     const fetchBookmarks = async () => {
-      if (!currentUser) return;
+      if (!profile) return;
 
       try {
         setBookmarksLoading(true);
-        const bookmarks = await bookmarkService.getAllBookmarks(currentUser.id);
+        const bookmarks = await bookmarkService.getAllBookmarks(profile.id);
         setBookmarkedProjects(bookmarks.projects);
-        setBookmarkedUsers(bookmarks.users);
+        setBookmarkedUsers(bookmarks.users as unknown as Profile[]);
       } catch (err) {
         console.error("Error fetching bookmarks:", err);
         setError("Failed to load bookmarks. Please try again later.");
@@ -221,18 +193,16 @@ export default function ProfilePage() {
     };
 
     fetchBookmarks();
-  }, [currentUser]);
+  }, [profile]);
 
   // Load user's projects
   useEffect(() => {
     const fetchUserProjects = async () => {
-      if (!currentUser) return;
+      if (!profile) return;
 
       try {
         setProjectsLoading(true);
-        const projects = await projectService.getProjectsByOwnerId(
-          currentUser.id
-        );
+        const projects = await projectService.getProjectsByOwnerId(profile.id);
         setUserProjects(projects);
       } catch (err) {
         console.error("Error fetching user projects:", err);
@@ -243,18 +213,18 @@ export default function ProfilePage() {
     };
 
     fetchUserProjects();
-  }, [currentUser]);
+  }, [profile]);
 
   // Load inquiries
   useEffect(() => {
     const fetchInquiries = async () => {
-      if (!currentUser) return;
+      if (!profile) return;
 
       try {
         setInquiriesLoading(true);
         const [received, sent] = await Promise.all([
-          inquiryService.getReceivedInquiries(currentUser.id),
-          inquiryService.getSentInquiries(currentUser.id),
+          inquiryService.getReceivedInquiries(profile.id),
+          inquiryService.getSentInquiries(profile.id),
         ]);
 
         setReceivedInquiries(received);
@@ -268,7 +238,7 @@ export default function ProfilePage() {
     };
 
     fetchInquiries();
-  }, [currentUser]);
+  }, [profile]);
 
   // Filter inquiries when inquiry type, status filter, or search query changes
   useEffect(() => {
@@ -303,7 +273,7 @@ export default function ProfilePage() {
   ]);
 
   const handleDeleteInquiry = async (inquiryId: string) => {
-    if (!currentUser) return;
+    if (!profile) return;
 
     try {
       setDeleteInProgress(inquiryId);
@@ -326,7 +296,7 @@ export default function ProfilePage() {
     inquiryId: string,
     status: "accepted" | "rejected"
   ) => {
-    if (!currentUser) return;
+    if (!profile) return;
 
     try {
       await inquiryService.updateInquiryStatus(inquiryId, status);
@@ -343,43 +313,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsSaving(true);
-
-      // 1) upload file to bucket
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${uuid()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 2) get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(fileName);
-
-      // 3) update user profile with new avatar URL
-      setFormData((prev) => ({
-        ...prev,
-        avatar: publicUrl,
-      }));
-    } catch (error) {
-      console.error("Error uploading avatar:", error);
-      toast.error("Failed to upload avatar. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -390,97 +323,6 @@ export default function ProfilePage() {
     }));
   };
 
-  const handleDeleteAvatar = async () => {
-    if (!formData.avatar) return;
-
-    try {
-      const filePath = formData.avatar.split(
-        "/storage/v1/object/public/avatars/"
-      )[1];
-      if (filePath) {
-        await supabase.storage.from("avatars").remove([filePath]);
-      }
-
-      setFormData((prev) => ({ ...prev, avatar: "" }));
-    } catch (err) {
-      console.error("Failed to delete avatar from storage:", err);
-      toast.error("Could not delete avatar from storage.");
-    }
-  };
-
-  const handleSwitchChange = (checked: boolean, name: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: checked,
-    }));
-  };
-
-  const handleSaveProfile = async () => {
-    if (!user) return;
-
-    try {
-      setIsSaving(true);
-      setError(null);
-
-      const result = await userService.updateUser(user.id, {
-        full_name: formData.full_name,
-        bio: formData.bio,
-        linkedin_url: formData.linkedin_url,
-        website_url: formData.website_url,
-        is_texas_am_affiliate: formData.is_texas_am_affiliate,
-        graduation_year: formData.graduation_year,
-        avatar: formData.avatar,
-        resume_url: formData.resume_url,
-        industry: selectedIndustries,
-        contact: formData.contact,
-        skills: selectedSkills,
-      });
-
-      if (result) {
-        await refreshProfile();
-        setIsEditOpen(false);
-        toast.success("Your profile has been updated successfully");
-        window.location.reload();
-        router.refresh();
-      }
-    } catch (err) {
-      console.error("Error updating profile:", err);
-      setError("Failed to update profile. Please try again.");
-      toast.error("Failed to update profile. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsSaving(true);
-      // генерируем уникальное имя
-      const ext = file.name.split(".").pop();
-      const filename = `${uuid()}.${ext}`;
-      // заливаем в bucket "resumes"
-      const { error: uploadError } = await supabase.storage
-        .from("resumes")
-        .upload(filename, file, { cacheControl: "3600", upsert: false });
-      if (uploadError) throw uploadError;
-
-      // получаем публичный URL
-      const { data } = supabase.storage.from("resumes").getPublicUrl(filename);
-      setFormData((prev) => ({
-        ...prev,
-        resume_url: data.publicUrl,
-      }));
-      toast.success("Resume uploaded");
-    } catch (err) {
-      console.error("Error uploading resume:", err);
-      toast.error("Failed to upload resume. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -492,7 +334,172 @@ export default function ProfilePage() {
     }));
   };
 
-  if (!currentUser) {
+  const handleSaveProfile = async () => {
+    if (!profile) return;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      // 1) upload avatar
+      let avatarUrl = formData.avatar;
+      if (pendingAvatarFile) {
+        avatarUrl = await uploadToBucket("avatars", pendingAvatarFile);
+      }
+
+      // 2) upload resume
+      let resumeUrl = formData.resume_url;
+      if (pendingResumeFile) {
+        resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
+      }
+      // 3) collect form data
+      const payload = {
+        full_name: formData.full_name.trim(),
+        bio: formData.bio.trim(),
+        linkedin_url: formData.linkedin_url.trim() || null,
+        website_url: formData.website_url.trim() || null,
+        is_texas_am_affiliate: formData.is_texas_am_affiliate,
+        graduation_year: formData.graduation_year ?? null,
+        avatar: avatarUrl || null,
+        resume_url: resumeUrl || null,
+        industry: selectedIndustries,
+        skills: selectedSkills,
+        contact: formData.contact,
+      };
+
+      // 4) update user profile
+      await userService.updateUser(profile.id, payload);
+      await refreshProfile();
+
+      // 5) reset form state
+      setPendingAvatarFile(null);
+      setPendingResumeFile(null);
+
+      toast.success("Profile updated!");
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      toast.error("Failed to update profile, please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /* -------------------------------------------------
+   Helpers that talk to the new API route
+--------------------------------------------------*/
+  async function uploadToBucket(
+    bucket: "avatars" | "resumes",
+    file: File
+  ): Promise<string> {
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error || "Upload failed");
+    }
+    return (await res.json()).publicUrl as string;
+  }
+
+  async function deleteFromBucket(bucket: "avatars" | "resumes", url: string) {
+    console.log(`[deleteFromBucket] DELETE /api/upload/${bucket}`, url);
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    console.log(`[deleteFromBucket] response status=${res.status}`, payload);
+    if (!res.ok) {
+      throw new Error(payload.error || `Status ${res.status}`);
+    }
+  }
+
+  /* -------------------------------------------------
+   Avatar upload  (POST)
+--------------------------------------------------*/
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingAvatarFile(file);
+    // preview
+    setFormData((prev) => ({
+      ...prev,
+      avatar: URL.createObjectURL(file),
+    }));
+  };
+
+  /* -------------------------------------------------
+   Résumé upload  (POST)
+--------------------------------------------------*/
+  const handleResumeChange = (file: File | null) => {
+    if (file) {
+      const blobUrl = URL.createObjectURL(file);
+      setPendingResumeFile(file);
+      setFormData((prev) => ({ ...prev, resume_url: blobUrl }));
+      setResumeFileInfo({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date(),
+      });
+    }
+  };
+
+  /* -------------------------------------------------
+   Avatar delete  (DELETE)
+--------------------------------------------------*/
+  const handleDeleteAvatar = async () => {
+    if (pendingAvatarFile) {
+      URL.revokeObjectURL(formData.avatar);
+      setPendingAvatarFile(null);
+      setFormData((prev) => ({ ...prev, avatar: "" }));
+      toast.success("Avatar preview removed");
+      return;
+    }
+
+    if (!formData.avatar) return;
+
+    try {
+      setIsSaving(true);
+      await deleteFromBucket("avatars", formData.avatar);
+      setFormData((p) => ({ ...p, avatar: "" }));
+      toast.success("Avatar removed");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not delete avatar");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /* -------------------------------------------------
+   Résumé delete  (DELETE)
+--------------------------------------------------*/
+  const handleResumeDelete = async () => {
+    if (pendingResumeFile) {
+      URL.revokeObjectURL(formData.resume_url);
+      setPendingResumeFile(null);
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
+      return;
+    }
+
+    if (formData.resume_url) {
+      await deleteFromBucket("resumes", formData.resume_url);
+      await userService.updateUser(profile!.id, { resume_url: null });
+      await refreshProfile();
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
+    }
+  };
+
+  if (!profile) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <p>Please log in to view your profile.</p>
@@ -529,14 +536,12 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Profile Card */}
         <ProfileCard
-          user={user}
+          user={profile}
           formData={formData}
           setFormData={setFormData}
-          selectedIndustries={selectedIndustries}
           setSelectedIndustries={setSelectedIndustries}
           handleAvatarChange={handleAvatarChange}
           handleDeleteAvatar={handleDeleteAvatar}
-          handleSwitchChange={handleSwitchChange}
           handleSaveProfile={handleSaveProfile}
           isSaving={isSaving}
           showCompletionBanner={showCompletionBanner}
@@ -552,18 +557,18 @@ export default function ProfilePage() {
 
           {/* Profile Tab */}
           <ProfileTab
-            isEditOpen={isEditOpen}
-            setIsEditOpen={setIsEditOpen}
             isLoading={isLoading}
-            user={user}
+            user={profile}
             formData={formData}
             setFormData={setFormData}
-            selectedSkills={selectedSkills}
             setSelectedSkills={setSelectedSkills}
-            handleResumeChange={handleResumeChange}
             handleSaveProfile={handleSaveProfile}
             handleChange={handleChange}
             handleContactChange={handleContactChange}
+            resumeUrl={formData.resume_url || null}
+            fileInfo={resumeFileInfo || undefined}
+            onResumeChange={handleResumeChange}
+            onResumeDelete={handleResumeDelete}
           />
 
           {/* My Projects Tab */}
@@ -1170,7 +1175,7 @@ export default function ProfilePage() {
                                         alt={user.full_name}
                                       />
                                       <AvatarFallback>
-                                        {user.full_name.charAt(0)}
+                                        {user.full_name?.charAt(0)}
                                       </AvatarFallback>
                                     </Avatar>
                                   </motion.div>

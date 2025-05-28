@@ -4,11 +4,12 @@ import React, { useState } from "react";
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { ResumeInput } from "@/components/profile/resume-input";
 import {
   TexasAMAffiliation,
   type TexasAMAffiliationData,
 } from "@/components/profile/tamu-affiliate";
-import { User as UserType } from "@/lib/models/users";
+import { Profile as ProfileType } from "@/lib/auth";
 import {
   containerVariants,
   itemVariants,
@@ -40,7 +41,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input, InputFile } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -51,7 +52,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
+
 import { TagSelector } from "@/components/profile/tag-selector";
 import { Textarea } from "../ui/textarea";
 
@@ -78,12 +79,19 @@ export interface ProfileSetupFormProps<T extends MinimalFormData> {
   setSelectedIndustries: React.Dispatch<React.SetStateAction<string[]>>;
   handleAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleDeleteAvatar: () => void;
-  handleAffiliationChange: (data: TexasAMAffiliationData) => void;
   handleContactChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => void;
-  handleResumeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  resumeUrl: string | null;
+  fileInfo?: {
+    name: string;
+    size: number;
+    type: string;
+    uploadedAt: Date;
+  };
+  onResumeChange: (file: File | null) => void;
+  onResumeDelete: () => void;
 }
 
 export function ProfileSetupForm<T extends MinimalFormData>({
@@ -93,13 +101,20 @@ export function ProfileSetupForm<T extends MinimalFormData>({
   setSelectedIndustries,
   handleAvatarChange,
   handleDeleteAvatar,
-  handleAffiliationChange,
   handleContactChange,
   handleChange,
-  handleResumeChange,
+  resumeUrl,
+  fileInfo,
+  onResumeChange,
+  onResumeDelete,
 }: ProfileSetupFormProps<T>) {
-  const currentYear = new Date().getFullYear();
-
+  const handleAffiliationChange = (data: TexasAMAffiliationData) => {
+    setFormData({
+      ...formData,
+      is_texas_am_affiliate: data.is_texas_am_affiliate,
+      graduation_year: data.graduation_year,
+    });
+  };
   return (
     <Card className="w-full border-0 md:border shadow-none md:shadow">
       <CardHeader>
@@ -187,33 +202,14 @@ export function ProfileSetupForm<T extends MinimalFormData>({
 
         {/* Resume */}
         <div className=" sm:col-span-2">
-          <InputFile
-            label="Upload resume"
-            accept=".pdf"
-            onChange={handleResumeChange}
+          <ResumeInput
+            label="Professional Resume"
+            value={resumeUrl}
+            onChange={onResumeChange}
+            onDelete={onResumeDelete}
+            accept=".pdf,.doc,.docx"
+            fileInfo={fileInfo || undefined}
           />
-          <div className="mt-auto flex justify-end">
-            {formData.resume_url ? (
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="text-sm py-4"
-              >
-                <a
-                  href={formData.resume_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Download className="mr-1 h-4 w-4" /> Resume
-                </a>
-              </Button>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                No resume uploaded
-              </p>
-            )}
-          </div>
         </div>
 
         {/* Bio */}
@@ -247,17 +243,15 @@ export function ProfileSetupForm<T extends MinimalFormData>({
  */
 
 interface ProfileCardProps<T extends MinimalFormData = MinimalFormData> {
-  user: UserType | null;
+  user: ProfileType | null;
 
   formData: T;
   setFormData: React.Dispatch<React.SetStateAction<T>>;
 
-  selectedIndustries: string[];
   setSelectedIndustries: React.Dispatch<React.SetStateAction<string[]>>;
 
   handleAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleDeleteAvatar: () => void;
-  handleSwitchChange: (checked: boolean, name: keyof T) => void;
   handleSaveProfile: () => void;
   showCompletionBanner: boolean;
   isSaving: boolean;
@@ -267,11 +261,9 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
   user,
   formData,
   setFormData,
-  selectedIndustries,
   setSelectedIndustries,
   handleAvatarChange,
   handleDeleteAvatar,
-  handleSwitchChange,
   handleSaveProfile,
   showCompletionBanner,
   isSaving,
@@ -308,7 +300,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
           {/* Avatar */}
           <div className="flex justify-center">
             <ProfileAvatar
-              avatar={formData.avatar}
+              avatar={user?.avatar || null}
               fullName={formData.full_name}
               is_texas_am_affiliate={formData.is_texas_am_affiliate}
             />
@@ -386,7 +378,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                       <TagSelector
                         label="Industries"
                         options={industryOptions}
-                        selected={selectedIndustries}
+                        selected={user?.industry || []}
                         onChange={setSelectedIndustries}
                       />
                     </div>
@@ -394,7 +386,13 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
 
                   <DialogFooter>
                     <div className="w-full flex justify-end">
-                      <Button onClick={handleSaveProfile} disabled={isSaving}>
+                      <Button
+                        disabled={isSaving}
+                        onClick={async () => {
+                          await handleSaveProfile();
+                          setIsEditOpen(false);
+                        }}
+                      >
                         {isSaving ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -428,7 +426,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                 </div>
               )}
 
-              {user?.graduation_year && (
+              {user?.is_texas_am_affiliate && user.graduation_year && (
                 <div className="flex items-center">
                   <Separator orientation="vertical" className="h-4 mx-2" />
                   <CalendarIcon className="h-4 w-4 mr-1" />
@@ -438,7 +436,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
             </motion.div>
 
             {/* Industry tags */}
-            {user?.industry?.length && (
+            {user?.industry && user.industry.length > 0 && (
               <motion.div
                 className="flex flex-wrap gap-2 mt-2"
                 variants={containerVariants}

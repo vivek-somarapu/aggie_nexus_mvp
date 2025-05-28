@@ -1,142 +1,160 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bookmark, Calendar, MapPin, Users, Eye, Loader2 } from "lucide-react"
-import { formatDate } from "@/lib/utils"
-import { projectService, Project, ProjectSearchParams } from "@/lib/services/project-service"
-import { bookmarkService } from "@/lib/services/bookmark-service"
-import { useAuth } from "@/lib"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { motion, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Bookmark, Calendar, MapPin, Users, Eye, Loader2 } from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import {
+  projectService,
+  Project,
+  ProjectSearchParams,
+} from "@/lib/services/project-service";
+import { bookmarkService } from "@/lib/services/bookmark-service";
+import { useAuth } from "@/lib";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 // Animation variants
 const pageVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
-    transition: { duration: 0.5 }
+    transition: { duration: 0.5 },
   },
-  exit: { 
+  exit: {
     opacity: 0,
-    transition: { duration: 0.3 } 
-  }
-}
+    transition: { duration: 0.3 },
+  },
+};
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.07
-    }
-  }
-}
+      staggerChildren: 0.07,
+    },
+  },
+};
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      type: "spring", 
-      damping: 15, 
-      stiffness: 100
-    } 
-  }
-}
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      damping: 15,
+      stiffness: 100,
+    },
+  },
+};
 
 const buttonVariants = {
-  tap: { scale: 0.98 }
-}
+  tap: { scale: 0.98 },
+};
 
 export default function ProjectsPage() {
-  const { user: currentUser, isLoading: authLoading } = useAuth()
-  const router = useRouter()
-  
+  const { authUser: currentUser, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+
   // Client-side authentication check
   useEffect(() => {
     // Wait until auth is no longer loading to make a decision
     if (!authLoading && !currentUser) {
-      console.log("No authenticated user found, redirecting to login")
-      router.push('/auth/login?redirect=' + encodeURIComponent('/projects'))
+      console.log("No authenticated user found, redirecting to login");
+      router.push("/auth/login?redirect=" + encodeURIComponent("/projects"));
     }
-  }, [currentUser, authLoading, router])
-  
-  const [projects, setProjects] = useState<Project[]>([])
-  const [bookmarkedProjects, setBookmarkedProjects] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  
-  const [searchQuery, setSearchQuery] = useState("")
-  const [industryFilter, setIndustryFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [tamuFilter, setTamuFilter] = useState("all")
-  const [projectTypeFilter, setProjectTypeFilter] = useState("all")
-  
+  }, [currentUser, authLoading, router]);
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [bookmarkedProjects, setBookmarkedProjects] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [industryFilter, setIndustryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [tamuFilter, setTamuFilter] = useState("all");
+  const [projectTypeFilter, setProjectTypeFilter] = useState("all");
+
   // Fetch projects only when user is authenticated
   useEffect(() => {
     // Skip if auth is still loading or user is not authenticated
-    if (authLoading || !currentUser) return
-    
+    if (authLoading || !currentUser) return;
+
     const fetchProjects = async () => {
       try {
-        setIsLoading(true)
-        setError(null)
-        
-        const searchParams: ProjectSearchParams = {}
-        
+        setIsLoading(true);
+        setError(null);
+
+        const searchParams: ProjectSearchParams = {};
+
         if (tamuFilter === "tamu") {
-          searchParams.tamu = true
+          searchParams.tamu = true;
         } else if (tamuFilter === "non-tamu") {
-          searchParams.tamu = false
+          searchParams.tamu = false;
         }
-        
+
         if (projectTypeFilter === "ideas") {
-          searchParams.is_idea = true
+          searchParams.is_idea = true;
         } else if (projectTypeFilter === "projects") {
-          searchParams.is_idea = false
+          searchParams.is_idea = false;
         }
-        
+
         if (searchQuery) {
-          searchParams.search = searchQuery
+          searchParams.search = searchQuery;
         }
-        
-        console.log("Fetching projects with params:", searchParams)
-        const fetchedProjects = await projectService.getProjects(searchParams)
-        console.log(`Received ${fetchedProjects.length} projects from API`)
-        
+
+        console.log("Fetching projects with params:", searchParams);
+        const fetchedProjects = await projectService.getProjects(searchParams);
+        console.log(`Received ${fetchedProjects.length} projects from API`);
+
         if (Array.isArray(fetchedProjects)) {
-          setProjects(fetchedProjects)
+          setProjects(fetchedProjects);
         } else {
-          console.error("API did not return an array:", fetchedProjects)
-          setError("Received invalid data format from server. Please try again.")
+          console.error("API did not return an array:", fetchedProjects);
+          setError(
+            "Received invalid data format from server. Please try again."
+          );
         }
       } catch (err) {
-        console.error("Error fetching projects:", err)
-        setError("Failed to load projects. Please try again later.")
+        console.error("Error fetching projects:", err);
+        setError("Failed to load projects. Please try again later.");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
-    
-    fetchProjects()
-  }, [searchQuery, tamuFilter, projectTypeFilter, currentUser, authLoading])
-  
+    };
+
+    fetchProjects();
+  }, [searchQuery, tamuFilter, projectTypeFilter, currentUser, authLoading]);
+
   // If auth is still loading or user is not authenticated, show loading state
   if (authLoading || !currentUser) {
     return (
-      <motion.div 
+      <motion.div
         className="flex flex-col justify-center items-center py-12 space-y-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -148,70 +166,93 @@ export default function ProjectsPage() {
           <p className="text-sm text-muted-foreground">Please wait</p>
         </div>
       </motion.div>
-    )
+    );
   }
-  
+
   // Fetch bookmarked projects if user is logged in
   useEffect(() => {
     const fetchBookmarks = async () => {
-      if (!currentUser) return
-      
+      if (!currentUser) return;
+
       try {
-        const bookmarks = await bookmarkService.getProjectBookmarks(currentUser.id)
-        setBookmarkedProjects(bookmarks.map(bookmark => bookmark.project_id))
+        const bookmarks = await bookmarkService.getProjectBookmarks(
+          currentUser.id
+        );
+        setBookmarkedProjects(bookmarks.map((bookmark) => bookmark.project_id));
       } catch (err) {
-        console.error("Error fetching bookmarks:", err)
+        console.error("Error fetching bookmarks:", err);
         // Don't set the main error as this is not critical
       }
-    }
-    
-    fetchBookmarks()
-  }, [currentUser])
-  
-  const handleBookmarkToggle = async (projectId: string, event: React.MouseEvent) => {
-    event.preventDefault() // Prevent navigating to project detail
-    
-    if (!currentUser) return
-    
+    };
+
+    fetchBookmarks();
+  }, [currentUser]);
+
+  const handleBookmarkToggle = async (
+    projectId: string,
+    event: React.MouseEvent
+  ) => {
+    event.preventDefault(); // Prevent navigating to project detail
+
+    if (!currentUser) return;
+
     try {
-      setIsBookmarkLoading(true)
-      const result = await bookmarkService.toggleProjectBookmark(currentUser.id, projectId)
-      
-      if (result.action === 'added') {
-        setBookmarkedProjects(prev => [...prev, projectId])
+      setIsBookmarkLoading(true);
+      const result = await bookmarkService.toggleProjectBookmark(
+        currentUser.id,
+        projectId
+      );
+
+      if (result.action === "added") {
+        setBookmarkedProjects((prev) => [...prev, projectId]);
       } else {
-        setBookmarkedProjects(prev => prev.filter(id => id !== projectId))
+        setBookmarkedProjects((prev) => prev.filter((id) => id !== projectId));
       }
     } catch (err) {
-      console.error("Error toggling bookmark:", err)
+      console.error("Error toggling bookmark:", err);
     } finally {
-      setIsBookmarkLoading(false)
+      setIsBookmarkLoading(false);
     }
-  }
+  };
 
   // Get all unique industries from projects
-  const industries = Array.from(new Set(projects.flatMap((project) => project.industry)))
+  const industries = Array.from(
+    new Set(projects.flatMap((project) => project.industry))
+  );
 
   // Filter projects based on filters
   const filteredProjects = projects.filter((project: Project) => {
     // Filter by industry
-    const matchesIndustry = industryFilter === "all" || project.industry.includes(industryFilter)
+    const matchesIndustry =
+      industryFilter === "all" || project.industry.includes(industryFilter);
 
     // Filter by status
-    const matchesStatus = statusFilter === "all" || project.project_status === statusFilter
+    const matchesStatus =
+      statusFilter === "all" || project.project_status === statusFilter;
 
-    const isMatch = matchesIndustry && matchesStatus
-    return isMatch
-  })
+    const isMatch = matchesIndustry && matchesStatus;
+    return isMatch;
+  });
 
   // Log filtering results for debugging
   useEffect(() => {
-    console.log(`Filtering projects: ${projects.length} total, ${filteredProjects.length} after filters`);
-    console.log(`Filters: projectType=${projectTypeFilter}, tamu=${tamuFilter}, industry=${industryFilter}, status=${statusFilter}`);
-  }, [filteredProjects, projects, projectTypeFilter, tamuFilter, industryFilter, statusFilter])
+    console.log(
+      `Filtering projects: ${projects.length} total, ${filteredProjects.length} after filters`
+    );
+    console.log(
+      `Filters: projectType=${projectTypeFilter}, tamu=${tamuFilter}, industry=${industryFilter}, status=${statusFilter}`
+    );
+  }, [
+    filteredProjects,
+    projects,
+    projectTypeFilter,
+    tamuFilter,
+    industryFilter,
+    statusFilter,
+  ]);
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6"
       variants={pageVariants}
       initial="hidden"
@@ -220,7 +261,7 @@ export default function ProjectsPage() {
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <motion.h1 
+          <motion.h1
             className="text-3xl font-bold tracking-tight text-red-600/80"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -228,13 +269,14 @@ export default function ProjectsPage() {
           >
             Projects
           </motion.h1>
-          <motion.p 
+          <motion.p
             className="text-muted-foreground"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
           >
-            Discover innovative ideas and collaborate on impactful projects with fellow Aggies
+            Discover innovative ideas and collaborate on impactful projects with
+            fellow Aggies
           </motion.p>
         </div>
         <motion.div
@@ -247,7 +289,7 @@ export default function ProjectsPage() {
           </Button>
         </motion.div>
       </div>
-      
+
       {error && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -260,7 +302,7 @@ export default function ProjectsPage() {
         </motion.div>
       )}
 
-      <motion.div 
+      <motion.div
         className="space-y-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -286,7 +328,7 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        <motion.div 
+        <motion.div
           className="flex flex-col md:flex-row gap-4 mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -330,7 +372,7 @@ export default function ProjectsPage() {
         <div className="mt-0">
           <AnimatePresence mode="wait">
             {isLoading ? (
-              <motion.div 
+              <motion.div
                 key="loading"
                 className="flex flex-col justify-center items-center py-12 space-y-4"
                 initial={{ opacity: 0 }}
@@ -341,7 +383,9 @@ export default function ProjectsPage() {
                 <Loader2 className="h-12 w-12 text-primary animate-spin" />
                 <div className="text-center">
                   <p className="text-lg font-medium">Loading projects...</p>
-                  <p className="text-sm text-muted-foreground">This may take a moment</p>
+                  <p className="text-sm text-muted-foreground">
+                    This may take a moment
+                  </p>
                 </div>
               </motion.div>
             ) : error ? (
@@ -355,9 +399,9 @@ export default function ProjectsPage() {
                   <AlertDescription className="flex items-center">
                     <span className="font-medium">{error}</span>
                     <motion.div whileTap={{ scale: 0.95 }}>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="ml-auto"
                         onClick={() => window.location.reload()}
                       >
@@ -368,7 +412,7 @@ export default function ProjectsPage() {
                 </Alert>
               </motion.div>
             ) : filteredProjects.length === 0 ? (
-              <motion.div 
+              <motion.div
                 key="empty"
                 className="text-center py-12"
                 initial={{ opacity: 0 }}
@@ -376,10 +420,12 @@ export default function ProjectsPage() {
                 exit={{ opacity: 0 }}
               >
                 <p className="text-lg font-medium">No projects found</p>
-                <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
+                <p className="text-muted-foreground">
+                  Try adjusting your filters or search criteria
+                </p>
               </motion.div>
             ) : (
-              <motion.div 
+              <motion.div
                 key="projects"
                 className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
                 variants={containerVariants}
@@ -387,7 +433,7 @@ export default function ProjectsPage() {
                 animate="visible"
               >
                 {filteredProjects.map((project: Project, index: number) => (
-                  <motion.div 
+                  <motion.div
                     key={project.id}
                     variants={cardVariants}
                     custom={index}
@@ -397,43 +443,63 @@ export default function ProjectsPage() {
                       <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">
                           <div className="flex justify-between items-start">
-                            <CardTitle className="line-clamp-1">{project.title}</CardTitle>
-                            <motion.div 
+                            <CardTitle className="line-clamp-1">
+                              {project.title}
+                            </CardTitle>
+                            <motion.div
                               whileTap={buttonVariants.tap}
-                              onClick={(e) => handleBookmarkToggle(project.id, e)}
+                              onClick={(e) =>
+                                handleBookmarkToggle(project.id, e)
+                              }
                             >
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-8 w-8"
                                 disabled={isBookmarkLoading}
                               >
                                 {isBookmarkLoading ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  <Bookmark 
-                                    className={`h-4 w-4 ${bookmarkedProjects.includes(project.id) ? "fill-primary" : ""}`} 
+                                  <Bookmark
+                                    className={`h-4 w-4 ${
+                                      bookmarkedProjects.includes(project.id)
+                                        ? "fill-primary"
+                                        : ""
+                                    }`}
                                   />
                                 )}
-                                <span className="sr-only">Bookmark project</span>
+                                <span className="sr-only">
+                                  Bookmark project
+                                </span>
                               </Button>
                             </motion.div>
                           </div>
                           <div className="flex flex-wrap gap-2 mt-2">
                             {project.is_idea ? (
-                              <Badge variant="outline" className="bg-yellow-100 text-black">
+                              <Badge
+                                variant="outline"
+                                className="bg-yellow-100 text-black"
+                              >
                                 Idea
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="bg-green-100 text-black">
+                              <Badge
+                                variant="outline"
+                                className="bg-green-100 text-black"
+                              >
                                 Project
                               </Badge>
                             )}
-                            <Badge variant="outline">{project.project_status}</Badge>
+                            <Badge variant="outline">
+                              {project.project_status}
+                            </Badge>
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <p className="text-muted-foreground line-clamp-3 mb-4">{project.description}</p>
+                          <p className="text-muted-foreground line-clamp-3 mb-4">
+                            {project.description}
+                          </p>
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="flex items-center gap-1 text-muted-foreground">
                               <MapPin className="h-3 w-3" />
@@ -455,7 +521,11 @@ export default function ProjectsPage() {
                         </CardContent>
                         <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
                           {project.industry.slice(0, 3).map((ind: string) => (
-                            <Badge key={ind} variant="secondary" className="text-xs">
+                            <Badge
+                              key={ind}
+                              variant="secondary"
+                              className="text-xs"
+                            >
                               {ind}
                             </Badge>
                           ))}
@@ -475,5 +545,5 @@ export default function ProjectsPage() {
         </div>
       </motion.div>
     </motion.div>
-  )
+  );
 }

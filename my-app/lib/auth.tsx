@@ -1,5 +1,12 @@
 "use client";
 
+// Auth Context and Provider for Next.js with Supabase
+// ---------------------------------------------
+// This module exports:
+// 1. `AuthUser`  - minimal auth user info from Supabase Auth (id, email)
+// 2. `Profile`   - extended user profile stored in your own `users` table
+// 3. `AuthProvider` & `useAuth` hook for accessing both
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "./supabase/client";
@@ -7,14 +14,26 @@ import {
   User as SupabaseUser,
   Session,
   AuthError,
+  User,
 } from "@supabase/supabase-js";
 
-// Update the User type to include all profile fields used in the app
-export type User = {
+/**
+ * Minimal authenticated user info from Supabase Auth
+ */
+export type AuthUser = {
+  id: string;
+  email: string;
+};
+
+/**
+ * Extended profile fetched from the `users` table
+ */
+export type Profile = {
   id: string;
   email: string;
   full_name?: string;
-  avatar?: string;
+  avatar?: string | null;
+  resume_url?: string | null;
   bio?: string;
   linkedin_url?: string;
   website_url?: string;
@@ -30,24 +49,12 @@ export type User = {
   profile_setup_completed?: boolean;
   profile_setup_skipped_at?: string;
   last_login_at?: string;
-};
-
-// Define user profile type based on your users table
-export type Profile = {
-  id: string;
-  full_name: string;
-  email: string;
-  bio?: string;
-  skills?: string[];
-  avatar?: string;
-  industry?: string[];
   is_manager?: boolean;
-  // Add more fields as needed
 };
 
 // Define auth context type
 type AuthContextType = {
-  user: User | null;
+  authUser: AuthUser | null;
   profile: Profile | null;
   isLoading: boolean;
   error: string | null;
@@ -68,7 +75,7 @@ type AuthContextType = {
 
 // Create auth context with default values
 const AuthContext = createContext<AuthContextType>({
-  user: null,
+  authUser: null,
   profile: null,
   isLoading: true,
   error: null,
@@ -131,21 +138,17 @@ async function fetchUserProfile(userId: string): Promise<Profile | null> {
 }
 
 /**
- * Map a Supabase User to our application User type
+ * Map Supabase Auth user to our minimal `AuthUser` type
  */
-function mapSupabaseUser(supabaseUser: SupabaseUser): User {
-  return {
-    id: supabaseUser.id,
-    email: supabaseUser.email || "",
-    // Other fields will be populated from profile data
-  };
+function mapSupabaseUser(s: SupabaseUser): AuthUser {
+  return { id: s.id, email: s.email ?? "" };
 }
 
 /**
  * AuthProvider component that manages authentication state
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,10 +184,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }: {
           data: { session: Session | null };
         }) => {
+          clearTimeout(timeoutId);
           console.log("AUTH: Session check complete", !!session);
 
           if (session) {
-            setUser(mapSupabaseUser(session.user));
+            setAuthUser(mapSupabaseUser(session.user));
             try {
               console.log("AUTH: Fetching user profile for", session.user.id);
               const userProfile = await fetchUserProfile(session.user.id);
@@ -203,13 +207,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.log("AUTH: Auth state change event:", event);
 
               if (event === "SIGNED_OUT") {
-                setUser(null);
+                setAuthUser(null);
                 setProfile(null);
                 return;
               }
 
               if (session) {
-                setUser(mapSupabaseUser(session.user));
+                setAuthUser(mapSupabaseUser(session.user));
 
                 // Only fetch profile for certain events
                 if (
@@ -271,7 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Fetch user profile after successful sign-in
       if (data.user) {
-        setUser(mapSupabaseUser(data.user));
+        setAuthUser(mapSupabaseUser(data.user));
         const userProfile = await fetchUserProfile(data.user.id);
         setProfile(userProfile);
       }
@@ -327,7 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If we need the user information immediately after signup,
       // we should simply set the state with the data we have
       if (data.user) {
-        setUser(mapSupabaseUser(data.user));
+        setAuthUser(mapSupabaseUser(data.user));
       }
 
       // Return true to indicate successful signup
@@ -358,7 +362,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Clear auth state immediately to prevent flash of protected content
-      setUser(null);
+      setAuthUser(null);
       setProfile(null);
 
       // Redirect to landing page instead of login
@@ -482,14 +486,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
-   * Manually refresh user profile data
+   * Manually refresh user profile data from the database,
+   * in case something changed — like after the user updates their
+   * profile (name, bio, avatar, etc.), or after an external update.
    */
   const refreshProfile = async () => {
-    if (!user) return;
+    if (!authUser) return;
 
     try {
       setIsLoading(true);
-      const userProfile = await fetchUserProfile(user.id);
+      const userProfile = await fetchUserProfile(authUser.id);
       setProfile(userProfile);
     } catch (err) {
       console.error("Error refreshing profile:", err);
@@ -500,7 +506,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Create context value
   const value: AuthContextType = {
-    user,
+    authUser,
     profile,
     isLoading,
     error,

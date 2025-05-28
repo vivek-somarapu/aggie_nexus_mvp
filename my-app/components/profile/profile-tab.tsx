@@ -1,5 +1,7 @@
-import React from "react";
-import { User as UserType } from "@/lib/models/users";
+"use client";
+
+import React, { useState } from "react";
+import { Profile as ProfileType } from "@/lib/auth";
 import {
   Dialog,
   DialogContent,
@@ -11,11 +13,13 @@ import {
 import { TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ResumeInput } from "@/components/profile/resume-input";
 import { Button } from "@/components/ui/button";
 import {
   Pencil,
   Loader2,
   Download,
+  Trash2,
   FileText,
   Linkedin,
   ExternalLink,
@@ -27,8 +31,11 @@ import { InputFile } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TagSelector } from "@/components/profile/tag-selector";
 import { LinkWithPreview } from "@/components/link-preview";
-import { useIsMobile } from "@/lib/is-mobile";
 import { containerVariants, itemVariants, skillOptions } from "@/lib/constants";
+
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
 
 type BaseFormFields = {
   full_name: string;
@@ -46,41 +53,49 @@ type BaseFormFields = {
 };
 
 export interface ProfileTabProps<T extends BaseFormFields> {
-  isEditOpen: boolean;
-  setIsEditOpen: (open: boolean) => void;
   isLoading: boolean;
-  user: UserType | null;
+  user: ProfileType | null;
 
   formData: T;
   setFormData: React.Dispatch<React.SetStateAction<T>>;
 
-  selectedSkills: string[];
   setSelectedSkills: React.Dispatch<React.SetStateAction<string[]>>;
 
-  handleResumeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSaveProfile: () => void;
   handleChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => void;
   handleContactChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  resumeUrl: string | null;
+  fileInfo?: {
+    name: string;
+    size: number;
+    type: string;
+    uploadedAt: Date;
+  };
+  onResumeChange: (file: File | null) => void;
+  onResumeDelete: () => void;
 }
 
+// -----------------------------------------------------------------------------
+// Component
+// -----------------------------------------------------------------------------
+
 export function ProfileTab<T extends BaseFormFields>({
-  isEditOpen,
-  setIsEditOpen,
   isLoading,
   user,
   formData,
   setFormData,
-  selectedSkills,
   setSelectedSkills,
-  handleResumeChange,
   handleSaveProfile,
   handleChange,
   handleContactChange,
+  resumeUrl,
+  fileInfo,
+  onResumeChange,
+  onResumeDelete,
 }: ProfileTabProps<T>) {
-  const isMobile = useIsMobile();
-
+  const [isEditOpen, setIsEditOpen] = useState(false);
   /* ---------------------------- UI -------------------------*/
   return (
     <TabsContent value="profile" className="space-y-6 mx-2">
@@ -158,12 +173,14 @@ export function ProfileTab<T extends BaseFormFields>({
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
                           <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{user?.contact.email}</span>
+                          <span className="text-sm">
+                            {user?.contact?.email}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Links */}
+                    {/* Links (LinkedIn & Website) */}
                     {(user?.linkedin_url || user?.website_url) && (
                       <div>
                         <h3 className="font-semibold mb-2 text-lg">Links</h3>
@@ -171,7 +188,6 @@ export function ProfileTab<T extends BaseFormFields>({
                           {user?.linkedin_url && (
                             <div className="flex items-center gap-3 group">
                               <Linkedin className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-
                               <LinkWithPreview
                                 name={user?.full_name}
                                 url={user.linkedin_url}
@@ -183,7 +199,6 @@ export function ProfileTab<T extends BaseFormFields>({
                           {user?.website_url && (
                             <div className="flex items-center gap-3 group">
                               <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-
                               <LinkWithPreview
                                 name={user?.full_name}
                                 url={user.website_url}
@@ -195,50 +210,58 @@ export function ProfileTab<T extends BaseFormFields>({
                               </LinkWithPreview>
                             </div>
                           )}
-                          {user?.resume_url &&
-                            (isMobile ? (
-                              // Mobile: just a link
-                              <a
-                                href={user.resume_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-3 text-sm text-primary hover:underline"
-                              >
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                View Resume
-                              </a>
-                            ) : (
-                              // Desktop: modal preview
-                              <Dialog>
-                                <DialogTrigger asChild>
-                                  <div className="flex items-center gap-3 group cursor-pointer text-primary hover:underline">
-                                    <FileText className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                    <span className="text-sm">View Resume</span>
-                                  </div>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl">
-                                  <DialogHeader>
-                                    <DialogTitle>
-                                      {user.full_name}'s Resume
-                                    </DialogTitle>
-                                  </DialogHeader>
-                                  <iframe
-                                    src={user.resume_url}
-                                    title="Resume"
-                                    className="w-full h-[80vh] rounded-md border"
-                                  />
-                                  <Button asChild className="mt-4">
-                                    <a
-                                      href={user.resume_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      Download PDF
-                                    </a>
-                                  </Button>
-                                </DialogContent>
-                              </Dialog>
-                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Resume */}
+                    {user?.resume_url && (
+                      <div>
+                        <h3 className="font-semibold mb-2 text-lg">Resume</h3>
+                        {/* Mobile: link only */}
+                        <div className="sm:hidden">
+                          <a
+                            href={user.resume_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 text-sm text-primary hover:underline"
+                          >
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            View Resume
+                          </a>
+                        </div>
+
+                        {/* Desktop: modal preview */}
+                        <div className="hidden sm:block">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <div className="flex items-center gap-3 group cursor-pointer text-primary hover:underline">
+                                <FileText className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <span className="text-sm">View Resume</span>
+                              </div>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl">
+                              <DialogHeader>
+                                <DialogTitle>
+                                  {user.full_name}'s Resume
+                                </DialogTitle>
+                              </DialogHeader>
+                              <iframe
+                                src={user.resume_url}
+                                title="Resume"
+                                className="w-full h-[80vh] rounded-md border"
+                              />
+                              <Button asChild className="mt-4">
+                                <a
+                                  href={user.resume_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Download PDF
+                                </a>
+                              </Button>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       </div>
                     )}
@@ -297,35 +320,14 @@ export function ProfileTab<T extends BaseFormFields>({
 
             {/* Resume uploader */}
             <div className="flex flex-col gap-2">
-              <InputFile
-                label="Upload resume"
-                accept=".pdf"
-                onChange={handleResumeChange}
+              <ResumeInput
+                label="Professional Resume"
+                value={resumeUrl}
+                onChange={onResumeChange}
+                onDelete={onResumeDelete}
+                accept=".pdf,.doc,.docx"
+                fileInfo={fileInfo || undefined}
               />
-
-              {formData.resume_url ? (
-                <div className="flex justify-end">
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="text-sm"
-                  >
-                    <a
-                      href={formData.resume_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Download className="mr-1 h-4 w-4" />
-                      Resume
-                    </a>
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic text-right">
-                  No resume uploaded
-                </p>
-              )}
             </div>
 
             {/* Bio */}
@@ -352,13 +354,12 @@ export function ProfileTab<T extends BaseFormFields>({
 
             {/* Skills */}
             <div className="space-y-2">
-              <Label>Skills</Label>
+              <Label>Skills (select up to 10)</Label>
               <TagSelector
                 label="Skills"
                 options={skillOptions}
-                selected={selectedSkills}
+                selected={user?.skills || []}
                 onChange={setSelectedSkills}
-                maxTags={15}
               />
             </div>
           </div>
@@ -366,7 +367,14 @@ export function ProfileTab<T extends BaseFormFields>({
           {/* footer */}
           <DialogFooter>
             <div className="w-full flex justify-end">
-              <Button size="sm" className="w-32" onClick={handleSaveProfile}>
+              <Button
+                size="sm"
+                className="w-32"
+                onClick={async () => {
+                  await handleSaveProfile();
+                  setIsEditOpen(false);
+                }}
+              >
                 Save
               </Button>
             </div>

@@ -1,20 +1,20 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { User as UserType } from "@/lib/models/users";
-import { useState, useEffect } from "react";
-import { v4 as uuid } from "uuid";
-import Link from "next/link";
-import { useAuth } from "@/lib/auth";
-import { userService } from "@/lib/services/user-service";
-import { Button } from "@/components/ui/button";
-import { InputFile } from "@/components/ui/input";
-import { ProfileAvatarEdit } from "@/components/profile/profile-avatar";
 import { ProfileSetupForm } from "@/components/profile/profile-card";
+import { TagSelector } from "@/components/profile/tag-selector";
+import { type TexasAMAffiliationData } from "@/components/profile/tamu-affiliate";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  TexasAMAffiliation,
-  type TexasAMAffiliationData,
-} from "@/components/profile/tamu-affiliate";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -26,34 +26,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/lib/auth";
+import { industryOptions, skillOptions } from "@/lib/constants";
+import { profileSetupStatus } from "@/lib/profile-utils";
+import { userService } from "@/lib/services/user-service";
 import {
+  AlertTriangle,
   ChevronLeft,
+  Loader2,
   Shield,
   User,
-  Upload,
-  Loader2,
-  AlertTriangle,
-  Download,
-  Trash2,
 } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { createClient } from "@/lib/supabase/client";
+import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { industryOptions, skillOptions } from "@/lib/constants";
-import { TagSelector } from "@/components/profile/tag-selector";
-import { type } from "os";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 // Dynamically import the Bell icon with SSR disabled
 const BellIcon = dynamic(() => import("lucide-react").then((mod) => mod.Bell), {
@@ -61,7 +49,12 @@ const BellIcon = dynamic(() => import("lucide-react").then((mod) => mod.Bell), {
 });
 
 export default function SettingsPage() {
-  const { user: authUser, isLoading: authLoading, signOut } = useAuth();
+  const {
+    profile,
+    refreshProfile,
+    isLoading: authLoading,
+    signOut,
+  } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -72,8 +65,9 @@ export default function SettingsPage() {
 
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [pendingResumeFile, setPendingResumeFile] = useState<File | null>(null);
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
 
-  const [user, setUser] = useState<UserType | null>(null);
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -95,54 +89,42 @@ export default function SettingsPage() {
     newFollowers: false,
     marketing: false,
   });
+  const [resumeFileInfo, setResumeFileInfo] = useState<{
+    name: string;
+    size: number;
+    type: string;
+    uploadedAt: Date;
+  } | null>(null);
 
-  const supabase = createClient();
-  const { refreshProfile } = useAuth();
-
-  // Initialize form data when user data is available
+  // fetch user and check if profile is complete
   useEffect(() => {
-    if (!authUser?.id) return;
-    const fetchUser = async () => {
-      try {
-        setIsLoading(true);
-        const userData = await userService.getUser(authUser.id);
-        if (!userData) {
-          throw new Error("User not found");
-        }
-        console.log("Raw userData:", userData);
-        setUser(userData);
-        setFormData({
-          full_name: userData.full_name || "",
-          email: userData.email || "",
-          bio: userData.bio || "",
-          industry: userData.industry || [],
-          skills: userData.skills || [],
-          linkedin_url: userData.linkedin_url || "",
-          website_url: userData.website_url || "",
-          contact: {
-            email: userData.contact?.email || userData.email || "",
-            phone: userData.contact?.phone || "",
-          },
-          is_texas_am_affiliate: userData.is_texas_am_affiliate || false,
-          graduation_year: userData.graduation_year ?? undefined,
-          avatar: userData.avatar || "",
-          resume_url: userData.resume_url || "",
-        });
-        if (userData.industry) {
-          setSelectedIndustries(userData.industry);
-        }
+    if (!profile) {
+      setIsLoading(true);
+      return;
+    }
+    setFormData({
+      full_name: profile.full_name || "",
+      email: profile.email || "",
+      bio: profile.bio || "",
+      industry: profile.industry || [],
+      skills: profile.skills || [],
+      linkedin_url: profile.linkedin_url || "",
+      website_url: profile.website_url || "",
+      is_texas_am_affiliate: profile.is_texas_am_affiliate || false,
+      graduation_year: profile.graduation_year ?? undefined,
+      avatar: profile.avatar || "",
+      resume_url: profile.resume_url || "",
+      contact: {
+        email: profile.contact?.email || profile.email || "",
+        phone: profile.contact?.phone || "",
+      },
+    });
 
-        if (userData.skills) {
-          setSelectedSkills(userData.skills);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchUser();
-  }, [authUser?.id]);
+    setSelectedSkills(profile.skills || []);
+    setSelectedIndustries(profile.industry || []);
+
+    setIsLoading(false);
+  }, [profile]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -151,13 +133,6 @@ export default function SettingsPage() {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }));
-  };
-
-  const handleSwitchChange = (checked: boolean, name: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: checked,
     }));
   };
 
@@ -172,109 +147,173 @@ export default function SettingsPage() {
     }));
   };
 
-  const handleAffiliationChange = (data: TexasAMAffiliationData) => {
-    setFormData({
-      ...formData,
-      is_texas_am_affiliate: data.is_texas_am_affiliate,
-      graduation_year: data.graduation_year,
-    });
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsSaving(true);
-
-      // 1) upload file to bucket
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${uuid()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 2) get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(fileName);
-
-      // 3) update user profile with new avatar URL
-      setFormData((prev) => ({
-        ...prev,
-        avatar: publicUrl,
-      }));
-    } catch (error) {
-      console.error("Error uploading avatar:", error);
-      toast.error("Failed to upload avatar. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteAvatar = async () => {
-    if (!formData.avatar) return;
-
-    try {
-      const filePath = formData.avatar.split(
-        "/storage/v1/object/public/avatars/"
-      )[1];
-      if (filePath) {
-        await supabase.storage.from("avatars").remove([filePath]);
-      }
-
-      setFormData((prev) => ({ ...prev, avatar: "" }));
-    } catch (err) {
-      console.error("Failed to delete avatar from storage:", err);
-      toast.error("Could not delete avatar from storage.");
-    }
-  };
-
   const handleSaveProfile = async () => {
-    if (!user) return;
+    if (!profile) return;
 
     try {
       setIsSaving(true);
       setError(null);
-      setSuccess(null);
 
-      const result = await userService.updateUser(user.id, {
-        full_name: formData.full_name,
-        bio: formData.bio,
-        linkedin_url: formData.linkedin_url,
-        website_url: formData.website_url,
-        contact: formData.contact,
+      // 1) upload avatar
+      let avatarUrl = formData.avatar;
+      if (pendingAvatarFile) {
+        avatarUrl = await uploadToBucket("avatars", pendingAvatarFile);
+      }
+
+      // 2) upload resume
+      let resumeUrl = formData.resume_url;
+      if (pendingResumeFile) {
+        resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
+      }
+      // 3) collect form data
+      const payload = {
+        full_name: formData.full_name.trim(),
+        bio: formData.bio.trim(),
+        linkedin_url: formData.linkedin_url.trim() || null,
+        website_url: formData.website_url.trim() || null,
         is_texas_am_affiliate: formData.is_texas_am_affiliate,
-        graduation_year: formData.graduation_year,
-        avatar: formData.avatar,
-        resume_url: formData.resume_url,
+        graduation_year: formData.graduation_year ?? null,
+        avatar: avatarUrl || null,
+        resume_url: resumeUrl || null,
         industry: selectedIndustries,
         skills: selectedSkills,
-      });
+        contact: formData.contact,
+      };
 
-      if (result) {
-        await refreshProfile();
-        setSuccess("Profile updated successfully");
-        toast.success("Your profile has been updated successfully");
-        router.push("/profile");
-        router.refresh();
-      }
+      // 4) update user profile
+      await userService.updateUser(profile.id, payload);
+      await refreshProfile();
+
+      // 5) reset form state
+      setPendingAvatarFile(null);
+      setPendingResumeFile(null);
+
+      toast.success("Profile updated!");
+      router.push("/profile");
     } catch (err) {
       console.error("Error updating profile:", err);
-      setError("Failed to update profile. Please try again.");
-      toast.error("Failed to update profile. Please try again.");
+      toast.error("Failed to update profile, please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  /* -------------------------------------------------
+   Helpers that talk to the new API route
+--------------------------------------------------*/
+  async function uploadToBucket(
+    bucket: "avatars" | "resumes",
+    file: File
+  ): Promise<string> {
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error || "Upload failed");
+    }
+    return (await res.json()).publicUrl as string;
+  }
+
+  async function deleteFromBucket(bucket: "avatars" | "resumes", url: string) {
+    console.log(`[deleteFromBucket] DELETE /api/upload/${bucket}`, url);
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    console.log(`[deleteFromBucket] response status=${res.status}`, payload);
+    if (!res.ok) {
+      throw new Error(payload.error || `Status ${res.status}`);
+    }
+  }
+
+  /* -------------------------------------------------
+ Avatar upload  (POST)
+--------------------------------------------------*/
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingAvatarFile(file);
+    // preview
+    setFormData((prev) => ({
+      ...prev,
+      avatar: URL.createObjectURL(file),
+    }));
+  };
+
+  /* -------------------------------------------------
+ Résumé upload  (POST)
+--------------------------------------------------*/
+  const handleResumeChange = (file: File | null) => {
+    if (file) {
+      const blobUrl = URL.createObjectURL(file);
+      setPendingResumeFile(file);
+      setFormData((prev) => ({ ...prev, resume_url: blobUrl }));
+      setResumeFileInfo({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date(),
+      });
+    }
+  };
+
+  /* -------------------------------------------------
+ Avatar delete  (DELETE)
+--------------------------------------------------*/
+  const handleDeleteAvatar = async () => {
+    if (pendingAvatarFile) {
+      URL.revokeObjectURL(formData.avatar);
+      setPendingAvatarFile(null);
+      setFormData((prev) => ({ ...prev, avatar: "" }));
+      toast.success("Avatar preview removed");
+      return;
+    }
+
+    if (!formData.avatar) return;
+
+    try {
+      setIsSaving(true);
+      await deleteFromBucket("avatars", formData.avatar);
+      setFormData((p) => ({ ...p, avatar: "" }));
+      toast.success("Avatar removed");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not delete avatar");
     } finally {
       setIsSaving(false);
     }
   };
 
+  /* -------------------------------------------------
+ Résumé delete  (DELETE)
+--------------------------------------------------*/
+  const handleResumeDelete = async () => {
+    if (pendingResumeFile) {
+      URL.revokeObjectURL(formData.resume_url);
+      setPendingResumeFile(null);
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
+      return;
+    }
+
+    if (formData.resume_url) {
+      await deleteFromBucket("resumes", formData.resume_url);
+      await userService.updateUser(profile!.id, { resume_url: null });
+      await refreshProfile();
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
+    }
+  };
+
   const handleDeleteAccount = async () => {
-    if (!user) return;
+    if (!profile) return;
 
     setIsDeletingAccount(true);
     setError(null);
@@ -317,32 +356,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsSaving(true);
-      const ext = file.name.split(".").pop();
-      const filename = `${uuid()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("resumes")
-        .upload(filename, file, { cacheControl: "3600", upsert: false });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from("resumes").getPublicUrl(filename);
-      setFormData((prev) => ({
-        ...prev,
-        resume_url: data.publicUrl,
-      }));
-      toast.success("Resume uploaded");
-    } catch (err) {
-      console.error("Error uploading resume:", err);
-      toast.error("Failed to upload resume. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   if (authLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -351,7 +364,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (!user) {
+  if (!profile) {
     return (
       <div className="space-y-4">
         <Alert>
@@ -422,10 +435,12 @@ export default function SettingsPage() {
             setSelectedIndustries={setSelectedIndustries}
             handleAvatarChange={handleAvatarChange}
             handleDeleteAvatar={handleDeleteAvatar}
-            handleAffiliationChange={handleAffiliationChange}
             handleContactChange={handleContactChange}
             handleChange={handleChange}
-            handleResumeChange={handleResumeChange}
+            resumeUrl={formData.resume_url || null}
+            fileInfo={resumeFileInfo || undefined}
+            onResumeChange={handleResumeChange}
+            onResumeDelete={handleResumeDelete}
           />
 
           <Card className="border-0 md:border shadow-none md:shadow">
@@ -442,7 +457,7 @@ export default function SettingsPage() {
                   <TagSelector
                     label="Industries"
                     options={industryOptions}
-                    selected={selectedIndustries}
+                    selected={profile.industry || []}
                     onChange={setSelectedIndustries}
                   />
                 </div>
@@ -452,7 +467,7 @@ export default function SettingsPage() {
                   <TagSelector
                     label="Skills"
                     options={skillOptions}
-                    selected={selectedSkills}
+                    selected={profile.skills || []}
                     onChange={setSelectedSkills}
                     maxTags={15}
                   />

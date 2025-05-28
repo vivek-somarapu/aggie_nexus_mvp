@@ -1,22 +1,35 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth"
-import { projectService } from "@/lib/services/project-service"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { ChevronLeft, Loader2 } from "lucide-react"
-import { toast } from "sonner"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import Link from "next/link"
-import { DatePicker } from "@/components/ui/date-picker"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { projectService } from "@/lib/services/project-service";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { ChevronLeft, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import Link from "next/link";
+import { DatePicker } from "@/components/ui/date-picker";
 
 // Industry options
 const industryOptions = [
@@ -34,8 +47,8 @@ const industryOptions = [
   "Nonprofit",
   "Sports",
   "Food & Beverage",
-  "Other"
-]
+  "Other",
+];
 
 // Skill options
 const skillOptions = [
@@ -53,8 +66,8 @@ const skillOptions = [
   "Leadership",
   "Communication",
   "Problem Solving",
-  "Creativity"
-]
+  "Creativity",
+];
 
 // Project status options
 const projectStatusOptions = [
@@ -63,35 +76,34 @@ const projectStatusOptions = [
   "Planning",
   "In Progress",
   "Advanced Stage",
-  "Completed"
-]
+  "Completed",
+];
 
 // Recruitment status options
 const recruitmentStatusOptions = [
   "Not Recruiting",
   "Open to Collaboration",
   "Actively Recruiting",
-  "Team Complete"
-]
+  "Team Complete",
+];
 
 // Location type options
-const locationTypeOptions = [
-  "Remote",
-  "On-site",
-  "Hybrid",
-  "Flexible"
-]
+const locationTypeOptions = ["Remote", "On-site", "Hybrid", "Flexible"];
 
 export default function NewProjectPage() {
-  const { user, isLoading: authLoading } = useAuth()
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([])
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
-  const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(undefined)
-  const [selectedEndDate, setSelectedEndDate] = useState<Date | undefined>(undefined)
-  
+  const { authUser: user, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
+    undefined
+  );
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | undefined>(
+    undefined
+  );
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -103,130 +115,132 @@ export default function NewProjectPage() {
     estimated_start: "",
     estimated_end: "",
     contact_info: { email: "", phone: "" },
-    project_status: "Idea Phase"
-  })
+    project_status: "Idea Phase",
+  });
 
   // Initialize contact email with user's email when user data is available
   useEffect(() => {
     if (user && user.email) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         contact_info: {
           ...prev.contact_info,
-          email: user.email
-        }
-      }))
+          email: user.email,
+        },
+      }));
     }
-  }, [user])
+  }, [user]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
       contact_info: {
         ...prev.contact_info,
-        [name]: value
-      }
-    }))
-  }
+        [name]: value,
+      },
+    }));
+  };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   const handleSwitchChange = (checked: boolean) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       is_idea: checked,
       // Update project status based on is_idea value
-      project_status: checked ? "Idea Phase" : "Not Started"
-    }))
-  }
+      project_status: checked ? "Idea Phase" : "Not Started",
+    }));
+  };
 
   const handleIndustrySelect = (industry: string) => {
     if (selectedIndustries.includes(industry)) {
-      setSelectedIndustries(selectedIndustries.filter(i => i !== industry))
+      setSelectedIndustries(selectedIndustries.filter((i) => i !== industry));
     } else {
-      setSelectedIndustries([...selectedIndustries, industry])
+      setSelectedIndustries([...selectedIndustries, industry]);
     }
-  }
+  };
 
   const handleSkillSelect = (skill: string) => {
     if (selectedSkills.includes(skill)) {
-      setSelectedSkills(selectedSkills.filter(s => s !== skill))
+      setSelectedSkills(selectedSkills.filter((s) => s !== skill));
     } else {
-      setSelectedSkills([...selectedSkills, skill])
+      setSelectedSkills([...selectedSkills, skill]);
     }
-  }
+  };
 
   const handleStartDateSelect = (date: Date | undefined) => {
-    setSelectedStartDate(date)
-    setFormData(prev => ({
+    setSelectedStartDate(date);
+    setFormData((prev) => ({
       ...prev,
-      estimated_start: date ? date.toISOString() : ""
-    }))
-  }
+      estimated_start: date ? date.toISOString() : "",
+    }));
+  };
 
   const handleEndDateSelect = (date: Date | undefined) => {
-    setSelectedEndDate(date)
-    setFormData(prev => ({
+    setSelectedEndDate(date);
+    setFormData((prev) => ({
       ...prev,
-      estimated_end: date ? date.toISOString() : ""
-    }))
-  }
+      estimated_end: date ? date.toISOString() : "",
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
     if (!user) {
-      setError("You must be logged in to create a project")
-      return
+      setError("You must be logged in to create a project");
+      return;
     }
-    
+
     try {
-      setIsSubmitting(true)
-      setError(null)
-      
+      setIsSubmitting(true);
+      setError(null);
+
       // Validate form data
       if (!formData.title.trim()) {
-        throw new Error("Project title is required")
+        throw new Error("Project title is required");
       }
-      
+
       if (!formData.description.trim()) {
-        throw new Error("Project description is required")
+        throw new Error("Project description is required");
       }
-      
+
       // Update form data with selected arrays
       const projectData = {
         ...formData,
         industry: selectedIndustries,
-        required_skills: selectedSkills
+        required_skills: selectedSkills,
         // owner_id is handled by the server via auth middleware
-      }
-      
-      const newProject = await projectService.createProject(projectData)
-      
-      toast.success("Project created successfully!")
-      router.push(`/projects/${newProject.id}`)
+      };
+
+      const newProject = await projectService.createProject(projectData);
+
+      toast.success("Project created successfully!");
+      router.push(`/projects/${newProject.id}`);
     } catch (err: any) {
-      console.error("Error creating project:", err)
-      setError(err.message || "Failed to create project. Please try again.")
-      toast.error("Failed to create project")
+      console.error("Error creating project:", err);
+      setError(err.message || "Failed to create project. Please try again.");
+      toast.error("Failed to create project");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   if (authLoading) {
     return (
@@ -234,7 +248,7 @@ export default function NewProjectPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="ml-2">Loading...</span>
       </div>
-    )
+    );
   }
 
   if (!user) {
@@ -249,7 +263,7 @@ export default function NewProjectPage() {
           </AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
   return (
@@ -323,7 +337,9 @@ export default function NewProjectPage() {
                   <Label htmlFor="project_status">Project Status</Label>
                   <Select
                     value={formData.project_status}
-                    onValueChange={(value) => handleSelectChange("project_status", value)}
+                    onValueChange={(value) =>
+                      handleSelectChange("project_status", value)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
@@ -342,7 +358,9 @@ export default function NewProjectPage() {
                   <Label htmlFor="location_type">Location Type</Label>
                   <Select
                     value={formData.location_type}
-                    onValueChange={(value) => handleSelectChange("location_type", value)}
+                    onValueChange={(value) =>
+                      handleSelectChange("location_type", value)
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select location type" />
@@ -411,7 +429,10 @@ export default function NewProjectPage() {
                         onChange={() => handleIndustrySelect(industry)}
                         className="rounded border-gray-300"
                       />
-                      <Label htmlFor={`industry-${industry}`} className="font-normal">
+                      <Label
+                        htmlFor={`industry-${industry}`}
+                        className="font-normal"
+                      >
                         {industry}
                       </Label>
                     </div>
@@ -455,7 +476,9 @@ export default function NewProjectPage() {
                 <Label htmlFor="recruitment_status">Recruitment Status</Label>
                 <Select
                   value={formData.recruitment_status}
-                  onValueChange={(value) => handleSelectChange("recruitment_status", value)}
+                  onValueChange={(value) =>
+                    handleSelectChange("recruitment_status", value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select recruitment status" />
@@ -494,7 +517,9 @@ export default function NewProjectPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="contact_phone">Contact Phone (Optional)</Label>
+                  <Label htmlFor="contact_phone">
+                    Contact Phone (Optional)
+                  </Label>
                   <Input
                     id="contact_phone"
                     name="phone"
@@ -525,5 +550,5 @@ export default function NewProjectPage() {
         </div>
       </form>
     </div>
-  )
-} 
+  );
+}

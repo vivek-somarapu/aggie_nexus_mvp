@@ -1,10 +1,10 @@
-import { User } from "./auth";
+import { Profile } from "./auth";
 
 /**
  * Determines whether a user needs to complete their profile setup
  * based on their profile data and preferences
  */
-export function profileSetupStatus(user: User | null, justLoggedIn = false) {
+export function profileSetupStatus(user: Profile | null, justLoggedIn = false) {
   if (!user) {
     return {
       shouldSetupProfile: false,
@@ -40,7 +40,7 @@ export function profileSetupStatus(user: User | null, justLoggedIn = false) {
 /**
  * Checks if a user has just logged in (within the last minute)
  */
-export function hasJustLoggedIn(user: User | null): boolean {
+export function hasJustLoggedIn(user: Profile | null): boolean {
   if (!user || !user.last_login_at) {
     return false;
   }

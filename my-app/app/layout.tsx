@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
 import ClientLayout from "@/components/client-layout";
+import Navbar from "@/components/navbar";
 import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -20,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning className={inter.className}>
+    <html lang="en">
+      <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -29,6 +30,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
+            <Navbar />
             <ClientLayout>{children}</ClientLayout>
             <Toaster position="top-right" richColors closeButton />
           </AuthProvider>
