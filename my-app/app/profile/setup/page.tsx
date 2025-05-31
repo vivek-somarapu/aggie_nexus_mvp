@@ -1,241 +1,309 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth"
-import { userService } from "@/lib/services/user-service"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, ChevronRight, ChevronLeft, User as UserIcon, Check } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import Link from "next/link"
-
-// Get industry options from the project page
-const industryOptions = [
-  "Technology",
-  "Healthcare",
-  "Education",
-  "Finance",
-  "Entertainment",
-  "Retail",
-  "Manufacturing",
-  "Agriculture",
-  "Energy",
-  "Transportation",
-  "Real Estate",
-  "Nonprofit",
-  "Sports",
-  "Food & Beverage",
-  "Other"
-]
-
-// Get skill options from the project page
-const skillOptions = [
-  "Programming",
-  "Design",
-  "Marketing",
-  "Sales",
-  "Finance",
-  "Management",
-  "Writing",
-  "Research",
-  "Customer Service",
-  "Data Analysis",
-  "Project Management",
-  "Leadership",
-  "Communication",
-  "Problem Solving",
-  "Creativity"
-]
+import { ProfileAvatar } from "@/components/profile/profile-avatar";
+import { ProfileSetupForm } from "@/components/profile/profile-card";
+import { TagSelector } from "@/components/profile/tag-selector";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth";
+import {
+  containerVariants,
+  industryOptions,
+  itemVariants,
+  skillOptions,
+  stepVariants,
+} from "@/lib/constants";
+import { userService } from "@/lib/services/user-service";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function ProfileSetupPage() {
-  const { user, isLoading: authLoading } = useAuth()
-  const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(1)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([])
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
-  const [isFromAuthError, setIsFromAuthError] = useState(false)
+  const { profile, refreshProfile, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [pendingResumeFile, setPendingResumeFile] = useState<File | null>(null);
+  const [resumeFileInfo, setResumeFileInfo] = useState<{
+    name: string;
+    size: number;
+    type: string;
+    uploadedAt: Date;
+  } | null>(null);
+
+  // Form state
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
     bio: "",
     linkedin_url: "",
     website_url: "",
-    graduation_year: "",
+    graduation_year: undefined as number | undefined,
     is_texas_am_affiliate: false,
+    avatar: "",
+    skills: [] as string[],
+    industry: [] as string[],
     resume_url: "",
-    contact: { email: "", phone: "" },
-  })
+    contact: { email: "", phone: "" } as { email: string; phone: string },
+  });
 
-  // Initialize form with user data if available
+  // fetch user and check if profile is complete
   useEffect(() => {
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        full_name: user.full_name || "",
-        email: user.email || "",
-        bio: user.bio || "",
-        linkedin_url: user.linkedin_url || "",
-        website_url: user.website_url || "",
-        graduation_year: user.graduation_year?.toString() || "",
-        is_texas_am_affiliate: user.is_texas_am_affiliate || false,
-        contact: {
-          email: user.email || "",
-          phone: user.contact?.phone || ""
-        }
-      }))
-
-      if (user.industry) {
-        setSelectedIndustries(user.industry)
-      }
-
-      if (user.skills) {
-        setSelectedSkills(user.skills)
-      }
+    if (!profile) {
+      setIsLoading(true);
+      return;
     }
-  }, [user])
+    setFormData({
+      full_name: profile.full_name || "",
+      email: profile.email || "",
+      bio: profile.bio || "",
+      industry: profile.industry || [],
+      skills: profile.skills || [],
+      linkedin_url: profile.linkedin_url || "",
+      website_url: profile.website_url || "",
+      is_texas_am_affiliate: profile.is_texas_am_affiliate || false,
+      graduation_year: profile.graduation_year ?? undefined,
+      avatar: profile.avatar || "",
+      resume_url: profile.resume_url || "",
+      contact: {
+        email: profile.contact?.email || profile.email || "",
+        phone: profile.contact?.phone || "",
+      },
+    });
 
-  // Check if user was redirected from auth error
-  useEffect(() => {
-    // Check localStorage for auth error flag
-    const authErrorFlag = localStorage.getItem("auth_profile_error")
-    if (authErrorFlag === "true") {
-      setIsFromAuthError(true)
-      setMessage("We detected an issue with your profile during signup. Please complete your profile setup now.")
-      // Jump directly to step 2 (basic information)
-      setCurrentStep(2)
-      // Clear the flag
-      localStorage.removeItem("auth_profile_error")
-    }
-  }, [])
+    setSelectedSkills(profile.skills || []);
+    setSelectedIndustries(profile.industry || []);
 
-  // Handle user interaction
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+    setIsLoading(false);
+  }, [profile]);
+
+  const prevStep = () => {
+    setCurrentStep((prev) => prev - 1);
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+    const { name, value } = e.target;
+    setFormData((prev) => ({
       ...prev,
       contact: {
         ...prev.contact,
-        [name]: value
-      }
-    }))
-  }
+        [name]: value,
+      },
+    }));
+  };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+  const handleSaveProfile = async () => {
+    if (!profile) return;
 
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: checked
-    }))
-  }
-
-  const handleIndustrySelect = (industry: string) => {
-    if (selectedIndustries.includes(industry)) {
-      setSelectedIndustries(selectedIndustries.filter(i => i !== industry))
-    } else {
-      setSelectedIndustries([...selectedIndustries, industry])
-    }
-  }
-
-  const handleSkillSelect = (skill: string) => {
-    if (selectedSkills.includes(skill)) {
-      setSelectedSkills(selectedSkills.filter(s => s !== skill))
-    } else {
-      setSelectedSkills([...selectedSkills, skill])
-    }
-  }
-
-  const nextStep = () => {
-    setCurrentStep(prev => prev + 1)
-  }
-
-  const prevStep = () => {
-    setCurrentStep(prev => prev - 1)
-  }
-
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    
-    if (!user) {
-      setError("You must be logged in to update your profile")
-      return
-    }
-    
     try {
-      setIsSubmitting(true)
-      setError(null)
-      
-      // Format the data for API with validation
-      const userData = {
-        ...formData,
-        // Ensure full_name is never empty - use email prefix if empty
-        full_name: formData.full_name || (formData.email?.split('@')[0] || 'User'),
+      setIsSaving(true);
+      setError(null);
+
+      // 1) upload avatar
+      let avatarUrl = formData.avatar;
+      if (pendingAvatarFile) {
+        avatarUrl = await uploadToBucket("avatars", pendingAvatarFile);
+      }
+
+      // 2) upload resume
+      let resumeUrl = formData.resume_url;
+      if (pendingResumeFile) {
+        resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
+      }
+      // 3) collect form data
+      const payload = {
+        full_name: formData.full_name.trim(),
+        bio: formData.bio.trim(),
+        linkedin_url: formData.linkedin_url.trim() || null,
+        website_url: formData.website_url.trim() || null,
+        is_texas_am_affiliate: formData.is_texas_am_affiliate,
+        graduation_year: formData.graduation_year ?? null,
+        avatar: avatarUrl || null,
+        resume_url: resumeUrl || null,
         industry: selectedIndustries,
         skills: selectedSkills,
-        graduation_year: formData.graduation_year ? parseInt(formData.graduation_year) : null,
-        // Explicitly mark profile as completed
-        profile_setup_completed: true,
-        profile_setup_skipped: false
-      }
-      
-      // Update user via API
-      await userService.updateUser(user.id, userData)
-      
-      if (isFromAuthError) {
-        setMessage("Your profile has been successfully created!")
-      }
-      
-      // Redirect to home page or profile
-      router.push("/")
-    } catch (err: any) {
-      console.error("Error updating profile:", err)
-      setError(err.message || "Failed to update profile. Please try again.")
+        contact: formData.contact,
+      };
+
+      // 4) update user profile
+      await userService.updateUser(profile.id, payload);
+      await refreshProfile();
+
+      // 5) reset form state
+      setPendingAvatarFile(null);
+      setPendingResumeFile(null);
+
+      toast.success("Profile updated!");
+      router.push("/profile");
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      toast.error("Failed to update profile, please try again.");
     } finally {
-      setIsSubmitting(false)
+      setIsSaving(false);
+    }
+  };
+
+  /* -------------------------------------------------
+   Helpers that talk to the new API route
+--------------------------------------------------*/
+  async function uploadToBucket(
+    bucket: "avatars" | "resumes",
+    file: File
+  ): Promise<string> {
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error || "Upload failed");
+    }
+    return (await res.json()).publicUrl as string;
+  }
+
+  async function deleteFromBucket(bucket: "avatars" | "resumes", url: string) {
+    const res = await fetch(`/api/upload/${bucket}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error || "Delete failed");
     }
   }
+
+  /* -------------------------------------------------
+   Avatar upload  (POST)
+--------------------------------------------------*/
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingAvatarFile(file);
+    // preview
+    setFormData((prev) => ({
+      ...prev,
+      avatar: URL.createObjectURL(file),
+    }));
+  };
+
+  /* -------------------------------------------------
+   Résumé upload  (POST)
+--------------------------------------------------*/
+  const handleResumeChange = (file: File | null) => {
+    if (file) {
+      const blobUrl = URL.createObjectURL(file);
+      setPendingResumeFile(file);
+      setFormData((prev) => ({ ...prev, resume_url: blobUrl }));
+      setResumeFileInfo({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date(),
+      });
+    }
+  };
+
+  /* -------------------------------------------------
+   Avatar delete  (DELETE)
+--------------------------------------------------*/
+  const handleDeleteAvatar = async () => {
+    if (pendingAvatarFile) {
+      URL.revokeObjectURL(formData.avatar);
+      setPendingAvatarFile(null);
+      setFormData((prev) => ({ ...prev, avatar: "" }));
+      toast.success("Avatar preview removed");
+      return;
+    }
+
+    if (!formData.avatar) return;
+
+    try {
+      setIsSaving(true);
+      await deleteFromBucket("avatars", formData.avatar);
+      setFormData((p) => ({ ...p, avatar: "" }));
+      toast.success("Avatar removed");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not delete avatar");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /* -------------------------------------------------
+   Résumé delete  (DELETE)
+--------------------------------------------------*/
+  const handleResumeDelete = async () => {
+    if (pendingResumeFile) {
+      URL.revokeObjectURL(formData.resume_url);
+      setPendingResumeFile(null);
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
+      return;
+    }
+
+    if (formData.resume_url) {
+      await deleteFromBucket("resumes", formData.resume_url);
+      await userService.updateUser(profile!.id, { resume_url: null });
+      await refreshProfile();
+      setFormData((prev) => ({ ...prev, resume_url: "" }));
+      setResumeFileInfo(null);
+    }
+  };
 
   const skipToHome = async () => {
     try {
       // Record that the user has chosen to skip profile setup
-      if (user) {
-        await userService.updateUser(user.id, {
+      if (profile) {
+        await userService.updateUser(profile.id, {
           profile_setup_skipped: true,
           // Add a timestamp to record when setup was skipped
-          profile_setup_skipped_at: new Date().toISOString()
+          profile_setup_skipped_at: new Date().toISOString(),
         });
       }
-      router.push("/")
+      router.push("/");
     } catch (err) {
       console.error("Error recording skip preference:", err);
       // Continue to home page even if there's an error
-      router.push("/")
+      router.push("/");
     }
-  }
+  };
 
   if (authLoading) {
     return (
@@ -243,10 +311,10 @@ export default function ProfileSetupPage() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="ml-2">Loading...</span>
       </div>
-    )
+    );
   }
 
-  if (!user) {
+  if (!profile) {
     return (
       <div className="container py-8">
         <Alert className="mb-6">
@@ -258,359 +326,363 @@ export default function ProfileSetupPage() {
           </AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
-  // Step 1: Welcome screen with options
-  if (currentStep === 1) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Welcome to Aggie Nexus!</CardTitle>
-            <CardDescription>
-              Would you like to set up your profile now or continue to the platform?
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-center">
-              <Avatar className="h-24 w-24">
-                <AvatarImage src={user.avatar || undefined} alt={user.full_name} />
-                <AvatarFallback>
-                  <UserIcon className="h-12 w-12" />
-                </AvatarFallback>
-              </Avatar>
-            </div>
-            <p className="text-center text-muted-foreground">
-              Setting up your profile helps others find you and makes it easier to connect with like-minded individuals.
-            </p>
-            {message && (
-              <Alert className="mt-4">
-                <AlertDescription>{message}</AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={skipToHome}>Skip for now</Button>
-            <Button onClick={nextStep}>Set up profile <ChevronRight className="ml-2 h-4 w-4" /></Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
-  }
-
-  // Step 2: Basic information
-  if (currentStep === 2) {
-    return (
-      <div className="flex items-center justify-center min-h-screen py-8">
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-            <CardDescription>Let's start with the basics</CardDescription>
-            {isFromAuthError && (
-              <Alert className="mt-4">
-                <AlertDescription>{message}</AlertDescription>
-              </Alert>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input
-                id="full_name"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleChange}
-                placeholder="Enter your full name"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleChange}
-                placeholder="Tell us about yourself"
-                rows={4}
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="is_texas_am_affiliate"
-                name="is_texas_am_affiliate"
-                checked={formData.is_texas_am_affiliate}
-                onChange={handleCheckboxChange}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="is_texas_am_affiliate" className="font-normal">
-                I am a Texas A&M Affiliate
-              </Label>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="graduation_year">Graduation Year</Label>
-              <Input
-                id="graduation_year"
-                name="graduation_year"
-                type="number"
-                value={formData.graduation_year}
-                onChange={handleChange}
-                placeholder="Enter your graduation year"
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={prevStep}>
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back
-            </Button>
-            <Button onClick={nextStep}>
-              Continue <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
-  }
-
-  // Step 3: Skills and Industries
-  if (currentStep === 3) {
-    return (
-      <div className="flex items-center justify-center min-h-screen py-8">
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle>Skills & Industries</CardTitle>
-            <CardDescription>Select your skills and industries of interest</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Industries (Select all that apply)</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {industryOptions.map((industry) => (
-                  <div key={industry} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id={`industry-${industry}`}
-                      checked={selectedIndustries.includes(industry)}
-                      onChange={() => handleIndustrySelect(industry)}
-                      className="rounded border-gray-300"
-                    />
-                    <Label htmlFor={`industry-${industry}`} className="font-normal">
-                      {industry}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Skills (Select all that apply)</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {skillOptions.map((skill) => (
-                  <div key={skill} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id={`skill-${skill}`}
-                      checked={selectedSkills.includes(skill)}
-                      onChange={() => handleSkillSelect(skill)}
-                      className="rounded border-gray-300"
-                    />
-                    <Label htmlFor={`skill-${skill}`} className="font-normal">
-                      {skill}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={prevStep}>
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back
-            </Button>
-            <Button onClick={nextStep}>
-              Continue <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
-  }
-
-  // Step 4: Contact and Links
-  if (currentStep === 4) {
-    return (
-      <div className="flex items-center justify-center min-h-screen py-8">
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle>Contact & Links</CardTitle>
-            <CardDescription>How can others reach you?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="contact_email">Contact Email</Label>
-              <Input
-                id="contact_email"
-                name="email"
-                type="email"
-                value={formData.contact.email}
-                onChange={handleContactChange}
-                placeholder="Enter contact email"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="contact_phone">Contact Phone (Optional)</Label>
-              <Input
-                id="contact_phone"
-                name="phone"
-                value={formData.contact.phone || ""}
-                onChange={handleContactChange}
-                placeholder="Enter contact phone"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-              <Input
-                id="linkedin_url"
-                name="linkedin_url"
-                value={formData.linkedin_url}
-                onChange={handleChange}
-                placeholder="https://linkedin.com/in/yourprofile"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="website_url">Website URL</Label>
-              <Input
-                id="website_url"
-                name="website_url"
-                value={formData.website_url}
-                onChange={handleChange}
-                placeholder="https://yourwebsite.com"
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={prevStep}>
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back
-            </Button>
-            <Button onClick={nextStep}>
-              Review <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
-  }
-
-  // Step 5: Review and Submit
   return (
-    <div className="flex items-center justify-center min-h-screen py-8">
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle>Review Your Profile</CardTitle>
-          <CardDescription>Make sure everything looks good</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Name</p>
-            <p className="text-sm text-muted-foreground">{formData.full_name}</p>
+    <div className="w-full">
+      {/* Mobile only version */}
+      <div className="block md:hidden">
+        <ProfileSetupForm
+          formData={formData}
+          setFormData={setFormData}
+          selectedIndustries={selectedIndustries}
+          setSelectedIndustries={setSelectedIndustries}
+          handleAvatarChange={handleAvatarChange}
+          handleDeleteAvatar={handleDeleteAvatar}
+          handleContactChange={handleContactChange}
+          handleChange={handleChange}
+          resumeUrl={formData.resume_url || null}
+          fileInfo={resumeFileInfo || undefined}
+          onResumeChange={handleResumeChange}
+          onResumeDelete={handleResumeDelete}
+        />
+        <div className="px-6 md:hidden">
+          <div className="space-y-2">
+            <Label>Industries</Label>
+            <TagSelector
+              label="Industries"
+              options={industryOptions}
+              selected={profile.industry || []}
+              onChange={setSelectedIndustries}
+            />
           </div>
-
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Email</p>
-            <p className="text-sm text-muted-foreground">{formData.email}</p>
+          <div className="space-y-2 md:hidden">
+            <Label>Skills</Label>
+            <TagSelector
+              label="Skills"
+              options={skillOptions}
+              selected={profile.skills || []}
+              onChange={setSelectedSkills}
+              maxTags={15}
+            />
           </div>
-
-          {formData.bio && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Bio</p>
-              <p className="text-sm text-muted-foreground">{formData.bio}</p>
-            </div>
-          )}
-
-          {formData.graduation_year && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Graduation Year</p>
-              <p className="text-sm text-muted-foreground">{formData.graduation_year}</p>
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Texas A&M Affiliate</p>
-            <p className="text-sm text-muted-foreground">{formData.is_texas_am_affiliate ? "Yes" : "No"}</p>
-          </div>
-
-          {selectedIndustries.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Industries</p>
-              <p className="text-sm text-muted-foreground">{selectedIndustries.join(", ")}</p>
-            </div>
-          )}
-
-          {selectedSkills.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Skills</p>
-              <p className="text-sm text-muted-foreground">{selectedSkills.join(", ")}</p>
-            </div>
-          )}
-
-          {formData.linkedin_url && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">LinkedIn</p>
-              <p className="text-sm text-muted-foreground">{formData.linkedin_url}</p>
-            </div>
-          )}
-
-          {formData.website_url && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Website</p>
-              <p className="text-sm text-muted-foreground">{formData.website_url}</p>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button variant="outline" onClick={prevStep}>
-            <ChevronLeft className="mr-2 h-4 w-4" /> Back
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+        </div>
+        {/* Save Button */}
+        <div className="flex justify-end mt-4">
+          <Button onClick={handleSaveProfile} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                Saving…
               </>
             ) : (
-              <>
-                <Check className="mr-2 h-4 w-4" /> Complete Setup
-              </>
+              "Save profile"
             )}
           </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
+
+      {/* Desktop/Tablet: step-by-step cards */}
+      <div className="hidden md:block ">
+        <AnimatePresence mode="wait">
+          {currentStep >= 1 && (
+            <motion.div
+              key={currentStep}
+              className="flex items-center justify-center"
+              variants={stepVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              {/* Background animated circles */}
+              <motion.div
+                className="
+              hidden lg:block
+              absolute
+              right-0
+              top-50
+              z-0
+              transform
+              rotate-[220deg]
+              pointer-events-none
+              opacity-60
+            "
+                initial={{ opacity: 0, scale: 0.8, rotate: 205 }}
+                animate={{
+                  opacity: 0.6,
+                  scale: 1,
+                  rotate: 220,
+                  transition: {
+                    duration: 0.8,
+                    ease: "easeOut",
+                  },
+                }}
+                whileInView={{
+                  x: [0, 10, 0],
+                  transition: {
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    duration: 8,
+                  },
+                }}
+              >
+                <Image
+                  src="/images/circles-logo.png"
+                  alt="Decorative circles"
+                  width={700}
+                  height={500}
+                  className="object-contain"
+                  priority
+                />
+              </motion.div>
+
+              <div className="relative z-10 w-full max-w-3xl">
+                {currentStep === 1 && (
+                  <>
+                    <ProfileSetupForm
+                      formData={formData}
+                      setFormData={setFormData}
+                      selectedIndustries={selectedIndustries}
+                      setSelectedIndustries={setSelectedIndustries}
+                      handleAvatarChange={handleAvatarChange}
+                      handleDeleteAvatar={handleDeleteAvatar}
+                      handleContactChange={handleContactChange}
+                      handleChange={handleChange}
+                      resumeUrl={formData.resume_url || null}
+                      fileInfo={resumeFileInfo || undefined}
+                      onResumeChange={handleResumeChange}
+                      onResumeDelete={handleResumeDelete}
+                    />
+
+                    <div className="flex justify-between mt-2">
+                      <Button variant="outline" onClick={skipToHome}>
+                        Skip for now
+                      </Button>
+                      <Button
+                        onClick={() => setCurrentStep(2)}
+                        disabled={isSaving}
+                      >
+                        Set up profile <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {/* Step 2 */}
+                {currentStep === 2 && (
+                  <>
+                    <Card className="w-full">
+                      <CardHeader>
+                        <CardTitle>Skills & Industries</CardTitle>
+                        <CardDescription>
+                          Select your skills and industries of interest
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label>Industries</Label>
+                          <TagSelector
+                            label="Industries"
+                            options={industryOptions}
+                            selected={selectedIndustries}
+                            onChange={setSelectedIndustries}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Skills</Label>
+                          <TagSelector
+                            label="Skills"
+                            options={skillOptions}
+                            selected={selectedSkills}
+                            onChange={setSelectedSkills}
+                            maxTags={15}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <div className="flex justify-between gap-4 mt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setCurrentStep(1)}
+                      >
+                        <ChevronLeft className="mr-2 h-4 w-4" /> Back
+                      </Button>
+
+                      <Button
+                        onClick={() => setCurrentStep(3)}
+                        disabled={isSaving}
+                      >
+                        Next Step
+                        <ChevronRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {/* Steps 3 */}
+                {currentStep === 3 && (
+                  <Card className="w-full mx-auto">
+                    <CardHeader>
+                      <CardTitle>Review Your Profile</CardTitle>
+                      <CardDescription>
+                        Make sure everything looks good
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-1 max-h-[60vh] overflow-y-auto">
+                      {error && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="flex items-start gap-6">
+                        {/* Avatar */}
+                        <div className="flex-1 flex justify-center">
+                          <div className="shrink-0">
+                            <ProfileAvatar
+                              avatar={formData.avatar}
+                              fullName={formData.full_name}
+                              is_texas_am_affiliate={
+                                formData.is_texas_am_affiliate
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        {/* Name / Email / Affiliation */}
+                        <div className="flex-1 flex flex-col gap-3">
+                          <div className="">
+                            <p className="text-sm font-medium">Name</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formData.full_name}
+                            </p>
+                          </div>
+                          <div className="">
+                            <p className="text-sm font-medium">Email</p>
+                            <p className="text-sm text-muted-foreground">
+                              {formData.email}
+                            </p>
+                          </div>
+                          <div className="">
+                            <p className="text-sm font-medium">
+                              Texas A&M Affiliate
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {formData.is_texas_am_affiliate ? "Yes" : "No"}
+                              {formData.is_texas_am_affiliate &&
+                              formData.graduation_year
+                                ? ` - ${formData.graduation_year}`
+                                : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* LinkedIn / Website */}
+                        <div className="flex-1 flex flex-col gap-3">
+                          {formData.linkedin_url && (
+                            <div className="">
+                              <p className="text-sm font-medium">LinkedIn</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formData.linkedin_url}
+                              </p>
+                            </div>
+                          )}
+                          {formData.website_url && (
+                            <div className="">
+                              <p className="text-sm font-medium">Website</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formData.website_url}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Skills and industries */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {selectedIndustries.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Industries</p>
+                            <motion.div
+                              className="flex flex-wrap gap-2 mt-2"
+                              variants={containerVariants}
+                            >
+                              {selectedIndustries.map((tag) => (
+                                <motion.div key={tag} variants={itemVariants}>
+                                  <Badge
+                                    variant="secondary"
+                                    className="px-2 py-1"
+                                  >
+                                    {tag}
+                                  </Badge>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                          </div>
+                        )}
+
+                        {selectedSkills.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Skills</p>
+                            <motion.div
+                              className="flex flex-wrap gap-2 mt-2"
+                              variants={containerVariants}
+                            >
+                              {selectedSkills.map((tag) => (
+                                <motion.div key={tag} variants={itemVariants}>
+                                  <Badge
+                                    variant="secondary"
+                                    className="px-2 py-1"
+                                  >
+                                    {tag}
+                                  </Badge>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bio */}
+                      {formData.bio && (
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Bio</p>
+                          <p className="text-sm text-muted-foreground break-words max-w-full">
+                            {formData.bio}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+
+                    <CardFooter className="flex justify-between mt-2">
+                      <Button variant="outline" onClick={prevStep}>
+                        <ChevronLeft className="mr-2 h-4 w-4" /> Back
+                      </Button>
+                      <Button
+                        onClick={handleSaveProfile}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="mr-2 h-4 w-4" /> Complete Setup
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
-  )
-} 
+  );
+}

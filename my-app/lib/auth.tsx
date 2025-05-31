@@ -1,16 +1,39 @@
 "use client";
 
+// Auth Context and Provider for Next.js with Supabase
+// ---------------------------------------------
+// This module exports:
+// 1. `AuthUser`  - minimal auth user info from Supabase Auth (id, email)
+// 2. `Profile`   - extended user profile stored in your own `users` table
+// 3. `AuthProvider` & `useAuth` hook for accessing both
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "./supabase/client";
-import { User as SupabaseUser, Session, AuthError } from "@supabase/supabase-js";
+import {
+  User as SupabaseUser,
+  Session,
+  AuthError,
+  User,
+} from "@supabase/supabase-js";
 
-// Update the User type to include all profile fields used in the app
-export type User = {
+/**
+ * Minimal authenticated user info from Supabase Auth
+ */
+export type AuthUser = {
+  id: string;
+  email: string;
+};
+
+/**
+ * Extended profile fetched from the `users` table
+ */
+export type Profile = {
   id: string;
   email: string;
   full_name?: string;
-  avatar?: string;
+  avatar?: string | null;
+  resume_url?: string | null;
   bio?: string;
   linkedin_url?: string;
   website_url?: string;
@@ -26,29 +49,21 @@ export type User = {
   profile_setup_completed?: boolean;
   profile_setup_skipped_at?: string;
   last_login_at?: string;
-};
-
-// Define user profile type based on your users table
-export type Profile = {
-  id: string;
-  full_name: string;
-  email: string;
-  bio?: string;
-  skills?: string[];
-  avatar?: string;
-  industry?: string[];
   is_manager?: boolean;
-  // Add more fields as needed
 };
 
 // Define auth context type
 type AuthContextType = {
-  user: User | null;
+  authUser: AuthUser | null;
   profile: Profile | null;
   isLoading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<boolean>;
-  signUp: (email: string, password: string, fullName: string) => Promise<boolean>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<boolean>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<boolean>;
   signInWithGitHub: () => Promise<boolean>;
@@ -60,7 +75,7 @@ type AuthContextType = {
 
 // Create auth context with default values
 const AuthContext = createContext<AuthContextType>({
-  user: null,
+  authUser: null,
   profile: null,
   isLoading: true,
   error: null,
@@ -83,79 +98,75 @@ const AuthContext = createContext<AuthContextType>({
 async function fetchUserProfile(userId: string): Promise<Profile | null> {
   console.log("AUTH: Fetching profile start");
   const supabase = createClient();
-  
+
   try {
     // Fetch from users table
     const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .eq('deleted', false)
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .eq("deleted", false)
       .single();
-    
+
     if (error) {
-      console.error('AUTH ERROR: Error fetching user profile:', error);
+      console.error("AUTH ERROR: Error fetching user profile:", error);
       // Don't get stuck - return empty profile as fallback
       return {
         id: userId,
-        full_name: 'User',
-        email: '',
-        bio: '',
+        full_name: "User",
+        email: "",
+        bio: "",
         skills: [],
-        industry: []
+        industry: [],
       };
     }
-    
+
     console.log("AUTH: Profile fetch success");
     return data as Profile;
   } catch (err) {
-    console.error('AUTH ERROR: Exception fetching profile:', err);
+    console.error("AUTH ERROR: Exception fetching profile:", err);
     // Return fallback profile
     return {
       id: userId,
-      full_name: 'User',
-      email: '',
-      bio: '',
+      full_name: "User",
+      email: "",
+      bio: "",
       skills: [],
-      industry: []
+      industry: [],
     };
   }
 }
 
 /**
- * Map a Supabase User to our application User type
+ * Map Supabase Auth user to our minimal `AuthUser` type
  */
-function mapSupabaseUser(supabaseUser: SupabaseUser): User {
-  return {
-    id: supabaseUser.id,
-    email: supabaseUser.email || '',
-    // Other fields will be populated from profile data
-  };
+function mapSupabaseUser(s: SupabaseUser): AuthUser {
+  return { id: s.id, email: s.email ?? "" };
 }
 
 /**
  * AuthProvider component that manages authentication state
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
-  
+
   /**
    * Initialize auth state and set up auth state change listener
    */
   useEffect(() => {
     console.log("AUTH: Starting auth initialization");
-    
+
     // Prevent multiple initializations during development with Fast Refresh
     if (isInitialized) return;
-    
+
     const supabase = createClient();
     let authListener: { data: { subscription: { unsubscribe: () => void } } };
-    
+
     // Timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       if (isLoading) {
@@ -163,60 +174,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
       }
     }, 5000);
-    
+
     // Initialize: Get current session
-    supabase.auth.getSession().then(async ({ data: { session } }: { data: { session: Session | null } }) => {
-      console.log("AUTH: Session check complete", !!session);
-      
-      if (session) {
-        setUser(mapSupabaseUser(session.user));
-        try {
-          console.log("AUTH: Fetching user profile for", session.user.id);
-          const userProfile = await fetchUserProfile(session.user.id);
-          console.log("AUTH: Profile fetch result", !!userProfile);
-          setProfile(userProfile);
-        } catch (err) {
-          console.error("AUTH: Error during initial profile fetch", err);
-        }
-      }
-      
-      // Setup listener after initial session check
-      authListener = supabase.auth.onAuthStateChange(
-        async (event: string, session: Session | null) => {
-          setError(null);
-          
-          console.log("AUTH: Auth state change event:", event);
-          
-          if (event === 'SIGNED_OUT') {
-            setUser(null);
-            setProfile(null);
-            return;
-          }
-          
+    supabase.auth
+      .getSession()
+      .then(
+        async ({
+          data: { session },
+        }: {
+          data: { session: Session | null };
+        }) => {
+          clearTimeout(timeoutId);
+          console.log("AUTH: Session check complete", !!session);
+
           if (session) {
-            setUser(mapSupabaseUser(session.user));
-            
-            // Only fetch profile for certain events
-            if (['SIGNED_IN', 'USER_UPDATED', 'TOKEN_REFRESHED'].includes(event)) {
-              try {
-                const userProfile = await fetchUserProfile(session.user.id);
-                setProfile(userProfile);
-              } catch (err) {
-                console.error("AUTH: Error fetching profile on auth change", err);
-              }
+            setAuthUser(mapSupabaseUser(session.user));
+            try {
+              console.log("AUTH: Fetching user profile for", session.user.id);
+              const userProfile = await fetchUserProfile(session.user.id);
+              console.log("AUTH: Profile fetch result", !!userProfile);
+              setProfile(userProfile);
+            } catch (err) {
+              console.error("AUTH: Error during initial profile fetch", err);
             }
           }
+
+          // Setup listener after initial session check
+          authListener = supabase.auth.onAuthStateChange(
+            async (event: string, session: Session | null) => {
+              setError(null);
+
+              console.log("AUTH: Auth state change event:", event);
+
+              if (event === "SIGNED_OUT") {
+                setAuthUser(null);
+                setProfile(null);
+                return;
+              }
+
+              if (session) {
+                setAuthUser(mapSupabaseUser(session.user));
+
+                // Only fetch profile for certain events
+                if (
+                  ["SIGNED_IN", "USER_UPDATED", "TOKEN_REFRESHED"].includes(
+                    event
+                  )
+                ) {
+                  try {
+                    const userProfile = await fetchUserProfile(session.user.id);
+                    setProfile(userProfile);
+                  } catch (err) {
+                    console.error(
+                      "AUTH: Error fetching profile on auth change",
+                      err
+                    );
+                  }
+                }
+              }
+            }
+          );
+
+          setIsInitialized(true);
+          setIsLoading(false);
         }
-      );
-      
-      setIsInitialized(true);
-      setIsLoading(false);
-    }).catch((err: Error) => {
-      console.error("AUTH: Error during initialization", err);
-      setIsLoading(false);
-      setIsInitialized(true);
-    });
-    
+      )
+      .catch((err: Error) => {
+        console.error("AUTH: Error during initialization", err);
+        setIsLoading(false);
+        setIsInitialized(true);
+      });
+
     // Clean up
     return () => {
       clearTimeout(timeoutId);
@@ -225,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []);
-  
+
   /**
    * Sign in with email and password
    */
@@ -233,41 +261,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const supabase = createClient();
       const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      
+
       if (error) {
         setError(error.message);
         return false;
       }
-      
+
       // Fetch user profile after successful sign-in
       if (data.user) {
-        setUser(mapSupabaseUser(data.user));
+        setAuthUser(mapSupabaseUser(data.user));
         const userProfile = await fetchUserProfile(data.user.id);
         setProfile(userProfile);
       }
-      
+
       // Redirect based on profile completeness
-      if (profile && (!profile.bio || !profile.skills || profile.skills.length === 0)) {
-        router.push('/profile/setup');
+      if (
+        profile &&
+        (!profile.bio || !profile.skills || profile.skills.length === 0)
+      ) {
+        router.push("/profile/setup");
       } else {
-        router.push('/');
+        router.push("/");
       }
-      
+
       return true;
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+      setError(err.message || "Failed to sign in");
       return false;
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   /**
    * Sign up with email and password
    */
@@ -275,7 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const supabase = createClient();
       const { error, data } = await supabase.auth.signUp({
         email,
@@ -286,64 +317,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         },
       });
-      
+
       if (error) {
         setError(error.message);
         return false;
       }
-      
+
       // Don't try to insert into users table directly after signup
       // Supabase auth handles the user creation in auth.users
       // Any profile data will be set when the user completes their profile
       // or we can use a database webhook to automatically create profiles
-      
+
       // If we need the user information immediately after signup,
       // we should simply set the state with the data we have
       if (data.user) {
-        setUser(mapSupabaseUser(data.user));
+        setAuthUser(mapSupabaseUser(data.user));
       }
-      
+
       // Return true to indicate successful signup
       // The user will need to verify their email before they can use full functionality
       return true;
     } catch (err: any) {
-      setError(err.message || 'Failed to sign up');
+      setError(err.message || "Failed to sign up");
       return false;
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   /**
    * Sign out the current user
    */
   const signOut = async () => {
     try {
       setIsLoading(true);
-      
+
       const supabase = createClient();
       // Sign out and clear any session data from browser
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
-        setError(error.message || 'Failed to sign out');
+        setError(error.message || "Failed to sign out");
         return;
       }
-      
+
       // Clear auth state immediately to prevent flash of protected content
-      setUser(null);
+      setAuthUser(null);
       setProfile(null);
-      
+
       // Redirect to landing page instead of login
-      router.push('/');
+      router.push("/");
     } catch (err: any) {
-      console.error('Logout error:', err);
-      setError(err.message || 'Failed to sign out');
+      console.error("Logout error:", err);
+      setError(err.message || "Failed to sign out");
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   /**
    * Sign in with Google OAuth
    */
@@ -351,20 +382,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-        }
+        },
       });
-      
+
       if (error) {
         setError(error.message);
         return false;
       }
-      
+
       return true;
     } catch (err: any) {
       console.error("AUTH: Error during Google OAuth sign-in", err);
@@ -374,7 +405,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }
   };
-  
+
   /**
    * Sign in with GitHub OAuth
    */
@@ -382,20 +413,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
+        provider: "github",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-        }
+        },
       });
-      
+
       if (error) {
         setError(error.message);
         return false;
       }
-      
+
       return true;
     } catch (err: any) {
       console.error("AUTH: Error during GitHub OAuth sign-in", err);
@@ -405,7 +436,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     }
   };
-  
+
   /**
    * Request a password reset email
    */
@@ -413,22 +444,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const supabase = createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
-      
+
       if (error) {
         setError(error.message);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to request password reset');
+      setError(err.message || "Failed to request password reset");
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   /**
    * Reset password with new password
    */
@@ -436,44 +467,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const supabase = createClient();
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
-      
+
       if (error) {
         setError(error.message);
       } else {
-        router.push('/auth/login?reset=success');
+        router.push("/auth/login?reset=success");
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+      setError(err.message || "Failed to reset password");
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   /**
-   * Manually refresh user profile data
+   * Manually refresh user profile data from the database,
+   * in case something changed — like after the user updates their
+   * profile (name, bio, avatar, etc.), or after an external update.
    */
   const refreshProfile = async () => {
-    if (!user) return;
-    
+    if (!authUser) return;
+
     try {
       setIsLoading(true);
-      const userProfile = await fetchUserProfile(user.id);
+      const userProfile = await fetchUserProfile(authUser.id);
       setProfile(userProfile);
     } catch (err) {
-      console.error('Error refreshing profile:', err);
+      console.error("Error refreshing profile:", err);
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   // Create context value
   const value: AuthContextType = {
-    user,
+    authUser,
     profile,
     isLoading,
     error,
@@ -487,15 +520,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshProfile,
     isManager: profile?.is_manager === true,
   };
-  
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 /**
  * Custom hook to access auth context
  */
-export const useAuth = () => useContext(AuthContext); 
+export const useAuth = () => useContext(AuthContext);
