@@ -260,31 +260,35 @@ export default function ProjectsPage() {
       exit="exit"
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <motion.h1
-            className="text-3xl font-bold tracking-tight text-red-600/80"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
-          >
-            Projects
-          </motion.h1>
-          <motion.p
-            className="text-muted-foreground"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-          >
-            Discover innovative ideas and collaborate on impactful projects with
-            fellow Aggies
-          </motion.p>
+        <div className="relative">
+          {/* Red accent background for projects */}
+          <div className="absolute inset-0 bg-gradient-to-r from-red-50 to-transparent dark:from-red-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
+          <div className="relative z-10">
+            <motion.h1
+              className="text-3xl font-bold tracking-tight"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+            >
+              Projects
+            </motion.h1>
+            <motion.p
+              className="text-muted-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+            >
+              Discover innovative ideas and collaborate on impactful projects with
+              fellow Aggies
+            </motion.p>
+          </div>
         </div>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.4 }}
         >
-          <Button asChild>
+          <Button asChild className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700">
             <Link href="/projects/new">Create New Project</Link>
           </Button>
         </motion.div>
@@ -329,7 +333,7 @@ export default function ProjectsPage() {
         </div>
 
         <motion.div
-          className="flex flex-col md:flex-row gap-4 mb-6"
+          className="flex flex-col md:flex-row gap-4 mb-6 p-4 rounded-lg border-l-4 border-red-200 bg-red-50/30 dark:border-red-800 dark:bg-red-950/10"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.4 }}

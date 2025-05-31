@@ -140,7 +140,7 @@ const containerVariants = {
 };
 
 export default function CalendarPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { authUser: user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   
   const [events, setEvents] = useState<Event[]>([]);
@@ -326,11 +326,15 @@ export default function CalendarPage() {
       exit="exit"
     >
       <motion.div variants={itemVariants} className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center mb-2">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-green-600/80">Events Calendar</h1>
-          <p className="text-muted-foreground">
-            Stay organized with upcoming events, workshops, and networking opportunities
-          </p>
+        <div className="relative">
+          {/* Green accent background for calendar */}
+          <div className="absolute inset-0 bg-gradient-to-r from-green-50 to-transparent dark:from-green-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
+          <div className="relative z-10">
+            <h1 className="text-3xl font-bold tracking-tight">Events Calendar</h1>
+            <p className="text-muted-foreground">
+              Stay organized with upcoming events, workshops, and networking opportunities
+            </p>
+          </div>
         </div>
         
         <div className="flex space-x-2 mt-2 sm:mt-0">
@@ -353,7 +357,11 @@ export default function CalendarPage() {
             </TabsList>
           </Tabs>
           {user && (
-            <Button onClick={() => router.push('/calendar/new')} size="sm" className="flex items-center">
+            <Button 
+              onClick={() => router.push('/calendar/new')} 
+              size="sm" 
+              className="flex items-center bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Event
             </Button>
@@ -384,7 +392,7 @@ export default function CalendarPage() {
         </motion.div>
       )}
       
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2 p-4 rounded-lg border-l-4 border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/10">
         {/* <Select
           value={categoryFilter}
           onValueChange={setCategoryFilter}

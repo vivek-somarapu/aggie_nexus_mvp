@@ -12,6 +12,7 @@
 
 # .cursor
 .cursor
+.cursor-ignore
 
 # testing
 /coverage

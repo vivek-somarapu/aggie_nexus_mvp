@@ -56,7 +56,7 @@ const cardVariants = {
 }
 
 export default function UsersPage() {
-  const { user: currentUser, isLoading: authLoading } = useAuth()
+  const { authUser: currentUser, isLoading: authLoading } = useAuth()
   const router = useRouter()
   
   const [users, setUsers] = useState<User[]>([])
@@ -239,9 +239,14 @@ export default function UsersPage() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
+          className="relative"
         >
-          <h1 className="text-3xl font-bold tracking-tight text-blue-600/80">Talent</h1>
-          <p className="text-muted-foreground">Connect with talented Aggies, industry experts, and potential mentors to grow your network</p>
+          {/* Blue accent background for talent */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
+          <div className="relative z-10">
+            <h1 className="text-3xl font-bold tracking-tight">Talent</h1>
+            <p className="text-muted-foreground">Connect with talented Aggies, industry experts, and potential mentors to grow your network</p>
+          </div>
         </motion.div>
       </div>
       
@@ -289,7 +294,7 @@ export default function UsersPage() {
         </div>
 
         <motion.div 
-          className="flex flex-col md:flex-row gap-4 mb-6"
+          className="flex flex-col md:flex-row gap-4 mb-6 p-4 rounded-lg border-l-4 border-blue-200 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/10"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.4 }}
