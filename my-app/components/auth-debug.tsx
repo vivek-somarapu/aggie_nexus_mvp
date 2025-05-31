@@ -12,7 +12,6 @@ import { useAuth } from "@/lib/auth";
  */
 export default function AuthDebug() {
   const { authUser, profile, isLoading } = useAuth();
-  const [sessionState, setSessionState] = useState<any>(null);
   const [userState, setUserState] = useState<any>(null);
   const [cookies, setCookies] = useState<string[]>([]);
   const [rls, setRls] = useState<string>("unknown");
@@ -21,21 +20,17 @@ export default function AuthDebug() {
     const checkAuth = async () => {
       const supabase = createClient();
 
-      // Check session
-      const { data: sessionData } = await supabase.auth.getSession();
-      setSessionState(sessionData);
-
-      // Check user
+      // Check user (secure)
       try {
-        const { data, error } = await supabase.auth.getUser();
-        setUserState({ data, error });
+        const { data: userData } = await supabase.auth.getUser();
+        setUserState({ data: userData });
 
         // Test RLS with basic query
-        if (data.user) {
+        if (userData.user) {
           const { data: testData, error: testError } = await supabase
             .from("users")
             .select("id")
-            .eq("id", data.user.id)
+            .eq("id", userData.user.id)
             .single();
 
           setRls(
@@ -85,12 +80,11 @@ export default function AuthDebug() {
 
       <div>User: {authUser ? authUser.id.substring(0, 8) + "..." : "null"}</div>
       <div>Profile: {profile ? "loaded" : "null"}</div>
-      <div>Session: {sessionState?.session ? "active" : "none"}</div>
       <div>RLS: {rls}</div>
       <div>Cookies: {cookies.filter((c) => c.includes("supabase")).length}</div>
       <button
         onClick={() =>
-          console.log({ authUser, profile, sessionState, userState, cookies })
+          console.log({ authUser, profile, userState, cookies })
         }
         style={{ marginTop: "8px", padding: "4px", fontSize: "11px" }}
       >

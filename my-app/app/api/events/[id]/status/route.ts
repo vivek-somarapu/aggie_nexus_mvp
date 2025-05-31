@@ -11,19 +11,17 @@ export async function PATCH(
     const supabase = createClient();
 
     // Check authentication
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Check if user is a manager
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('is_manager')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     if (profileError || !profile) {
@@ -54,7 +52,7 @@ export async function PATCH(
     const { data, error } = await supabase.rpc('update_event_status', {
       event_id: params.id,
       new_status: body.status,
-      manager_id: session.user.id
+      manager_id: user.id
     });
 
     if (error) {

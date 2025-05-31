@@ -29,13 +29,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Retrieve the new session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
     
-    if (sessionError || !session) {
-      console.error('Session retrieval error:', sessionError)
-      return NextResponse.redirect(
-        new URL('/auth/login?error=Session+creation+failed', requestUrl.origin)
-      )
+    if (userError || !user) {
+      console.error('Auth callback error:', userError)
+      return NextResponse.redirect(`${requestUrl.origin}/?auth_error=callback_failed`)
     }
     
     // After OAuth login, we need to check if the user has a complete profile
@@ -45,7 +43,7 @@ export async function GET(request: NextRequest) {
       const { data: existingUser, error: userError } = await supabase
         .from('users')
         .select('id, bio, skills, profile_setup_skipped, profile_setup_completed')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single()
         
       if (userError && userError.code !== 'PGRST116') {
@@ -60,7 +58,7 @@ export async function GET(request: NextRequest) {
         .update({ 
           last_login_at: new Date().toISOString() 
         })
-        .eq('id', session.user.id);
+        .eq('id', user.id);
         
       if (updateError) {
         console.error('Error updating last login time:', updateError);
@@ -95,7 +93,7 @@ export async function GET(request: NextRequest) {
           const { error: completeError } = await supabase
             .from('users')
             .update({ profile_setup_completed: true })
-            .eq('id', session.user.id);
+            .eq('id', user.id);
             
           if (completeError) {
             console.error('Error marking profile as completed:', completeError);
@@ -107,14 +105,14 @@ export async function GET(request: NextRequest) {
       } else {
         // The user doesn't exist in the users table yet, we'll need to create them
         // Get user data from the session
-        const { full_name, email } = session.user.user_metadata || {}
-        const userEmail = email || session.user.email || ''
+        const { full_name, email } = user.user_metadata || {}
+        const userEmail = email || user.email || ''
         
         // Create a new user entry
         const { error: insertError } = await supabase
           .from('users')
           .insert({
-            id: session.user.id,
+            id: user.id,
             full_name: full_name || userEmail.split('@')[0] || 'New User',
             email: userEmail,
             industry: [],

@@ -16,26 +16,26 @@ export async function GET(request: NextRequest) {
     
     const supabase = createClient();
     
-    // Check if user is authenticated
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // Check if user is authenticated (secure)
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (sessionError) {
-      console.error('Session error in profile status:', sessionError);
+    if (userError) {
+      console.error('User verification error in profile status:', userError);
       return NextResponse.json(
-        { error: 'Authentication error', details: sessionError.message },
+        { error: 'Authentication error', details: userError.message },
         { status: 401 }
       );
     }
     
-    if (!session) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
     
-    // Get user ID from session
-    const userId = session.user.id;
+    // Get user ID from verified user
+    const userId = user.id;
     
     // Check user profile for completeness and skip preference
     const { data, error } = await supabase

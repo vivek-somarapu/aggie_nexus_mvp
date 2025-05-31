@@ -7,8 +7,9 @@ export async function POST(request: Request) {
   const supabase = createClient()
   
   // Check for admin auth (in a real app, you'd add proper admin validation)
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   

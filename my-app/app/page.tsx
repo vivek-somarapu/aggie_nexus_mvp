@@ -148,7 +148,9 @@ export default function Home() {
             >
               THE CENTRAL HUB
               <br />
-              FOR AGGIE INNOVATION
+              FOR
+              <br />
+              AGGIE INNOVATION
             </motion.h1>
             <motion.p
               variants={fadeIn}

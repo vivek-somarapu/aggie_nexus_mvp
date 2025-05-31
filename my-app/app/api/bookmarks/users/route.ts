@@ -8,20 +8,19 @@ export async function GET(request: NextRequest) {
   const supabase = createClient();
   
   // Check if user is authenticated
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    );
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  
+  const userId = user.id;
   
   try {
     const { data, error } = await supabase
       .from('user_bookmarks')
       .select('*')
-      .eq('user_id', session.user.id);
+      .eq('user_id', userId);
       
     if (error) {
       console.error('Error fetching user bookmarks:', error);
@@ -48,14 +47,13 @@ export async function POST(request: NextRequest) {
   const supabase = createClient();
   
   // Check if user is authenticated
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    );
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  
+  const userId = user.id;
   
   try {
     const requestData = await request.json();
@@ -72,7 +70,7 @@ export async function POST(request: NextRequest) {
     const { data: existingBookmark, error: fetchError } = await supabase
       .from('user_bookmarks')
       .select('id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .eq('bookmarked_user_id', bookmarked_user_id)
       .single();
       
@@ -107,7 +105,7 @@ export async function POST(request: NextRequest) {
       const { error: insertError } = await supabase
         .from('user_bookmarks')
         .insert({
-          user_id: session.user.id,
+          user_id: userId,
           bookmarked_user_id,
         });
         

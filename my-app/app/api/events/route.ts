@@ -14,10 +14,10 @@ export async function GET(request: NextRequest) {
     if (status && status !== 'approved') {
       const cookieStore = cookies();
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
       
       // If not authenticated or requesting non-approved events
-      if (!session) {
+      if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
       
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('is_manager')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single();
         
       if (!profile?.is_manager) {
@@ -70,9 +70,9 @@ export async function POST(request: NextRequest) {
     // Check if user is authenticated
     const cookieStore = cookies();
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Add the current user as the creator
-    body.created_by = session.user.id;
+    body.created_by = user.id;
     
     // Set initial status to pending
     body.status = 'pending';

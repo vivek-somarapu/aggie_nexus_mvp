@@ -44,56 +44,59 @@ export async function middleware(request: NextRequest) {
   try {
     // Get the session and user authentication status
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
     // Get the current path
-    const pathname = request.nextUrl.pathname;
+    const currentPath = request.nextUrl.pathname;
     
-    // List of routes that require authentication
-    const protectedRoutes = [
-      '/profile',
-      '/projects/new',
-      '/projects/edit',
-      '/bookmarks',
-      '/users',
-      '/projects',
+    // Public routes that don't require authentication
+    const publicRoutes = [
+      '/',
+      '/auth/login',
+      '/auth/signup',
+      '/auth/callback',
+      '/auth/reset-password',
+      '/projects', // Allow unauthenticated users to view projects
+      '/users', // Allow unauthenticated users to view users  
+      '/calendar', // Allow unauthenticated users to view calendar
+      '/api/events', // Allow fetching events without auth
     ];
 
+    // Check if current route is public or an API route
+    const isPublicRoute = publicRoutes.some(route => 
+      currentPath === route || currentPath.startsWith(route + '/')
+    );
+    
+    const isApiRoute = currentPath.startsWith('/api/');
+    
+    // Allow public routes and most API routes to proceed
+    if (isPublicRoute || isApiRoute) {
+      return response;
+    }
+
+    // For protected routes, check authentication
+    if (!user) {
+      // Redirect to login with return URL
+      const loginUrl = new URL('/auth/login', request.url);
+      loginUrl.searchParams.set('redirect', currentPath);
+      return NextResponse.redirect(loginUrl);
+    }
+    
     // List of routes that require email verification
     const verificationRequiredRoutes = [
       '/profile',
       '/projects/new',
       '/projects/edit',
     ];
-
-    // Check if the user is on a protected route without authentication
-    const isProtectedRoute = protectedRoutes.some(route => 
-      pathname.startsWith(route)
-    );
-
-    // If not authenticated and trying to access protected route, redirect to login
-    if (isProtectedRoute && !session) {
-      console.log(`Middleware: Redirecting unauthenticated user from ${pathname} to login`);
-      const redirectUrl = new URL('/auth/login', request.url);
-      redirectUrl.searchParams.set('redirect', encodeURIComponent(pathname));
-      
-      // Set cache-control header to prevent caching of protected pages
-      // This helps with back-button navigation issues
-      response = NextResponse.redirect(redirectUrl);
-      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      response.headers.set('Pragma', 'no-cache');
-      response.headers.set('Expires', '0');
-      return response;
-    }
     
     // Check if route requires email verification
     const requiresVerification = verificationRequiredRoutes.some(route => 
-      pathname.startsWith(route)
+      currentPath.startsWith(route)
     );
     
     // If email verification is required and user's email isn't verified
-    if (requiresVerification && session && !session.user.email_confirmed_at) {
+    if (requiresVerification && user && !user.email_confirmed_at) {
       return NextResponse.redirect(new URL('/auth/waiting', request.url));
     }
     
@@ -107,11 +110,11 @@ export async function middleware(request: NextRequest) {
     
     // Check if the user is already authenticated but trying to access auth routes
     const isAuthRoute = authRoutes.some(route => 
-      pathname.startsWith(route)
+      currentPath.startsWith(route)
     );
     
     // Redirect authenticated users away from auth pages
-    if (isAuthRoute && session) {
+    if (isAuthRoute && user) {
       return NextResponse.redirect(new URL('/', request.url));
     }
     

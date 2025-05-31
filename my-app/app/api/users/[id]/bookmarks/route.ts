@@ -8,20 +8,17 @@ export async function GET(
   const supabase = createClient();
   
   // Check if user is authenticated
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    );
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
   try {
     const { id: userId } = params;
     
     // Only allow users to access their own bookmarks
-    if (userId !== session.user.id) {
+    if (userId !== user.id) {
       return NextResponse.json(
         { error: 'You can only access your own bookmarks' },
         { status: 403 }

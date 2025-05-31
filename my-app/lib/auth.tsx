@@ -175,23 +175,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }, 5000);
 
-    // Initialize: Get current session
+    // Initialize: Get current user (secure)
     supabase.auth
-      .getSession()
+      .getUser()
       .then(
         async ({
-          data: { session },
+          data: { user },
         }: {
-          data: { session: Session | null };
+          data: { user: SupabaseUser | null };
         }) => {
           clearTimeout(timeoutId);
-          console.log("AUTH: Session check complete", !!session);
+          console.log("AUTH: User check complete", !!user);
 
-          if (session) {
-            setAuthUser(mapSupabaseUser(session.user));
+          if (user) {
+            setAuthUser(mapSupabaseUser(user));
             try {
-              console.log("AUTH: Fetching user profile for", session.user.id);
-              const userProfile = await fetchUserProfile(session.user.id);
+              console.log("AUTH: Fetching user profile for", user.id);
+              const userProfile = await fetchUserProfile(user.id);
               console.log("AUTH: Profile fetch result", !!userProfile);
               setProfile(userProfile);
             } catch (err) {
