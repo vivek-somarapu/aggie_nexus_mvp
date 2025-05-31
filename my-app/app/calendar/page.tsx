@@ -360,7 +360,7 @@ export default function CalendarPage() {
             <Button 
               onClick={() => router.push('/calendar/new')} 
               size="sm" 
-              className="flex items-center bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
+              className="flex items-center bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Event
