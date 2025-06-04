@@ -832,40 +832,53 @@ export default function CalendarPage() {
 
       {/* Event Detail Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md overflow-hidden p-0">
+        <DialogContent className="max-w-[80%] md:max-w-xl overflow-hidden p-0">
           <motion.div
             initial="hidden"
             animate="visible"
             exit="exit"
             variants={dialogVariants}
-            className="p-6"
+            className="p-5"
           >
-            <DialogHeader>
-              <DialogTitle>Event Details</DialogTitle>
-            </DialogHeader>
             {selectedEvent && (
               <div className="space-y-4">
-                <h3 className="text-xl font-semibold">{selectedEvent.title}</h3>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{format(selectedEvent.start, "MMM d, yyyy • h:mm a")} - {format(selectedEvent.end, "h:mm a")}</span>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-center border-r-4 pr-4" style={{ borderColor: "#000000" }}>
+                      <p className="text-lg font-semibold">{format(selectedEvent.start, "MMM")}</p>
+                      <p className="text-3xl font-semibold">{format(selectedEvent.start, "d")}</p>
+                    </div>
+                    <h3 className="text-xl font-semibold">{selectedEvent.title}</h3>
+                  </div>
+                  
+                  <div className="flex flex-col pl-[76px] gap-2 mt-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span>{format(selectedEvent.start, "MMM d, yyyy • h:mm a")} - {format(selectedEvent.end, "h:mm a")}</span>
+                    </div>
+                  
+                    {selectedEvent.location && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span>{selectedEvent.location}</span>
+                      </div>
+                    )}
+
+                    {selectedEvent.description && (
+                      <div className="flex items-start gap-2 text-sm mt-3 bg-muted/30 rounded-md">
+                        <MapPin className="h-4 w-4 flex-shrink-0 opacity-0" />
+                        <p className="text-sm whitespace-pre-line">{selectedEvent.description}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" className="mr-2 bg-background text-foreground hover:bg-accent">RSVP</Button>
+                  <Button variant="outline" className="mr-2">Add to Calendar</Button>
                 </div>
                 
-                {selectedEvent.location && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedEvent.location}</span>
-                  </div>
-                )}
-                
-                {selectedEvent.description && (
-                  <div className="mt-4 bg-muted/30 p-3 rounded-md">
-                    <p className="text-sm whitespace-pre-line">{selectedEvent.description}</p>
-                  </div>
-                )}
-                
-                <div className="flex justify-end pt-4">
+                {/* <div className="flex justify-end pt-4">
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                     <Button 
                       variant="outline" 
@@ -875,14 +888,7 @@ export default function CalendarPage() {
                       Close
                     </Button>
                   </motion.div>
-                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    <Button 
-                      onClick={() => router.push(`/calendar/${selectedEvent.id}`)}
-                    >
-                      View Details
-                    </Button>
-                  </motion.div>
-                </div>
+                </div> */}
               </div>
             )}
           </motion.div>
