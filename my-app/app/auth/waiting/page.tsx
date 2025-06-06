@@ -18,7 +18,12 @@ export default function AuthWaitingPage() {
   const router = useRouter()
   const { user, profile, isLoading, signOut } = useAuth()
   const [message, setMessage] = useState("Please verify your email to continue...")
-  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("lastSignupEmail")
+    }
+    return null
+  })
   const [resendLoading, setResendLoading] = useState(false)
   const [emailResent, setEmailResent] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -30,12 +35,10 @@ export default function AuthWaitingPage() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [isChecking, setIsChecking] = useState(false)
 
-  // Initialize email from localStorage and set verification flag in sessionStorage
+  // Initialize verification flag in sessionStorage and set timeout
   useEffect(() => {
-    const storedEmail = localStorage.getItem("lastSignupEmail")
-    if (storedEmail) {
-      setUserEmail(storedEmail)
-      setMessage(`Please verify your email (${storedEmail}) to continue...`)
+    if (userEmail) {
+      setMessage(`Please verify your email (${userEmail}) to continue...`)
     }
     
     // Set verification flag in sessionStorage to handle tab redirection
