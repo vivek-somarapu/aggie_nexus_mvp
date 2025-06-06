@@ -122,7 +122,7 @@ export default function ProjectPage() {
 
     fetchProjectData();
     console.log(currentUser);
-  }, [id, currentUser]);
+  }, [id, currentUser?.id]);
   
   const handleEdit = async () => {
     redirect(`/projects/edit/${project?.id}`);
