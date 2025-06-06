@@ -278,15 +278,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthUser(mapSupabaseUser(data.user));
         const userProfile = await fetchUserProfile(data.user.id);
         setProfile(userProfile);
+
+        // Redirect based on the fetched profile's completeness
+        if (
+          !userProfile ||
+          !userProfile.bio ||
+          !userProfile.skills ||
+          userProfile.skills.length === 0
+        ) {
+          router.push("/profile/setup");
+        } else {
+          router.push("/");
+        }
       }
 
-      // Redirect based on profile completeness
-      if (
-        profile &&
-        (!profile.bio || !profile.skills || profile.skills.length === 0)
-      ) {
-        router.push("/profile/setup");
-      } else {
+      // No user returned is unexpected but handle gracefully
+      if (!data.user) {
         router.push("/");
       }
 
