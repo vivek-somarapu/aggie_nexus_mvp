@@ -175,7 +175,7 @@ export default function ProfileSetupPage() {
   };
 
   /* -------------------------------------------------
-   Helpers that talk to the new API route
+  Helpers that talk to the new API route
 --------------------------------------------------*/
   async function uploadToBucket(
     bucket: "avatars" | "resumes",
@@ -209,7 +209,7 @@ export default function ProfileSetupPage() {
   }
 
   /* -------------------------------------------------
-   Avatar upload  (POST)
+  Avatar upload  (POST)
 --------------------------------------------------*/
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -223,7 +223,7 @@ export default function ProfileSetupPage() {
   };
 
   /* -------------------------------------------------
-   Résumé upload  (POST)
+  Résumé upload  (POST)
 --------------------------------------------------*/
   const handleResumeChange = (file: File | null) => {
     if (file) {
@@ -240,7 +240,7 @@ export default function ProfileSetupPage() {
   };
 
   /* -------------------------------------------------
-   Avatar delete  (DELETE)
+  Avatar delete  (DELETE)
 --------------------------------------------------*/
   const handleDeleteAvatar = async () => {
     if (pendingAvatarFile) {
@@ -267,7 +267,7 @@ export default function ProfileSetupPage() {
   };
 
   /* -------------------------------------------------
-   Résumé delete  (DELETE)
+  Résumé delete  (DELETE)
 --------------------------------------------------*/
   const handleResumeDelete = async () => {
     if (pendingResumeFile) {
@@ -333,6 +333,28 @@ export default function ProfileSetupPage() {
     <div className="w-full">
       {/* Mobile only version */}
       <div className="block md:hidden">
+        <motion.div
+          key="completion-banner"
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -40 }}
+          transition={{ duration: 0.3 }}
+          className=" sm:right-6 sm:left-auto z-50 w-auto sm:max-w-md max-w-sm"
+        >
+          <Card className="border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg rounded-lg px-4 py-3">
+            <CardDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-green-800 dark:text-green-300">
+                  Your profile is incomplete
+                </p>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  You’re almost there — finish setting up your profile!
+                </p>
+              </div>
+            </CardDescription>
+          </Card>
+        </motion.div>
+
         <ProfileSetupForm
           formData={formData}
           setFormData={setFormData}
@@ -440,6 +462,29 @@ export default function ProfileSetupPage() {
               <div className="relative z-10 w-full max-w-3xl">
                 {currentStep === 1 && (
                   <>
+                    <motion.div
+                      key="completion-banner"
+                      initial={{ opacity: 0, x: -40 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -40 }}
+                      transition={{ duration: 0.3 }}
+                      className="fixed top-25 right-4 left-4 sm:right-6 sm:left-auto z-50 w-auto sm:max-w-md max-w-sm"
+                    >
+                      <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg rounded-lg px-4 py-3">
+                        <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                          <div className="flex-1 text-sm">
+                            <p className="font-medium text-green-800 dark:text-green-300">
+                              Your profile is incomplete
+                            </p>
+                            <p className="text-sm text-green-600 dark:text-green-400">
+                              You’re almost there — finish setting up your
+                              profile!
+                            </p>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    </motion.div>
+
                     <ProfileSetupForm
                       formData={formData}
                       setFormData={setFormData}
@@ -454,7 +499,6 @@ export default function ProfileSetupPage() {
                       onResumeChange={handleResumeChange}
                       onResumeDelete={handleResumeDelete}
                     />
-
                     <div className="flex justify-between mt-2">
                       <Button variant="outline" onClick={skipToHome}>
                         Skip for now

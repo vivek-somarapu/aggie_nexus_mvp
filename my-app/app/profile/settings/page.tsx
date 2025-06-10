@@ -2,7 +2,6 @@
 
 import { ProfileSetupForm } from "@/components/profile/profile-card";
 import { TagSelector } from "@/components/profile/tag-selector";
-import { type TexasAMAffiliationData } from "@/components/profile/tamu-affiliate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -28,7 +27,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth";
 import { industryOptions, skillOptions } from "@/lib/constants";
-import { profileSetupStatus } from "@/lib/profile-utils";
 import { userService } from "@/lib/services/user-service";
 import {
   AlertTriangle,
@@ -61,7 +59,7 @@ export default function SettingsPage() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success] = useState<string | null>(null);
 
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
