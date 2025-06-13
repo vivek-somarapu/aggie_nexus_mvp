@@ -16,13 +16,7 @@ import {
   itemVariants,
   industryOptions,
 } from "@/lib/constants";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 import {
   ProfileAvatar,
@@ -116,137 +110,128 @@ export function ProfileSetupForm<T extends MinimalFormData>({
   const additionalLinks = formData.additional_links || [];
 
   return (
-    <Card className="w-full border-0 md:border shadow-none md:shadow">
-      <CardHeader>
-        <CardTitle>Personal & Professional Information</CardTitle>
-        <CardDescription>
-          Update your personal & professional details and links
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Avatar + Name + Affiliation */}
-        <div className="flex flex-col sm:flex-row gap-6">
-          <div className="w-full flex justify-center sm:w-auto sm:shrink-0">
-            <ProfileAvatarEdit
-              avatar={formData.avatar}
-              fullName={formData.full_name}
-              onAvatarChange={handleAvatarChange}
-              onAvatarDelete={handleDeleteAvatar}
-            />
-          </div>
-          <div className="w-full sm:flex-1 space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input
-                id="full_name"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleChange}
-              />
-            </div>
-            <TexasAMAffiliation
-              value={{
-                is_texas_am_affiliate: formData.is_texas_am_affiliate,
-                graduation_year: formData.graduation_year,
-              }}
-              onChange={handleAffiliationChange}
-            />
-          </div>
+    <>
+      {/* Avatar + Name + Affiliation */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="w-full flex justify-center sm:w-auto sm:shrink-0">
+          <ProfileAvatarEdit
+            avatar={formData.avatar}
+            fullName={formData.full_name}
+            onAvatarChange={handleAvatarChange}
+            onAvatarDelete={handleDeleteAvatar}
+          />
         </div>
-
-        {/* Contacts and links */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="contact_email">Contact Email</Label>
+        <div className="w-full sm:flex-1 space-y-2">
+          <div className="space-y-1">
+            <Label htmlFor="full_name">Full Name</Label>
             <Input
-              id="contact_email"
-              name="email"
-              type="email"
-              value={formData.contact.email || ""}
-              onChange={handleContactChange}
-              placeholder="public@example.com"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-            <Input
-              id="linkedin_url"
-              name="linkedin_url"
-              value={formData.linkedin_url || ""}
+              id="full_name"
+              name="full_name"
+              value={formData.full_name}
               onChange={handleChange}
-              placeholder="https://linkedin.com/in/username"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="contact_phone">Contact Phone</Label>
-            <Input
-              id="contact_phone"
-              name="phone"
-              value={formData.contact.phone || ""}
-              onChange={handleContactChange}
-              placeholder="(123) 456-7890"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="website_url">Website URL</Label>
-            <Input
-              id="website_url"
-              name="website_url"
-              value={formData.website_url || ""}
-              onChange={handleChange}
-              placeholder="https://example.com"
-            />
-          </div>
+          <TexasAMAffiliation
+            value={{
+              is_texas_am_affiliate: formData.is_texas_am_affiliate,
+              graduation_year: formData.graduation_year,
+            }}
+            onChange={handleAffiliationChange}
+          />
+        </div>
+      </div>
 
-          {/* Additional Links */}
-          <AdditionalLinks
-            links={additionalLinks}
-            colsClass="grid-cols-1 md:grid-cols-2"
-            onChangeLinks={(newLinks) =>
-              setFormData({
-                ...formData,
-                additional_links: newLinks,
-              })
-            }
+      {/* Contacts and links */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="contact_email">Contact Email</Label>
+          <Input
+            id="contact_email"
+            name="email"
+            type="email"
+            value={formData.contact.email || ""}
+            onChange={handleContactChange}
+            placeholder="public@example.com"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="linkedin_url">LinkedIn URL</Label>
+          <Input
+            id="linkedin_url"
+            name="linkedin_url"
+            value={formData.linkedin_url || ""}
+            onChange={handleChange}
+            placeholder="https://linkedin.com/in/username"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="contact_phone">Contact Phone</Label>
+          <Input
+            id="contact_phone"
+            name="phone"
+            value={formData.contact.phone || ""}
+            onChange={handleContactChange}
+            placeholder="(123) 456-7890"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="website_url">Website URL</Label>
+          <Input
+            id="website_url"
+            name="website_url"
+            value={formData.website_url || ""}
+            onChange={handleChange}
+            placeholder="https://example.com"
           />
         </div>
 
-        {/* Resume */}
-        <div className=" sm:col-span-2">
-          <ResumeInput
-            label="Professional Resume"
-            value={resumeUrl}
-            onChange={onResumeChange}
-            onDelete={onResumeDelete}
-            accept=".pdf,.doc,.docx"
-            fileInfo={fileInfo || undefined}
-          />
-        </div>
+        {/* Additional Links */}
+        <AdditionalLinks
+          links={additionalLinks}
+          colsClass="grid-cols-1 md:grid-cols-2"
+          onChangeLinks={(newLinks) =>
+            setFormData({
+              ...formData,
+              additional_links: newLinks,
+            })
+          }
+        />
+      </div>
 
-        {/* Bio */}
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="bio">Bio</Label>
-          <Textarea
-            id="bio"
-            name="bio"
-            className="max-h-[80px] overflow-y-auto"
-            value={formData.bio || ""}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                bio: e.target.value.slice(0, 250),
-              }))
-            }
-            placeholder="Tell us about yourself"
-            rows={4}
-          />
-          <div className="text-sm text-muted-foreground text-right">
-            {formData.bio?.length || 0} / 250
-          </div>
+      {/* Resume */}
+      <div className=" sm:col-span-2">
+        <ResumeInput
+          label="Professional Resume"
+          value={resumeUrl}
+          onChange={onResumeChange}
+          onDelete={onResumeDelete}
+          accept=".pdf,.doc,.docx"
+          fileInfo={fileInfo || undefined}
+        />
+      </div>
+
+      {/* Bio */}
+      <div className="space-y-2 sm:col-span-2">
+        <Label htmlFor="bio">Bio</Label>
+        <Textarea
+          id="bio"
+          name="bio"
+          className="max-h-[80px] overflow-y-auto"
+          value={formData.bio || ""}
+          onChange={(e) =>
+            setFormData((prev) => ({
+              ...prev,
+              bio: e.target.value.slice(0, 250),
+            }))
+          }
+          placeholder="Tell us about yourself"
+          rows={4}
+        />
+        <div className="text-sm text-muted-foreground text-right">
+          {formData.bio?.length || 0} / 250
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
 }
 

@@ -435,20 +435,31 @@ export default function SettingsPage() {
             </Alert>
           )}
 
-          <ProfileSetupForm
-            formData={formData}
-            setFormData={setFormData}
-            selectedIndustries={selectedIndustries}
-            setSelectedIndustries={setSelectedIndustries}
-            handleAvatarChange={handleAvatarChange}
-            handleDeleteAvatar={handleDeleteAvatar}
-            handleContactChange={handleContactChange}
-            handleChange={handleChange}
-            resumeUrl={formData.resume_url || null}
-            fileInfo={resumeFileInfo || undefined}
-            onResumeChange={handleResumeChange}
-            onResumeDelete={handleResumeDelete}
-          />
+          <Card className="w-full max-w-5xl border-0 md:border shadow-none md:shadow">
+            <CardHeader>
+              <CardTitle>Personal & Professional Information</CardTitle>
+              <CardDescription>
+                Update your personal & professional details and links
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <ProfileSetupForm
+                formData={formData}
+                setFormData={setFormData}
+                selectedIndustries={selectedIndustries}
+                setSelectedIndustries={setSelectedIndustries}
+                handleAvatarChange={handleAvatarChange}
+                handleDeleteAvatar={handleDeleteAvatar}
+                handleContactChange={handleContactChange}
+                handleChange={handleChange}
+                resumeUrl={formData.resume_url || null}
+                fileInfo={resumeFileInfo || undefined}
+                onResumeChange={handleResumeChange}
+                onResumeDelete={handleResumeDelete}
+              />
+            </CardContent>
+          </Card>
 
           <Card className="border-0 md:border shadow-none md:shadow">
             <CardHeader>
@@ -541,25 +552,6 @@ export default function SettingsPage() {
                 />
               </div>
 
-              {/* The platform does not have any followers so far */}
-
-              {/* <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>New Followers</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications when someone follows you
-                  </p>
-                </div>
-                <Switch
-                  checked={emailNotifications.newFollowers}
-                  onCheckedChange={(checked) =>
-                    setEmailNotifications((prev) => ({
-                      ...prev,
-                      newFollowers: checked,
-                    }))
-                  }
-                />
-              </div> */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Marketing Updates</Label>

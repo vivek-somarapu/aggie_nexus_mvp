@@ -459,7 +459,7 @@ export default function ProfileSetupPage() {
                 />
               </motion.div>
 
-              <div className="relative z-10 w-full max-w-3xl">
+              <div className="relative z-10 w-full max-w-4xl">
                 {currentStep === 1 && (
                   <>
                     <motion.div
@@ -485,20 +485,55 @@ export default function ProfileSetupPage() {
                       </Alert>
                     </motion.div>
 
-                    <ProfileSetupForm
-                      formData={formData}
-                      setFormData={setFormData}
-                      selectedIndustries={selectedIndustries}
-                      setSelectedIndustries={setSelectedIndustries}
-                      handleAvatarChange={handleAvatarChange}
-                      handleDeleteAvatar={handleDeleteAvatar}
-                      handleContactChange={handleContactChange}
-                      handleChange={handleChange}
-                      resumeUrl={formData.resume_url || null}
-                      fileInfo={resumeFileInfo || undefined}
-                      onResumeChange={handleResumeChange}
-                      onResumeDelete={handleResumeDelete}
-                    />
+                    <Card className="w-full max-w-5xl border-0 md:border shadow-none md:shadow">
+                      <CardHeader>
+                        <CardTitle>
+                          Personal & Professional Information
+                        </CardTitle>
+                        <CardDescription>
+                          Update your personal & professional details and links
+                        </CardDescription>
+                      </CardHeader>
+
+                      <CardContent className="space-y-4">
+                        <ProfileSetupForm
+                          formData={formData}
+                          setFormData={setFormData}
+                          selectedIndustries={selectedIndustries}
+                          setSelectedIndustries={setSelectedIndustries}
+                          handleAvatarChange={handleAvatarChange}
+                          handleDeleteAvatar={handleDeleteAvatar}
+                          handleContactChange={handleContactChange}
+                          handleChange={handleChange}
+                          resumeUrl={formData.resume_url || null}
+                          fileInfo={resumeFileInfo || undefined}
+                          onResumeChange={handleResumeChange}
+                          onResumeDelete={handleResumeDelete}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <Label>Industries</Label>
+                            <TagSelector
+                              label="Industries"
+                              options={industryOptions}
+                              selected={selectedIndustries}
+                              onChange={setSelectedIndustries}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Skills</Label>
+                            <TagSelector
+                              label="Skills"
+                              options={skillOptions}
+                              selected={selectedSkills}
+                              onChange={setSelectedSkills}
+                              maxTags={15}
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
                     <div className="flex justify-between mt-2">
                       <Button variant="outline" onClick={skipToHome}>
                         Skip for now
@@ -516,211 +551,161 @@ export default function ProfileSetupPage() {
                 {/* Step 2 */}
                 {currentStep === 2 && (
                   <>
-                    <Card className="w-full">
+                    <Card className="w-full mx-auto">
                       <CardHeader>
-                        <CardTitle>Skills & Industries</CardTitle>
+                        <CardTitle>Review Your Profile</CardTitle>
                         <CardDescription>
-                          Select your skills and industries of interest
+                          Make sure everything looks good
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label>Industries</Label>
-                          <TagSelector
-                            label="Industries"
-                            options={industryOptions}
-                            selected={selectedIndustries}
-                            onChange={setSelectedIndustries}
-                          />
+                      <CardContent className="space-y-4 pt-1 max-h-[60vh] overflow-y-auto">
+                        {error && (
+                          <Alert variant="destructive">
+                            <AlertDescription>{error}</AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div className="flex items-start gap-6">
+                          {/* Avatar */}
+                          <div className="flex-1 flex justify-center">
+                            <div className="shrink-0">
+                              <ProfileAvatar
+                                avatar={formData.avatar}
+                                fullName={formData.full_name}
+                                is_texas_am_affiliate={
+                                  formData.is_texas_am_affiliate
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          {/* Name / Email / Affiliation */}
+                          <div className="flex-1 flex flex-col gap-3">
+                            <div className="">
+                              <p className="text-sm font-medium">Name</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formData.full_name}
+                              </p>
+                            </div>
+                            <div className="">
+                              <p className="text-sm font-medium">Email</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formData.email}
+                              </p>
+                            </div>
+                            <div className="">
+                              <p className="text-sm font-medium">
+                                Texas A&M Affiliate
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {formData.is_texas_am_affiliate ? "Yes" : "No"}
+                                {formData.is_texas_am_affiliate &&
+                                formData.graduation_year
+                                  ? ` - ${formData.graduation_year}`
+                                  : ""}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* LinkedIn / Website */}
+                          <div className="flex-1 flex flex-col gap-3">
+                            {formData.linkedin_url && (
+                              <div className="">
+                                <p className="text-sm font-medium">LinkedIn</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {formData.linkedin_url}
+                                </p>
+                              </div>
+                            )}
+                            {formData.website_url && (
+                              <div className="">
+                                <p className="text-sm font-medium">Website</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {formData.website_url}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label>Skills</Label>
-                          <TagSelector
-                            label="Skills"
-                            options={skillOptions}
-                            selected={selectedSkills}
-                            onChange={setSelectedSkills}
-                            maxTags={15}
-                          />
+
+                        {/* Skills and industries */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {selectedIndustries.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">Industries</p>
+                              <motion.div
+                                className="flex flex-wrap gap-2 mt-2"
+                                variants={containerVariants}
+                              >
+                                {selectedIndustries.map((tag) => (
+                                  <motion.div key={tag} variants={itemVariants}>
+                                    <Badge
+                                      variant="secondary"
+                                      className="px-2 py-1"
+                                    >
+                                      {tag}
+                                    </Badge>
+                                  </motion.div>
+                                ))}
+                              </motion.div>
+                            </div>
+                          )}
+
+                          {selectedSkills.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">Skills</p>
+                              <motion.div
+                                className="flex flex-wrap gap-2 mt-2"
+                                variants={containerVariants}
+                              >
+                                {selectedSkills.map((tag) => (
+                                  <motion.div key={tag} variants={itemVariants}>
+                                    <Badge
+                                      variant="secondary"
+                                      className="px-2 py-1"
+                                    >
+                                      {tag}
+                                    </Badge>
+                                  </motion.div>
+                                ))}
+                              </motion.div>
+                            </div>
+                          )}
                         </div>
+
+                        {/* Bio */}
+                        {formData.bio && (
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Bio</p>
+                            <p className="text-sm text-muted-foreground break-words max-w-full">
+                              {formData.bio}
+                            </p>
+                          </div>
+                        )}
                       </CardContent>
+
+                      <CardFooter className="flex justify-between mt-2">
+                        <Button variant="outline" onClick={prevStep}>
+                          <ChevronLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                        <Button
+                          onClick={handleSaveProfile}
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-2 h-4 w-4" /> Complete Setup
+                            </>
+                          )}
+                        </Button>
+                      </CardFooter>
                     </Card>
-
-                    <div className="flex justify-between gap-4 mt-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setCurrentStep(1)}
-                      >
-                        <ChevronLeft className="mr-2 h-4 w-4" /> Back
-                      </Button>
-
-                      <Button
-                        onClick={() => setCurrentStep(3)}
-                        disabled={isSaving}
-                      >
-                        Next Step
-                        <ChevronRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </div>
                   </>
-                )}
-
-                {/* Steps 3 */}
-                {currentStep === 3 && (
-                  <Card className="w-full mx-auto">
-                    <CardHeader>
-                      <CardTitle>Review Your Profile</CardTitle>
-                      <CardDescription>
-                        Make sure everything looks good
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-1 max-h-[60vh] overflow-y-auto">
-                      {error && (
-                        <Alert variant="destructive">
-                          <AlertDescription>{error}</AlertDescription>
-                        </Alert>
-                      )}
-
-                      <div className="flex items-start gap-6">
-                        {/* Avatar */}
-                        <div className="flex-1 flex justify-center">
-                          <div className="shrink-0">
-                            <ProfileAvatar
-                              avatar={formData.avatar}
-                              fullName={formData.full_name}
-                              is_texas_am_affiliate={
-                                formData.is_texas_am_affiliate
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        {/* Name / Email / Affiliation */}
-                        <div className="flex-1 flex flex-col gap-3">
-                          <div className="">
-                            <p className="text-sm font-medium">Name</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formData.full_name}
-                            </p>
-                          </div>
-                          <div className="">
-                            <p className="text-sm font-medium">Email</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formData.email}
-                            </p>
-                          </div>
-                          <div className="">
-                            <p className="text-sm font-medium">
-                              Texas A&M Affiliate
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {formData.is_texas_am_affiliate ? "Yes" : "No"}
-                              {formData.is_texas_am_affiliate &&
-                              formData.graduation_year
-                                ? ` - ${formData.graduation_year}`
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* LinkedIn / Website */}
-                        <div className="flex-1 flex flex-col gap-3">
-                          {formData.linkedin_url && (
-                            <div className="">
-                              <p className="text-sm font-medium">LinkedIn</p>
-                              <p className="text-sm text-muted-foreground">
-                                {formData.linkedin_url}
-                              </p>
-                            </div>
-                          )}
-                          {formData.website_url && (
-                            <div className="">
-                              <p className="text-sm font-medium">Website</p>
-                              <p className="text-sm text-muted-foreground">
-                                {formData.website_url}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Skills and industries */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {selectedIndustries.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium">Industries</p>
-                            <motion.div
-                              className="flex flex-wrap gap-2 mt-2"
-                              variants={containerVariants}
-                            >
-                              {selectedIndustries.map((tag) => (
-                                <motion.div key={tag} variants={itemVariants}>
-                                  <Badge
-                                    variant="secondary"
-                                    className="px-2 py-1"
-                                  >
-                                    {tag}
-                                  </Badge>
-                                </motion.div>
-                              ))}
-                            </motion.div>
-                          </div>
-                        )}
-
-                        {selectedSkills.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium">Skills</p>
-                            <motion.div
-                              className="flex flex-wrap gap-2 mt-2"
-                              variants={containerVariants}
-                            >
-                              {selectedSkills.map((tag) => (
-                                <motion.div key={tag} variants={itemVariants}>
-                                  <Badge
-                                    variant="secondary"
-                                    className="px-2 py-1"
-                                  >
-                                    {tag}
-                                  </Badge>
-                                </motion.div>
-                              ))}
-                            </motion.div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Bio */}
-                      {formData.bio && (
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">Bio</p>
-                          <p className="text-sm text-muted-foreground break-words max-w-full">
-                            {formData.bio}
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-
-                    <CardFooter className="flex justify-between mt-2">
-                      <Button variant="outline" onClick={prevStep}>
-                        <ChevronLeft className="mr-2 h-4 w-4" /> Back
-                      </Button>
-                      <Button
-                        onClick={handleSaveProfile}
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Check className="mr-2 h-4 w-4" /> Complete Setup
-                          </>
-                        )}
-                      </Button>
-                    </CardFooter>
-                  </Card>
                 )}
               </div>
             </motion.div>
