@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,10 +16,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   LogOut,
-  Menu,
   Settings,
   User as UserIcon,
   Calendar,
@@ -32,9 +31,12 @@ import { inquiryService } from "@/lib/services/inquiry-service";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { authUser, profile, signOut, isLoading, isManager } = useAuth();
   const [pendingInquiries, setPendingInquiries] = useState(0);
+  const [openNavigation, setOpenNavigation] = useState(false);
+  const toggleNavigation = () => {
+    setOpenNavigation(!openNavigation);
+  };
 
   // Load pending inquiries
   useEffect(() => {
@@ -81,81 +83,93 @@ export default function Navbar() {
   // While auth state is resolving, render nothing (or a spinner)
   if (isLoading) return null;
 
-  // GUEST navbar
-  if (!authUser) {
-    return (
-      <header className="sticky py-3 px-4 top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
-        <div className="flex h-14 items-center px-4">
-          <Link href="/" className="flex-1 flex items-center">
-            {/* logo */}
-            <img
-              src="/images/AggieNexus_LogoHorizontal.png"
-              alt="Aggie Nexus"
-              width={120}
-              height={30}
-              className="object-contain"
-            />
-          </Link>
-          <nav className="flex-1 flex justify-center">
-            <Link
-              href="/calendar"
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-md hover:text-primary",
-                pathname === "/calendar" && "bg-accent text-accent-foreground"
-              )}
-            >
-              Calendar
-            </Link>
-          </nav>
-          <div className="flex-1 flex justify-end space-x-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/auth/login">Log in</Link>
-            </Button>
-            <Button variant="default" size="sm" asChild>
-              <Link href="/auth/signup">Sign up</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
   // AUTHENTICATED navbar
   return (
-    <header className="sticky py-3 px-4 top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 w-full items-center px-4">
-        <div className="flex flex-1 items-center justify-between md:justify-start">
-          {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="pr-0">
-              <nav className="grid gap-6 text-lg font-medium">
-                <Link href="/" className="flex items-center gap-2">
-                  <img
-                    src="/images/logo_png_white.png"
-                    alt="Aggie Nexus"
-                    width="110"
-                    height="28"
-                    className="object-contain dark:block hidden"
-                  />
-                  <img
-                    src="/images/AggieNexus_LogoHorizontal.png"
-                    alt="Aggie Nexus"
-                    width="110"
-                    height="28"
-                    className="object-contain dark:hidden block"
-                  />
-                </Link>
+    <>
+      <div className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-3">
+        <div className="flex w-full items-center justify-between px-4">
+          {/* Left: Logo + menu */}
+          <div className="flex items-center gap-4">
+            {/* Menu Button (mobile only) */}
+            <button
+              className="flex items-center justify-center w-10 h-10 md:hidden"
+              onClick={toggleNavigation}
+            >
+              <svg
+                className="overflow-visible"
+                width="20"
+                height="20"
+                viewBox="0 0 20 12"
+              >
+                <rect
+                  style={{
+                    transformBox: "fill-box",
+                    transformOrigin: "center",
+                  }}
+                  className={`transform transition-transform ${
+                    openNavigation ? "rotate-45 translate-y-2" : ""
+                  }`}
+                  y="0"
+                  width="20"
+                  height="2"
+                  rx="1"
+                />
+                <rect
+                  style={{
+                    transformBox: "fill-box",
+                    transformOrigin: "center",
+                  }}
+                  className={`transform transition-transform ${
+                    openNavigation ? "-rotate-45 -translate-y-0.5" : ""
+                  }`}
+                  y="10"
+                  width="20"
+                  height="2"
+                  rx="1"
+                />
+              </svg>
+            </button>
+
+            {/* Logo */}
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/images/logo_png_white.png"
+                alt="Aggie Nexus"
+                width={120}
+                height={30}
+                priority
+                className="object-contain dark:block hidden"
+              />
+              <Image
+                src="/images/AggieNexus_LogoHorizontal.png"
+                alt="Aggie Nexus"
+                width={120}
+                height={30}
+                priority
+                className="object-contain dark:hidden block"
+              />
+            </Link>
+          </div>
+
+          {/* Center: Nav (only visible on md+) */}
+          {!authUser ? (
+            // Unauthenticated view — just show Calendar
+            <nav className="absolute left-1/2 transform -translate-x-1/2 hidden md:block">
+              <Link
+                href="/calendar"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                Calendar
+              </Link>
+            </nav>
+          ) : (
+            // Authenticated view — full nav
+            <nav className="absolute left-1/2 transform -translate-x-1/2 hidden md:block">
+              <ul className="flex gap-6">
                 {routes.map((route) => {
                   const isActive =
                     pathname === route.href ||
                     pathname.startsWith(route.href + "/");
-
                   return (
                     <li key={route.href}>
                       <Link
@@ -172,168 +186,227 @@ export default function Navbar() {
                     </li>
                   );
                 })}
-              </nav>
-            </SheetContent>
-          </Sheet>
+              </ul>
+            </nav>
+          )}
 
-          {/* Logo */}
-          <Link href="/" className="flex items-center">
-            <img
-              src="/images/logo_png_white.png"
-              alt="Aggie Nexus"
-              width="120"
-              height="30"
-              className="object-contain dark:block hidden"
-            />
-            <img
-              src="/images/AggieNexus_LogoHorizontal.png"
-              alt="Aggie Nexus"
-              width="120"
-              height="30"
-              className="object-contain dark:hidden block"
-            />
-          </Link>
-        </div>
-
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex md:flex-1 md:items-center md:justify-center">
-          <ul className="flex items-center space-x-1">
-            {routes.map((route) => {
-              const isActive =
-                pathname === route.href ||
-                pathname.startsWith(route.href + "/");
-
-              return (
-                <li key={route.href}>
-                  <Link
-                    href={route.href}
-                    className={cn(
-                      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
-                      isActive
-                        ? "bg-accent text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    )}
-                  >
-                    {route.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        {/* Right Side Actions */}
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="hidden md:inline-flex bg-[#500000] text-white hover:bg-[#500000]/90 hover:text-white"
-          >
-            <Link href="/projects/new">Create Project</Link>
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          {/* Right Side */}
+          {!authUser ? (
+            // Unauthenticated view
+            <div className="flex-1 flex justify-end space-x-4">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/auth/login">Log in</Link>
+              </Button>
+              <Button variant="default" size="sm" asChild>
+                <Link href="/auth/signup">Sign up</Link>
+              </Button>
+            </div>
+          ) : (
+            // Authenticated view
+            <div className="flex flex-1 items-center justify-end space-x-4">
               <Button
                 variant="ghost"
-                size="icon"
-                className="relative h-8 w-8 rounded-full"
+                size="sm"
+                asChild
+                className="hidden md:inline-flex bg-[#500000] text-white hover:bg-[#500000]/90 hover:text-white"
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={profile?.avatar || ""}
-                    alt={profile?.full_name || ""}
-                  />
-                  <AvatarFallback>
-                    {profile?.full_name ? (
-                      profile.full_name.charAt(0)
-                    ) : (
-                      <UserIcon className="h-4 w-4" />
-                    )}
-                  </AvatarFallback>
-                </Avatar>
+                <Link href="/projects/new">Create Project</Link>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {profile?.full_name || ""}
-                  </p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {authUser?.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/profile" className="cursor-pointer">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  Profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/profile/settings" className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </Link>
-              </DropdownMenuItem>
-              {/* Project Inquiries for all users - now in profile page */}
-              <DropdownMenuItem asChild>
-                <Link
-                  href="/profile?tab=inquiries"
-                  className="cursor-pointer flex items-center justify-between"
-                >
-                  <div className="flex items-center">
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Project Inquiries
-                  </div>
-                  {pendingInquiries > 0 && (
-                    <Badge
-                      variant="destructive"
-                      className="ml-2 px-1 py-0 h-5 min-w-5 flex items-center justify-center rounded-full"
-                    >
-                      {pendingInquiries}
-                    </Badge>
-                  )}
-                </Link>
-              </DropdownMenuItem>
-              {isManager && (
-                <>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative h-8 w-8 rounded-full"
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage
+                        src={profile?.avatar || ""}
+                        alt={profile?.full_name || ""}
+                      />
+                      <AvatarFallback>
+                        {profile?.full_name ? (
+                          profile.full_name.charAt(0)
+                        ) : (
+                          <UserIcon className="h-4 w-4" />
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {profile?.full_name || ""}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {authUser?.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/manager/events" className="cursor-pointer">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Event Management
+                    <Link href="/profile" className="cursor-pointer">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      Profile
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/manager/users" className="cursor-pointer">
-                      <Users className="mr-2 h-4 w-4" />
-                      User Management
+                    <Link href="/profile/settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/manager/projects" className="cursor-pointer">
-                      <FileText className="mr-2 h-4 w-4" />
-                      Project Management
+                    <Link
+                      href="/profile?tab=inquiries"
+                      className="cursor-pointer flex items-center justify-between"
+                    >
+                      <div className="flex items-center">
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Project Inquiries
+                      </div>
+                      {pendingInquiries > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="ml-2 px-1 py-0 h-5 min-w-5 flex items-center justify-center rounded-full"
+                        >
+                          {pendingInquiries}
+                        </Badge>
+                      )}
                     </Link>
                   </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={handleLogout}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  {isManager && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/manager/events" className="cursor-pointer">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Event Management
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/manager/users" className="cursor-pointer">
+                          <Users className="mr-2 h-4 w-4" />
+                          User Management
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/manager/projects"
+                          className="cursor-pointer"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Project Management
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </div>
-    </header>
+      {/* Mobile Nav Dropdown (Full Screen) */}
+      {openNavigation && (
+        <div className="fixed inset-0 z-40 bg-white dark:bg-dark md:hidden flex flex-col">
+          {/* Optional: keep a close button in the overlay itself */}
+          <button
+            onClick={toggleNavigation}
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center"
+          >
+            {/* reuse the same SVG or swap to a plain “X” */}
+            <svg width="20" height="20" viewBox="0 0 20 20">
+              <line
+                x1="0"
+                y1="0"
+                x2="20"
+                y2="20"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <line
+                x1="20"
+                y1="0"
+                x2="0"
+                y2="20"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+            </svg>
+          </button>
+
+          {/* centre your links */}
+          <nav className="flex flex-1 items-center justify-center">
+            <ul className="list-none flex flex-col items-center gap-8 text-lg">
+              {!authUser ? (
+                // Show only Calendar when not signed in
+                <li key="/calendar">
+                  <Link
+                    href="/calendar"
+                    className={cn(
+                      "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      pathname === "/calendar" &&
+                        "bg-accent text-accent-foreground"
+                    )}
+                    onClick={() => setOpenNavigation(false)}
+                  >
+                    Calendar
+                  </Link>
+                </li>
+              ) : (
+                <>
+                  {/* Authenticated view: Create Project + all routes */}
+                  <li key="create-project">
+                    <Link
+                      href="/projects/new"
+                      className={cn(
+                        "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      )}
+                      onClick={() => setOpenNavigation(false)}
+                    >
+                      Create Project
+                    </Link>
+                  </li>
+
+                  {routes.map((route) => {
+                    const isActive =
+                      pathname === route.href ||
+                      pathname.startsWith(route.href + "/");
+                    return (
+                      <li key={route.href}>
+                        <Link
+                          href={route.href}
+                          className={cn(
+                            "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1",
+                            isActive
+                              ? "bg-accent text-accent-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          )}
+                          onClick={() => setOpenNavigation(false)}
+                        >
+                          {route.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </>
+              )}
+            </ul>
+          </nav>
+        </div>
+      )}
+    </>
   );
 }

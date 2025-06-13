@@ -2,7 +2,6 @@
 
 import { ProfileSetupForm } from "@/components/profile/profile-card";
 import { TagSelector } from "@/components/profile/tag-selector";
-import { type TexasAMAffiliationData } from "@/components/profile/tamu-affiliate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -28,7 +27,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth";
 import { industryOptions, skillOptions } from "@/lib/constants";
-import { profileSetupStatus } from "@/lib/profile-utils";
 import { userService } from "@/lib/services/user-service";
 import {
   AlertTriangle,
@@ -61,7 +59,7 @@ export default function SettingsPage() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success] = useState<string | null>(null);
 
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -81,6 +79,7 @@ export default function SettingsPage() {
     graduation_year: undefined as number | undefined,
     avatar: "",
     resume_url: "",
+    additional_links: [] as { url: string; title: string }[],
   });
 
   const [emailNotifications, setEmailNotifications] = useState({
@@ -118,6 +117,7 @@ export default function SettingsPage() {
         email: profile.contact?.email || profile.email || "",
         phone: profile.contact?.phone || "",
       },
+      additional_links: profile.additional_links || [],
     });
 
     setSelectedSkills(profile.skills || []);
@@ -165,7 +165,12 @@ export default function SettingsPage() {
       if (pendingResumeFile) {
         resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
       }
-      // 3) collect form data
+      // 3) clean up additional links
+      const cleanedLinks = (formData.additional_links || []).filter(
+        (link) => link.url.trim() !== ""
+      );
+
+      // 4) collect form data
       const payload = {
         full_name: formData.full_name.trim(),
         bio: formData.bio.trim(),
@@ -178,6 +183,7 @@ export default function SettingsPage() {
         industry: selectedIndustries,
         skills: selectedSkills,
         contact: formData.contact,
+        additional_links: cleanedLinks,
       };
 
       // 4) update user profile
@@ -197,8 +203,9 @@ export default function SettingsPage() {
       setIsSaving(false);
     }
   };
+
   /* -------------------------------------------------
-   Helpers that talk to the new API route
+  Helpers that talk to the new API route
 --------------------------------------------------*/
   async function uploadToBucket(
     bucket: "avatars" | "resumes",
@@ -234,7 +241,7 @@ export default function SettingsPage() {
   }
 
   /* -------------------------------------------------
- Avatar upload  (POST)
+  Avatar upload  (POST)
 --------------------------------------------------*/
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -248,7 +255,7 @@ export default function SettingsPage() {
   };
 
   /* -------------------------------------------------
- Résumé upload  (POST)
+  Résumé upload  (POST)
 --------------------------------------------------*/
   const handleResumeChange = (file: File | null) => {
     if (file) {
@@ -265,7 +272,7 @@ export default function SettingsPage() {
   };
 
   /* -------------------------------------------------
- Avatar delete  (DELETE)
+    Avatar delete  (DELETE)
 --------------------------------------------------*/
   const handleDeleteAvatar = async () => {
     if (pendingAvatarFile) {
@@ -292,7 +299,7 @@ export default function SettingsPage() {
   };
 
   /* -------------------------------------------------
- Résumé delete  (DELETE)
+  Résumé delete  (DELETE)
 --------------------------------------------------*/
   const handleResumeDelete = async () => {
     if (pendingResumeFile) {
@@ -428,20 +435,31 @@ export default function SettingsPage() {
             </Alert>
           )}
 
-          <ProfileSetupForm
-            formData={formData}
-            setFormData={setFormData}
-            selectedIndustries={selectedIndustries}
-            setSelectedIndustries={setSelectedIndustries}
-            handleAvatarChange={handleAvatarChange}
-            handleDeleteAvatar={handleDeleteAvatar}
-            handleContactChange={handleContactChange}
-            handleChange={handleChange}
-            resumeUrl={formData.resume_url || null}
-            fileInfo={resumeFileInfo || undefined}
-            onResumeChange={handleResumeChange}
-            onResumeDelete={handleResumeDelete}
-          />
+          <Card className="w-full max-w-5xl border-0 md:border shadow-none md:shadow">
+            <CardHeader>
+              <CardTitle>Personal & Professional Information</CardTitle>
+              <CardDescription>
+                Update your personal & professional details and links
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <ProfileSetupForm
+                formData={formData}
+                setFormData={setFormData}
+                selectedIndustries={selectedIndustries}
+                setSelectedIndustries={setSelectedIndustries}
+                handleAvatarChange={handleAvatarChange}
+                handleDeleteAvatar={handleDeleteAvatar}
+                handleContactChange={handleContactChange}
+                handleChange={handleChange}
+                resumeUrl={formData.resume_url || null}
+                fileInfo={resumeFileInfo || undefined}
+                onResumeChange={handleResumeChange}
+                onResumeDelete={handleResumeDelete}
+              />
+            </CardContent>
+          </Card>
 
           <Card className="border-0 md:border shadow-none md:shadow">
             <CardHeader>
@@ -534,25 +552,6 @@ export default function SettingsPage() {
                 />
               </div>
 
-              {/* The platform does not have any followers so far */}
-
-              {/* <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>New Followers</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications when someone follows you
-                  </p>
-                </div>
-                <Switch
-                  checked={emailNotifications.newFollowers}
-                  onCheckedChange={(checked) =>
-                    setEmailNotifications((prev) => ({
-                      ...prev,
-                      newFollowers: checked,
-                    }))
-                  }
-                />
-              </div> */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Marketing Updates</Label>

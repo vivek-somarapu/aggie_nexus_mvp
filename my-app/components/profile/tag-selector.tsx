@@ -32,6 +32,11 @@ export function TagSelector({
   const [customInput, setCustomInput] = useState("");
 
   const initialTags = selected.map((item) => ({ id: item, label: item }));
+  const shadowVariants = [
+    "hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]", //   #1fa04e
+    "hover:shadow-[0_0_6px_2px_rgba(140,10,4,0.30)]", //   #8c0a04
+    "hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]", //     #2573fa
+  ];
 
   const { tags, addTag, removeTag } = useTags({
     defaultTags: initialTags,
@@ -104,10 +109,12 @@ export function TagSelector({
 
         <Button
           type="button"
+          variant="default"
+          className="bg-[#1fa04e]"
           onClick={handleCustomAdd}
           disabled={!customInput.trim() || tags.length >= maxTags}
         >
-          <Plus />
+          <Plus className="white" />
         </Button>
       </div>
 
@@ -119,17 +126,26 @@ export function TagSelector({
         </p>
 
         <div className="flex flex-wrap">
-          {availableOptions.map((item) => (
-            <Badge
-              key={item}
-              className="m-1 px-2 py-1 cursor-pointer hover:bg-muted"
-              variant="outline"
-              onClick={() => handleTagSelect(item)}
-            >
-              <span>{item}</span>
-              <Plus className="w-3 h-3 ml-2" />
-            </Badge>
-          ))}
+          {availableOptions.map((item) => {
+            // random shadow color of badges on hover
+            const randomShadow =
+              shadowVariants[Math.floor(Math.random() * shadowVariants.length)];
+
+            return (
+              <Badge
+                key={item}
+                onClick={() => handleTagSelect(item)}
+                className={cn(
+                  "m-1 px-2 py-1 cursor-pointer transition-shadow duration-200",
+                  randomShadow
+                )}
+                variant="outline"
+              >
+                <span>{item}</span>
+                <X className="w-3 h-3 ml-2" />
+              </Badge>
+            );
+          })}
         </div>
       </div>
 
