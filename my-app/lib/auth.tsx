@@ -50,6 +50,7 @@ export type Profile = {
   profile_setup_skipped_at?: string;
   last_login_at?: string;
   is_manager?: boolean;
+  additional_links?: { url: string; title: string }[];
 };
 
 // Define auth context type
@@ -179,11 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth
       .getUser()
       .then(
-        async ({
-          data: { user },
-        }: {
-          data: { user: SupabaseUser | null };
-        }) => {
+        async ({ data: { user } }: { data: { user: SupabaseUser | null } }) => {
           clearTimeout(timeoutId);
           console.log("AUTH: User check complete", !!user);
 

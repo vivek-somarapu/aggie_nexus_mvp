@@ -129,6 +129,7 @@ export default function ProfilePage() {
     industry: [] as string[],
     resume_url: "",
     contact: { email: "", phone: "" } as { email: string; phone: string },
+    additional_links: [] as { url: string; title: string }[],
   });
 
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
@@ -164,6 +165,7 @@ export default function ProfilePage() {
         email: profile.contact?.email || profile.email || "",
         phone: profile.contact?.phone || "",
       },
+      additional_links: profile.additional_links || [],
     });
 
     setSelectedSkills(profile.skills || []);
@@ -352,7 +354,12 @@ export default function ProfilePage() {
       if (pendingResumeFile) {
         resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
       }
-      // 3) collect form data
+      // 3) clean up additional links
+      const cleanedLinks = (formData.additional_links || []).filter(
+        (link) => link.url.trim() !== ""
+      );
+
+      // 4) collect form data
       const payload = {
         full_name: formData.full_name.trim(),
         bio: formData.bio.trim(),
@@ -365,6 +372,7 @@ export default function ProfilePage() {
         industry: selectedIndustries,
         skills: selectedSkills,
         contact: formData.contact,
+        additional_links: cleanedLinks,
       };
 
       // 4) update user profile
@@ -385,7 +393,7 @@ export default function ProfilePage() {
   };
 
   /* -------------------------------------------------
-   Helpers that talk to the new API route
+  Helpers that talk to the new API route
 --------------------------------------------------*/
   async function uploadToBucket(
     bucket: "avatars" | "resumes",
@@ -421,7 +429,7 @@ export default function ProfilePage() {
   }
 
   /* -------------------------------------------------
-   Avatar upload  (POST)
+  Avatar upload  (POST)
 --------------------------------------------------*/
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -435,7 +443,7 @@ export default function ProfilePage() {
   };
 
   /* -------------------------------------------------
-   Résumé upload  (POST)
+  Résumé upload  (POST)
 --------------------------------------------------*/
   const handleResumeChange = (file: File | null) => {
     if (file) {
@@ -452,7 +460,7 @@ export default function ProfilePage() {
   };
 
   /* -------------------------------------------------
-   Avatar delete  (DELETE)
+  Avatar delete  (DELETE)
 --------------------------------------------------*/
   const handleDeleteAvatar = async () => {
     if (pendingAvatarFile) {
@@ -479,7 +487,7 @@ export default function ProfilePage() {
   };
 
   /* -------------------------------------------------
-   Résumé delete  (DELETE)
+  Résumé delete  (DELETE)
 --------------------------------------------------*/
   const handleResumeDelete = async () => {
     if (pendingResumeFile) {
@@ -613,8 +621,9 @@ export default function ProfilePage() {
                         No projects yet
                       </h3>
                       <p className="text-muted-foreground mb-4">
-                        You haven't created any projects yet. Get started by
-                        creating your first project.
+                        {
+                          "You haven't created any projects yet. Get started by creating your first project."
+                        }
                       </p>
                       <motion.div
                         whileHover={{ scale: 1.05 }}

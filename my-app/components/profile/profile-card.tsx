@@ -9,6 +9,7 @@ import {
   TexasAMAffiliation,
   type TexasAMAffiliationData,
 } from "@/components/profile/tamu-affiliate";
+import AdditionalLinks from "@/components/profile/additional-links";
 import { Profile as ProfileType } from "@/lib/auth";
 import {
   containerVariants,
@@ -33,10 +34,7 @@ import {
   GraduationCap,
   Eye,
   Pencil,
-  Trash2,
-  User,
   Loader2,
-  Download,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +64,7 @@ type MinimalFormData = {
   website_url?: string;
   resume_url?: string;
   bio?: string;
+  additional_links?: { url: string; title: string }[];
 };
 
 /**
@@ -97,8 +96,6 @@ export interface ProfileSetupFormProps<T extends MinimalFormData> {
 export function ProfileSetupForm<T extends MinimalFormData>({
   formData,
   setFormData,
-  selectedIndustries,
-  setSelectedIndustries,
   handleAvatarChange,
   handleDeleteAvatar,
   handleContactChange,
@@ -115,6 +112,9 @@ export function ProfileSetupForm<T extends MinimalFormData>({
       graduation_year: data.graduation_year,
     });
   };
+
+  const additionalLinks = formData.additional_links || [];
+
   return (
     <Card className="w-full border-0 md:border shadow-none md:shadow">
       <CardHeader>
@@ -198,6 +198,18 @@ export function ProfileSetupForm<T extends MinimalFormData>({
               placeholder="https://example.com"
             />
           </div>
+
+          {/* Additional Links */}
+          <AdditionalLinks
+            links={additionalLinks}
+            colsClass="grid-cols-1 md:grid-cols-2"
+            onChangeLinks={(newLinks) =>
+              setFormData({
+                ...formData,
+                additional_links: newLinks,
+              })
+            }
+          />
         </div>
 
         {/* Resume */}
