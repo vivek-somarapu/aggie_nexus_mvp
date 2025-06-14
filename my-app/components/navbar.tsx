@@ -86,13 +86,14 @@ export default function Navbar() {
   // AUTHENTICATED navbar
   return (
     <>
-      <div className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 py-3">
-        <div className="flex w-full items-center justify-between px-4">
+      {/* ---------- TOP BAR ---------- */}
+      <div className="sticky top-0 z-50 w-full border-b bg-background/95 dark:bg-[#0e0e0e]/90 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#262626] px-4 py-3">
+        <div className="flex w-full items-center justify-between px-4 text-muted-foreground dark:text-white">
           {/* Left: Logo + menu */}
           <div className="flex items-center gap-4">
             {/* Menu Button (mobile only) */}
             <button
-              className="flex items-center justify-center w-10 h-10 md:hidden"
+              className="flex items-center justify-center w-10 h-10 md:hidden text-muted-foreground dark:text-white"
               onClick={toggleNavigation}
             >
               <svg
@@ -106,7 +107,7 @@ export default function Navbar() {
                     transformBox: "fill-box",
                     transformOrigin: "center",
                   }}
-                  className={`transform transition-transform ${
+                  className={`transition-transform fill-current ${
                     openNavigation ? "rotate-45 translate-y-2" : ""
                   }`}
                   y="0"
@@ -119,7 +120,7 @@ export default function Navbar() {
                     transformBox: "fill-box",
                     transformOrigin: "center",
                   }}
-                  className={`transform transition-transform ${
+                  className={`transition-transform fill-current ${
                     openNavigation ? "-rotate-45 -translate-y-0.5" : ""
                   }`}
                   y="10"
@@ -151,20 +152,21 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Center: Nav (only visible on md+) */}
+          {/* Center nav (md+) */}
           {!authUser ? (
-            // Unauthenticated view — just show Calendar
-            <nav className="absolute left-1/2 transform -translate-x-1/2 hidden md:block">
+            <nav className="absolute left-1/2 -translate-x-1/2 hidden md:block">
               <Link
                 href="/calendar"
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                className={cn(
+                  "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+                  "text-muted-foreground dark:text-white dark:hover:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground"
+                )}
               >
                 Calendar
               </Link>
             </nav>
           ) : (
-            // Authenticated view — full nav
-            <nav className="absolute left-1/2 transform -translate-x-1/2 hidden md:block">
+            <nav className="absolute left-1/2 -translate-x-1/2 hidden md:block">
               <ul className="flex gap-6">
                 {routes.map((route) => {
                   const isActive =
@@ -175,10 +177,10 @@ export default function Navbar() {
                       <Link
                         href={route.href}
                         className={cn(
-                          "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+                          "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                           isActive
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            ? "bg-accent text-accent-foreground dark:bg-[#262626] dark:text-white"
+                            : "text-muted-foreground dark:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground dark:hover:text-white"
                         )}
                       >
                         {route.label}
@@ -190,9 +192,8 @@ export default function Navbar() {
             </nav>
           )}
 
-          {/* Right Side */}
+          {/* Right side */}
           {!authUser ? (
-            // Unauthenticated view
             <div className="flex-1 flex justify-end space-x-4">
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/auth/login">Log in</Link>
@@ -202,7 +203,6 @@ export default function Navbar() {
               </Button>
             </div>
           ) : (
-            // Authenticated view
             <div className="flex flex-1 items-center justify-end space-x-4">
               <Button
                 variant="ghost"
@@ -218,7 +218,7 @@ export default function Navbar() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-8 w-8 rounded-full"
+                    className="relative h-8 w-8 rounded-full text-muted-foreground dark:text-white"
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarImage
@@ -229,43 +229,49 @@ export default function Navbar() {
                         {profile?.full_name ? (
                           profile.full_name.charAt(0)
                         ) : (
-                          <UserIcon className="h-4 w-4" />
+                          <UserIcon className="h-4 w-4 fill-current dark:text-white" />
                         )}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent
+                  align="end"
+                  className="w-56 dark:text-white"
+                >
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
+                      <p className="text-sm font-medium leading-none dark:text-white">
                         {profile?.full_name || ""}
                       </p>
-                      <p className="text-xs leading-none text-muted-foreground">
+                      <p className="text-xs leading-none text-muted-foreground dark:text-white">
                         {authUser?.email}
                       </p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profile" className="cursor-pointer">
-                      <UserIcon className="mr-2 h-4 w-4" />
+                    <Link href="/profile" className="flex items-center">
+                      <UserIcon className="mr-2 h-4 w-4 fill-current dark:text-white" />
                       Profile
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/profile/settings" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
+                    <Link
+                      href="/profile/settings"
+                      className="flex items-center"
+                    >
+                      <Settings className="mr-2 h-4 w-4 fill-current dark:text-white" />
                       Settings
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link
                       href="/profile?tab=inquiries"
-                      className="cursor-pointer flex items-center justify-between"
+                      className="flex items-center justify-between"
                     >
                       <div className="flex items-center">
-                        <MessageSquare className="mr-2 h-4 w-4" />
+                        <MessageSquare className="mr-2 h-4 w-4 fill-current dark:text-white" />
                         Project Inquiries
                       </div>
                       {pendingInquiries > 0 && (
@@ -282,23 +288,29 @@ export default function Navbar() {
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link href="/manager/events" className="cursor-pointer">
-                          <Calendar className="mr-2 h-4 w-4" />
+                        <Link
+                          href="/manager/events"
+                          className="flex items-center"
+                        >
+                          <Calendar className="mr-2 h-4 w-4 fill-current dark:text-white" />
                           Event Management
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/manager/users" className="cursor-pointer">
-                          <Users className="mr-2 h-4 w-4" />
+                        <Link
+                          href="/manager/users"
+                          className="flex items-center"
+                        >
+                          <Users className="mr-2 h-4 w-4 fill-current dark:text-white" />
                           User Management
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link
                           href="/manager/projects"
-                          className="cursor-pointer"
+                          className="flex items-center"
                         >
-                          <FileText className="mr-2 h-4 w-4" />
+                          <FileText className="mr-2 h-4 w-4 fill-current dark:text-white" />
                           Project Management
                         </Link>
                       </DropdownMenuItem>
@@ -307,9 +319,9 @@ export default function Navbar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className="cursor-pointer"
+                    className="flex items-center cursor-pointer"
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
+                    <LogOut className="mr-2 h-4 w-4 fill-current dark:text-white" />
                     Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -318,22 +330,21 @@ export default function Navbar() {
           )}
         </div>
       </div>
-      {/* Mobile Nav Dropdown (Full Screen) */}
+
+      {/* ---------- MOBILE OVERLAY ---------- */}
       {openNavigation && (
-        <div className="fixed inset-0 z-40 bg-white dark:bg-dark md:hidden flex flex-col">
-          {/* Optional: keep a close button in the overlay itself */}
+        <div className="fixed inset-0 z-40 bg-white dark:bg-[#0e0e0e] md:hidden flex flex-col">
           <button
             onClick={toggleNavigation}
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center"
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-muted-foreground dark:text-white"
           >
-            {/* reuse the same SVG or swap to a plain “X” */}
             <svg width="20" height="20" viewBox="0 0 20 20">
               <line
                 x1="0"
                 y1="0"
                 x2="20"
                 y2="20"
-                stroke="currentColor"
+                className="stroke-current dark:stroke-current"
                 strokeWidth="2"
               />
               <line
@@ -341,24 +352,23 @@ export default function Navbar() {
                 y1="0"
                 x2="0"
                 y2="20"
-                stroke="currentColor"
+                className="stroke-current dark:stroke-current"
                 strokeWidth="2"
               />
             </svg>
           </button>
 
-          {/* centre your links */}
           <nav className="flex flex-1 items-center justify-center">
-            <ul className="list-none flex flex-col items-center gap-8 text-lg">
+            <ul className="flex flex-col items-center gap-8 text-lg">
               {!authUser ? (
-                // Show only Calendar when not signed in
                 <li key="/calendar">
                   <Link
                     href="/calendar"
                     className={cn(
-                      "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      pathname === "/calendar" &&
-                        "bg-accent text-accent-foreground"
+                      "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1",
+                      pathname === "/calendar"
+                        ? "bg-accent text-accent-foreground dark:bg-[#262626] dark:text-white"
+                        : "text-muted-foreground dark:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground dark:hover:text-white"
                     )}
                     onClick={() => setOpenNavigation(false)}
                   >
@@ -367,19 +377,18 @@ export default function Navbar() {
                 </li>
               ) : (
                 <>
-                  {/* Authenticated view: Create Project + all routes */}
                   <li key="create-project">
                     <Link
                       href="/projects/new"
                       className={cn(
-                        "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        "px-6 py-3 rounded-md font-medium transition-colors",
+                        "text-muted-foreground dark:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground dark:hover:text-white"
                       )}
                       onClick={() => setOpenNavigation(false)}
                     >
                       Create Project
                     </Link>
                   </li>
-
                   {routes.map((route) => {
                     const isActive =
                       pathname === route.href ||
@@ -389,10 +398,10 @@ export default function Navbar() {
                         <Link
                           href={route.href}
                           className={cn(
-                            "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1",
+                            "px-6 py-3 rounded-md font-medium transition-colors focus:outline-none focus:ring-1",
                             isActive
-                              ? "bg-accent text-accent-foreground"
-                              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                              ? "bg-accent text-accent-foreground dark:bg-[#262626] dark:text-white"
+                              : "text-muted-foreground dark:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground dark:hover:text-white"
                           )}
                           onClick={() => setOpenNavigation(false)}
                         >
