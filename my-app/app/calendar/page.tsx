@@ -832,63 +832,57 @@ export default function CalendarPage() {
 
       {/* Event Detail Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-[80%] md:max-w-xl overflow-hidden p-0">
+        <DialogContent className="max-w-[80%] md:max-w-2xl min-h-[350px] overflow-hidden p-2">
           <motion.div
             initial="hidden"
             animate="visible"
             exit="exit"
             variants={dialogVariants}
-            className="p-5"
+            className="flex flex-col h-full p-3 sm:p-5"
           >
             {selectedEvent && (
-              <div className="space-y-4">
+              <div className="flex flex-col flex-grow space-y-4">
                 <div className="flex flex-col">
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-col items-center border-r-4 pr-4" style={{ borderColor: "#000000" }}>
-                      <p className="text-lg font-semibold">{format(selectedEvent.start, "MMM")}</p>
-                      <p className="text-3xl font-semibold">{format(selectedEvent.start, "d")}</p>
+                  <div className="flex flex-col items-center gap-4
+                        sm:flex-row sm:gap-4"> {/* date and title */}
+                    <div className="flex flex-col items-center border-r-0 border-b-4 pb-4 w-[50%] 
+                          sm:border-r-4 sm:border-b-0 sm:pb-0 sm:pr-4 sm:w-[auto]" style={{ borderColor: "#000000" }}>
+                      <p className="text-xl font-semibold">{format(selectedEvent.start, "MMM")}</p>
+                      <p className="text-4xl font-semibold">{format(selectedEvent.start, "d")}</p>
                     </div>
-                    <h3 className="text-xl font-semibold">{selectedEvent.title}</h3>
+                    <h3 className="text-2xl font-semibold text-center w-[80%] sm:w-[100%] sm:p-0 sm:text-left">{selectedEvent.title}</h3>
                   </div>
-                  
-                  <div className="flex flex-col pl-[76px] gap-2 mt-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
+                  {/* info */}
+                  <div className="flex flex-col mt-10 mb-10 sm:mt-5 gap-5 sm:pl-[76px]">
+                    <div className="flex items-center gap-5 text-md justify-center sm:justify-start">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
                       <span>{format(selectedEvent.start, "MMM d, yyyy • h:mm a")} - {format(selectedEvent.end, "h:mm a")}</span>
                     </div>
-                  
                     {selectedEvent.location && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center gap-5 text-md justify-center sm:justify-start">
+                        <MapPin className="h-5 w-5 text-muted-foreground" />
                         <span>{selectedEvent.location}</span>
                       </div>
                     )}
-
                     {selectedEvent.description && (
-                      <div className="flex items-start gap-2 text-sm mt-3 bg-muted/30 rounded-md">
-                        <MapPin className="h-4 w-4 flex-shrink-0 opacity-0" />
-                        <p className="text-sm whitespace-pre-line">{selectedEvent.description}</p>
+                      <div className="flex justify-center pl-4 pr-4 text-center w-full gap-5 text-md sm:p-0 sm:justify-start sm:text-left sm:w-auto">
+                        <MapPin className="hidden sm:flex h-5 w-5 flex-shrink-0 opacity-0" />
+                        <p className="text-md whitespace-pre-line">{selectedEvent.description}</p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" className="mr-2 bg-background text-foreground hover:bg-accent">RSVP</Button>
-                  <Button variant="outline" className="mr-2">Add to Calendar</Button>
-                </div>
-                
-                {/* <div className="flex justify-end pt-4">
+                <div className="flex justify-center gap-4 mt-auto md:justify-end">
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    <Button 
-                      variant="outline" 
-                      className="mr-2"
-                      onClick={() => setDialogOpen(false)}
-                    >
-                      Close
+                    <Button variant="outline">RSVP</Button>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                    <Button>
+                      Add to Calendar
                     </Button>
                   </motion.div>
-                </div> */}
+                </div>
               </div>
             )}
           </motion.div>
