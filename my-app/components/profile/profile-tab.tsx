@@ -18,19 +18,17 @@ import { Button } from "@/components/ui/button";
 import {
   Pencil,
   Loader2,
-  Download,
-  Trash2,
   FileText,
   Linkedin,
   ExternalLink,
   Mail,
 } from "lucide-react";
+import AdditionalLinks from "@/components/profile/additional-links";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { InputFile } from "@/components/ui/input";
+
 import { Textarea } from "@/components/ui/textarea";
 import { TagSelector } from "@/components/profile/tag-selector";
-import { LinkWithPreview } from "@/components/link-preview";
 import { containerVariants, itemVariants, skillOptions } from "@/lib/constants";
 
 // -----------------------------------------------------------------------------
@@ -50,6 +48,7 @@ type BaseFormFields = {
   industry: string[];
   resume_url: string;
   contact: { email: string; phone: string };
+  additional_links?: { url: string; title: string }[];
 };
 
 export interface ProfileTabProps<T extends BaseFormFields> {
@@ -96,6 +95,7 @@ export function ProfileTab<T extends BaseFormFields>({
   onResumeDelete,
 }: ProfileTabProps<T>) {
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const additionalLinks = formData.additional_links || [];
   /* ---------------------------- UI -------------------------*/
   return (
     <TabsContent value="profile" className="space-y-6 mx-2">
@@ -171,45 +171,79 @@ export function ProfileTab<T extends BaseFormFields>({
                     <div>
                       <h3 className="font-semibold mb-2 text-lg">Contact</h3>
                       <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {user?.contact?.email}
-                          </span>
-                        </div>
+                        {user?.contact?.email && (
+                          <div className="flex items-center gap-3">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <a
+                              href={`mailto:${user.contact.email}`}
+                              className="text-sm hover:underline text-primary"
+                            >
+                              {user.contact.email}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Links (LinkedIn & Website) */}
-                    {(user?.linkedin_url || user?.website_url) && (
+                    {/* Links (LinkedIn, Website & Additional) */}
+                    {(user?.linkedin_url ||
+                      user?.website_url ||
+                      (user?.additional_links?.length ?? 0) > 0) && (
                       <div>
                         <h3 className="font-semibold mb-2 text-lg">Links</h3>
                         <div className="space-y-3">
                           {user?.linkedin_url && (
                             <div className="flex items-center gap-3 group">
                               <Linkedin className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                              <LinkWithPreview
-                                name={user?.full_name}
-                                url={user.linkedin_url}
+                              <a
+                                href={user?.linkedin_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-primary hover:underline"
                               >
                                 LinkedIn
-                              </LinkWithPreview>
+                              </a>
                             </div>
                           )}
+
                           {user?.website_url && (
                             <div className="flex items-center gap-3 group">
                               <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                              <LinkWithPreview
-                                name={user?.full_name}
-                                url={user.website_url}
+                              <a
+                                href={user.website_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-primary hover:underline"
                               >
                                 {user.website_url.replace(
                                   /^https?:\/\/(www\.)?/,
                                   ""
                                 )}
-                              </LinkWithPreview>
+                              </a>
                             </div>
                           )}
+
+                          {(user?.additional_links?.length ?? 0) > 0 &&
+                            user?.additional_links?.map((link, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-3 group"
+                              >
+                                <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <a
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline"
+                                >
+                                  {link.title ||
+                                    link.url.replace(
+                                      /^https?:\/\/(www\.)?/,
+                                      ""
+                                    )}
+                                </a>
+                              </div>
+                            ))}
                         </div>
                       </div>
                     )}
@@ -243,7 +277,7 @@ export function ProfileTab<T extends BaseFormFields>({
                             <DialogContent className="max-w-3xl">
                               <DialogHeader>
                                 <DialogTitle>
-                                  {user.full_name}'s Resume
+                                  {`${user.full_name}'s Resume`}
                                 </DialogTitle>
                               </DialogHeader>
                               <iframe
@@ -273,7 +307,7 @@ export function ProfileTab<T extends BaseFormFields>({
         </AnimatePresence>
 
         {/* ---------- EDIT DIALOG ---------- */}
-        <DialogContent className="flex flex-col max-h-[90vh]">
+        <DialogContent className="flex flex-col max-h-[90vh]  w-full max-w-3xl">
           <DialogHeader>
             <DialogTitle>Edit Profile</DialogTitle>
           </DialogHeader>
@@ -317,6 +351,17 @@ export function ProfileTab<T extends BaseFormFields>({
                 placeholder="public@example.com"
               />
             </div>
+            {/* Additional Links */}
+            <AdditionalLinks
+              links={additionalLinks}
+              colsClass="grid-cols-1"
+              onChangeLinks={(newLinks) =>
+                setFormData({
+                  ...formData,
+                  additional_links: newLinks,
+                })
+              }
+            />
 
             {/* Resume uploader */}
             <div className="flex flex-col gap-2">
