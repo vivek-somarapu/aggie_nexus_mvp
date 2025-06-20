@@ -218,7 +218,7 @@ export default function Navbar() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="relative h-8 w-8 rounded-full text-muted-foreground dark:text-white"
+                    className="relative h-8 w-8 rounded-full"
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarImage
@@ -229,49 +229,43 @@ export default function Navbar() {
                         {profile?.full_name ? (
                           profile.full_name.charAt(0)
                         ) : (
-                          <UserIcon className="h-4 w-4 fill-current dark:text-white" />
+                          <UserIcon className="h-4 w-4" />
                         )}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-56 dark:text-white"
-                >
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none dark:text-white">
+                      <p className="text-sm font-medium leading-none">
                         {profile?.full_name || ""}
                       </p>
-                      <p className="text-xs leading-none text-muted-foreground dark:text-white">
+                      <p className="text-xs leading-none text-muted-foreground">
                         {authUser?.email}
                       </p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profile" className="flex items-center">
-                      <UserIcon className="mr-2 h-4 w-4 fill-current dark:text-white" />
+                    <Link href="/profile" className="cursor-pointer">
+                      <UserIcon className="mr-2 h-4 w-4" />
                       Profile
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link
-                      href="/profile/settings"
-                      className="flex items-center"
-                    >
-                      <Settings className="mr-2 h-4 w-4 fill-current dark:text-white" />
+                    <Link href="/profile/settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link
                       href="/profile?tab=inquiries"
-                      className="flex items-center justify-between"
+                      className="cursor-pointer flex items-center justify-between"
                     >
                       <div className="flex items-center">
-                        <MessageSquare className="mr-2 h-4 w-4 fill-current dark:text-white" />
+                        <MessageSquare className="mr-2 h-4 w-4" />
                         Project Inquiries
                       </div>
                       {pendingInquiries > 0 && (
@@ -288,29 +282,23 @@ export default function Navbar() {
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link
-                          href="/manager/events"
-                          className="flex items-center"
-                        >
-                          <Calendar className="mr-2 h-4 w-4 fill-current dark:text-white" />
+                        <Link href="/manager/events" className="cursor-pointer">
+                          <Calendar className="mr-2 h-4 w-4" />
                           Event Management
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link
-                          href="/manager/users"
-                          className="flex items-center"
-                        >
-                          <Users className="mr-2 h-4 w-4 fill-current dark:text-white" />
+                        <Link href="/manager/users" className="cursor-pointer">
+                          <Users className="mr-2 h-4 w-4" />
                           User Management
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link
                           href="/manager/projects"
-                          className="flex items-center"
+                          className="cursor-pointer"
                         >
-                          <FileText className="mr-2 h-4 w-4 fill-current dark:text-white" />
+                          <FileText className="mr-2 h-4 w-4" />
                           Project Management
                         </Link>
                       </DropdownMenuItem>
@@ -319,9 +307,9 @@ export default function Navbar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className="flex items-center cursor-pointer"
+                    className="cursor-pointer"
                   >
-                    <LogOut className="mr-2 h-4 w-4 fill-current dark:text-white" />
+                    <LogOut className="mr-2 h-4 w-4" />
                     Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
