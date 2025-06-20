@@ -379,9 +379,7 @@ export default function CalendarPage() {
             )}
 
             {isSmUp && (
-              <TabsContent value="calendar">
-                <div>📅 Calendar View Content</div>
-              </TabsContent>
+              <TabsContent value="calendar"/>
             )}
           </Tabs>
           {user && (
