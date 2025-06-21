@@ -28,7 +28,7 @@ export interface Event {
   end_time: string; // ISO
   location: string;
   is_virtual: boolean;
-  link?: string;
+  event_link?: string;
 
   /** NEW */
   event_type: EventType;
@@ -106,7 +106,7 @@ export const eventService = {
         | "end_time"
         | "location"
         | "is_virtual"
-        | "link"
+        | "event_link"
         | "event_type"
         | "poster_url"
       >

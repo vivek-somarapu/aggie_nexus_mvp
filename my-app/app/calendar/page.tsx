@@ -214,7 +214,7 @@ export default function CalendarPage() {
   // Sort events by date
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     if (!a.start || !b.start) return 0;
-    return new Date(a.start).getTime() - new Date(b.start).getTime();
+    return new Date(b.start).getTime() - new Date(a.start).getTime(); // DESC
   });
 
   // Convert events to FullCalendarEvent format for the full calendar

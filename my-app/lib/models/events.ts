@@ -9,7 +9,7 @@ export type Event = {
   end_time: string; // ISO
   location: string | null;
   is_virtual: boolean;
-  link: string | null;
+  event_link: string | null;
   event_type: string; // must match your EventType enum
   poster_url: string | null;
   organizer_id: string; // who created it
@@ -26,8 +26,8 @@ export type Event = {
 export async function getAllEvents(): Promise<Event[]> {
   const result = await query(
     `SELECT * 
-     FROM events 
-     ORDER BY start_time`
+    FROM events 
+    ORDER  BY start_time DESC`
   );
   return result.rows;
 }
@@ -37,9 +37,9 @@ export async function getEventsByStatus(
 ): Promise<Event[]> {
   const result = await query(
     `SELECT * 
-     FROM events 
-     WHERE status = $1 
-     ORDER BY start_time`,
+    FROM events 
+    WHERE status = $1 
+    ORDER  BY start_time DESC`,
     [status]
   );
   return result.rows;
@@ -60,8 +60,8 @@ export async function getRejectedEvents(): Promise<Event[]> {
 export async function getEventById(id: string): Promise<Event | null> {
   const result = await query(
     `SELECT * 
-     FROM events 
-     WHERE id = $1`,
+    FROM events 
+    WHERE id = $1`,
     [id]
   );
   return result.rows[0] ?? null;
@@ -87,42 +87,42 @@ export async function createEvent(
     end_time,
     location,
     is_virtual,
-    link,
     event_type,
     poster_url,
-    organizer_id, // ← your PK on profiles
+    organizer_id,
+    event_link,
     status = "pending",
   } = e;
 
   const result = await query(
     `INSERT INTO events (
-       title,
-       description,
-       start_time,
-       end_time,
-       location,
-       is_virtual,
-       link,
-       event_type,
-       poster_url,
-       organizer_id,
-       status
-     ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
-     )
-     RETURNING *`,
+    title,
+    description,
+    start_time,
+    end_time,
+    location,
+    is_virtual,
+    event_link, 
+    event_type,
+    poster_url,
+    organizer_id,
+    status
+  ) VALUES (
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+  )
+   RETURNING *`,
     [
-      title,
-      description,
-      start_time,
-      end_time,
-      location,
-      is_virtual,
-      link,
-      event_type,
-      poster_url,
-      organizer_id,
-      status,
+      title, // $1
+      description, // $2
+      start_time, // $3
+      end_time, // $4
+      location, // $5
+      is_virtual, // $6
+      event_link, // $7
+      event_type, // $8
+      poster_url, // $9
+      organizer_id, // $10
+      status, // $11
     ]
   );
 
