@@ -56,6 +56,7 @@ export async function middleware(request: NextRequest) {
       '/auth/login',
       '/auth/signup',
       '/auth/callback',
+      '/auth/waiting',
       '/auth/reset-password',
       '/projects', // Allow unauthenticated users to view projects
       '/users', // Allow unauthenticated users to view users  
@@ -115,6 +116,11 @@ export async function middleware(request: NextRequest) {
     
     // Redirect authenticated users away from auth pages
     if (isAuthRoute && user) {
+      // If user is authenticated but email not verified, redirect to waiting page
+      if (!user.email_confirmed_at) {
+        return NextResponse.redirect(new URL('/auth/waiting', request.url));
+      }
+      // If user is fully verified, redirect to home
       return NextResponse.redirect(new URL('/', request.url));
     }
     

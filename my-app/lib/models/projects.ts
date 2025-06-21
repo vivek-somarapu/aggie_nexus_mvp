@@ -1,5 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 
 export type Project = {
   id: string;
@@ -23,8 +22,7 @@ export type Project = {
 
 // Helper function to get Supabase client
 const getSupabase = async () => {
-  const cookieStore = cookies();
-  return await createClient(cookieStore);
+  return await createClient();
 };
 
 // CREATE

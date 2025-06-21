@@ -342,16 +342,16 @@ export default function ProjectPage() {
                 <div className="space-y-2">
                   <h3 className="font-semibold">Industry & Skills</h3>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {project.industry.map((ind) => (
-                      <Badge key={ind} variant="secondary">
+                    {project.industry.map((ind, indIndex) => (
+                      <Badge key={`project-${project.id}-industry-${indIndex}`} variant="secondary">
                         {ind}
                       </Badge>
                     ))}
                   </div>
                   <h4 className="text-sm font-medium">Required Skills</h4>
                   <div className="flex flex-wrap gap-2">
-                    {project.required_skills.map((skill) => (
-                      <Badge key={skill} variant="outline">
+                    {project.required_skills.map((skill, skillIndex) => (
+                      <Badge key={`project-${project.id}-skill-${skillIndex}`} variant="outline">
                         {skill}
                       </Badge>
                     ))}

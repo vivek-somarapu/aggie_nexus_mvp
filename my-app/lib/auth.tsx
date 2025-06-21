@@ -270,7 +270,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // Fetch user profile after successful sign-in
+      // Check if user's email is verified
+      if (data.user && !data.user.email_confirmed_at) {
+        console.log("User email not verified, redirecting to waiting page");
+        
+        // Store the email for the waiting page
+        localStorage.setItem("lastSignupEmail", email);
+        
+        // Send verification email
+        try {
+          const { error: resendError } = await supabase.auth.resend({
+            type: 'signup',
+            email: email,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+          });
+          
+          if (resendError) {
+            console.error("Error sending verification email:", resendError);
+            // Don't fail the login, just log the error
+          }
+        } catch (resendErr) {
+          console.error("Failed to send verification email:", resendErr);
+        }
+        
+        // Set the auth user so they can access the waiting page
+        setAuthUser(mapSupabaseUser(data.user));
+        
+        // Redirect to waiting page
+        router.push("/auth/waiting");
+        return true; // Return true because login was successful, just needs verification
+      }
+
+      // Fetch user profile after successful sign-in (for verified users)
       if (data.user) {
         setAuthUser(mapSupabaseUser(data.user));
         const userProfile = await fetchUserProfile(data.user.id);
