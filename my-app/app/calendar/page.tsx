@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Info, Loader2, AlertCircle, Plus, UserCircle2, ChevronLeft, ChevronRight, MapPin, Clock, Calendar as CalendarIcon, Home } from "lucide-react";
+import { Info, Loader2, AlertCircle, Plus, UserCircle2, ChevronLeft, ChevronRight, MapPin, Clock, Calendar as CalendarIcon, Home, CircleUser } from "lucide-react";
 import { format, parseISO, isValid, addDays, isWithinInterval } from "date-fns";
 import { eventService } from "@/lib/services/event-service";
 import { cn } from "@/lib/utils";
@@ -139,6 +139,20 @@ const containerVariants = {
   }
 };
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    setMatches(media.matches);
+    const listener = () => setMatches(media.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, [query]);
+
+  return matches;
+}
+
 export default function CalendarPage() {
   const { authUser: user, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -147,13 +161,20 @@ export default function CalendarPage() {
   const [personalEvents, setPersonalEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const isSmUp = useMediaQuery("(min-width: 640px)");
+  const [view, setView] = useState<"calendar" | "list">(isSmUp ? "calendar" : "list");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const calendarContainerRef = useRef<HTMLDivElement>(null);
+  const calendarContainerRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    if (!isSmUp && view !== "list") {
+      setView("list");
+    }
+  }, [isSmUp]);
   
   const categories: Record<EventType, string> = {
     workshop: "Workshops",
@@ -349,12 +370,17 @@ export default function CalendarPage() {
           <Tabs
             value={view}
             onValueChange={(v) => setView(v as "calendar" | "list")}
-            className="hidden sm:flex"
           >
-            <TabsList className="grid w-[200px] grid-cols-2">
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              <TabsTrigger value="list">List</TabsTrigger>
-            </TabsList>
+            {isSmUp && (
+              <TabsList className="grid w-[200px] grid-cols-2 mb-4">
+                <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                <TabsTrigger value="list">List</TabsTrigger>
+              </TabsList>
+            )}
+
+            {isSmUp && (
+              <TabsContent value="calendar"/>
+            )}
           </Tabs>
           {user && (
             <Button 
@@ -415,8 +441,8 @@ export default function CalendarPage() {
           onValueChange={(v) => setView(v as "calendar" | "list")}
           className="sm:hidden w-full"
         >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-1">
+            <TabsTrigger className="hidden sm:inline-flex sm:flex-1" value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="list">List</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -431,10 +457,29 @@ export default function CalendarPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Tabs defaultValue={view} onValueChange={(v) => setView(v as "calendar" | "list")}>
-                  <TabsList className="w-full">
-                    <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
-                    <TabsTrigger value="list" className="flex-1">List</TabsTrigger>
+                <Tabs
+                  value={view}
+                  onValueChange={(v) => setView(v as "calendar" | "list")}
+                >
+                  {isSmUp && (
+                    <TabsList className="w-full">
+                      <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
+                      <TabsTrigger value="list" className="flex-1">List</TabsTrigger>
+                    </TabsList>
+                  )}
+
+                  {isSmUp && (
+                    <TabsContent value="calendar"/>
+                  )}
+                </Tabs>
+                <Tabs
+                  value={view}
+                  onValueChange={(v) => setView(v as "calendar" | "list")}
+                  className="sm:hidden w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-1">
+                    <TabsTrigger className="hidden sm:inline-flex sm:flex-1" value="calendar">Calendar</TabsTrigger>
+                    <TabsTrigger value="list">List</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -845,7 +890,7 @@ export default function CalendarPage() {
                 <div className="flex flex-col">
                   <div className="flex flex-col items-center gap-4
                         sm:flex-row sm:gap-4"> {/* date and title */}
-                    <div className="flex flex-col items-center border-r-0 border-b-4 pb-4 w-[50%] 
+                    <div className="flex flex-col items-center border-r-0 border-b-4 border-current pb-4 w-[50%] 
                           sm:border-r-4 sm:border-b-0 sm:pb-0 sm:pr-4 sm:w-[auto]" style={{ borderColor: "#000000" }}>
                       <p className="text-xl font-semibold">{format(selectedEvent.start, "MMM")}</p>
                       <p className="text-4xl font-semibold">{format(selectedEvent.start, "d")}</p>
@@ -854,6 +899,10 @@ export default function CalendarPage() {
                   </div>
                   {/* info */}
                   <div className="flex flex-col mt-10 mb-10 sm:mt-5 gap-5 sm:pl-[76px]">
+                    {/* <div className="flex items-center gap-5 text-md justify-center sm:justify-start">
+                      <CircleUser className="h-5 w-5 text-muted-foreground" />
+                      <span>Event host</span>
+                    </div> */}
                     <div className="flex items-center gap-5 text-md justify-center sm:justify-start">
                       <Clock className="h-5 w-5 text-muted-foreground" />
                       <span>{format(selectedEvent.start, "MMM d, yyyy • h:mm a")} - {format(selectedEvent.end, "h:mm a")}</span>
