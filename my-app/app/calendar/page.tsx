@@ -1,47 +1,86 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Info, Loader2, AlertCircle, Plus, UserCircle2, ChevronLeft, ChevronRight, MapPin, Clock, Calendar as CalendarIcon, Home } from "lucide-react";
-import { format, parseISO, isValid, addDays, isWithinInterval } from "date-fns";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { rsvpService } from "@/lib/services/rsvp-service";
+import {
+  Info,
+  Loader2,
+  AlertCircle,
+  Plus,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Clock,
+  CalendarIcon,
+  Filter,
+  List,
+} from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { eventService } from "@/lib/services/event-service";
-import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar,
   CalendarCurrentDate,
   CalendarDayView,
   CalendarMonthView,
-  CalendarNextTrigger,
-  CalendarPrevTrigger,
   CalendarTodayTrigger,
   CalendarViewTrigger,
   CalendarWeekView,
   CalendarYearView,
-  CalendarEvent as FullCalendarEvent,
+  type CalendarEvent as FullCalendarEvent,
 } from "@/components/ui/full-calendar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import Link from "next/link";
+import {
+  CalendarPrevTrigger,
+  CalendarNextTrigger,
+} from "@/components/ui/full-calendar"; // Import CalendarPrevTrigger and CalendarNextTrigger
+
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+
+/* ────── Constants ────── */
+import {
+  pageVariants,
+  itemVariants,
+  calendarVariants,
+  dialogVariants,
+  type EventType,
+  colorPalette,
+  categories,
+} from "@/lib/constants";
 
 // Import and augment the Event type to match API response
 import type { Event as BaseEvent } from "@/lib/services/event-service";
 
 // Define the actual event structure that matches the API response
-interface Event extends Omit<BaseEvent, 'start_date' | 'end_date'> {
+interface Event extends Omit<BaseEvent, "start_time" | "end_time"> {
   start: string;
   end: string;
   color?: string;
 }
-
-// Define EventType for categorization
-type EventType = 'workshop' | 'info_session' | 'networking' | 'hackathon' | 'deadline' | 'meeting' | 'personal' | 'other';
 
 // Type for the processed events
 type ProcessedEvent = FullCalendarEvent & {
@@ -49,183 +88,92 @@ type ProcessedEvent = FullCalendarEvent & {
   location: string;
 };
 
-// Animation variants
-const pageVariants = {
-  hidden: { opacity: 0 },
-  visible: { 
-    opacity: 1,
-    transition: { 
-      duration: 0.5,
-      when: "beforeChildren",
-      staggerChildren: 0.1
-    }
-  },
-  exit: { 
-    opacity: 0,
-    transition: { duration: 0.3 } 
+// Add this after the imports and before the component
+const customStyles = `
+  .scrollbar-thin {
+    scrollbar-width: thin;
   }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { type: "spring", damping: 12, stiffness: 100 }
+  .scrollbar-thumb-muted {
+    scrollbar-color: hsl(var(--muted-foreground)) transparent;
   }
-};
-
-const calendarVariants = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    scale: 1,
-    transition: { type: "spring", damping: 20, stiffness: 150, delay: 0.2 }
+  .scrollbar-track-transparent {
+    scrollbar-track-color: transparent;
   }
-};
-
-// Add dialog animations
-const dialogVariants = {
-  hidden: { 
-    opacity: 0,
-    scale: 0.9,
-    y: 20
-  },
-  visible: { 
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: {
-      type: "spring",
-      damping: 25,
-      stiffness: 300
-    }
-  },
-  exit: { 
-    opacity: 0,
-    scale: 0.95,
-    y: 10,
-    transition: { duration: 0.2 } 
+  
+  /* Webkit scrollbar styles */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
-};
-
-// Update the event card variants for upcoming events
-const eventCardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { type: "spring", damping: 15, stiffness: 120 }
-  },
-  hover: { 
-    y: -5, 
-    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-    transition: { duration: 0.2 } 
-  },
-  tap: { 
-    scale: 0.98, 
-    transition: { duration: 0.1 } 
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
   }
-};
-
-// Add container variants for list animation
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.07
-    }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground));
+    border-radius: 3px;
   }
-};
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--foreground));
+  }
+`;
 
 export default function CalendarPage() {
-  const { authUser: user, isLoading: authLoading } = useAuth();
+  const { profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  
   const [events, setEvents] = useState<Event[]>([]);
   const [personalEvents, setPersonalEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
+    null
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const calendarContainerRef = useRef<HTMLDivElement>(null);
-  
-  const categories: Record<EventType, string> = {
-    workshop: "Workshops",
-    info_session: "Info Sessions",
-    networking: "Networking Events",
-    hackathon: "Hackathons",
-    deadline: "Project Deadlines",
-    meeting: "Meetings",
-    other: "Other Events",
-    personal: "Personal Events"
-  };
-  
-  // The color palette available in our variants
-  const colorPalette = [
-    'blue', 'green', 'yellow', 'pink', 'purple', 
-    'red', 'orange', 'indigo', 'teal', 'cyan', 
-    'emerald', 'rose', 'amber', 'lime', 'sky'
-  ];
-  
+  const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [rsvpSuccess, setRsvpSuccess] = useState(false);
+  const [rsvpData, setRsvpData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    notes: "",
+  });
+
   // Function to get a random color from our palette
   const getRandomColor = () => {
     return colorPalette[Math.floor(Math.random() * colorPalette.length)];
   };
-  
-  // Function to get badge variant based on event type
-  const getBadgeVariant = (type: string) => {
-    switch(type as EventType) {
-      case "workshop":
-        return "blue";
-      case "info_session":
-        return "green";
-      case "networking":
-        return "yellow";
-      case "hackathon":
-        return "purple";
-      case "deadline":
-        return "red";
-      case "meeting":
-        return "orange";
-      case "personal":
-        return "pink";
-      default:
-        return "default";
-    }
-  };
-  
+
   // Function to get events
   const getEvents = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       console.log("Fetching calendar events...");
-      
+
       // Always fetch public events regardless of auth state
       const publicEvents = await eventService.getEvents();
       // Safe cast since we know the API returns the correct shape
       setEvents(publicEvents as unknown as Event[]);
-      
+
       // Get personal events if user is authenticated
-      if (user) {
+      if (profile) {
         try {
           // Since getUserEvents doesn't exist, we'll filter the events for this user
           // This is a temporary solution - ideally we'd implement proper getUserEvents in the service
-          const userEvents = publicEvents.filter(event => event.organizer_id === user.id);
+          const userEvents = publicEvents.filter(
+            (event) => event.organizer_id === profile.id
+          );
           // Safe cast since we know the API returns the correct shape
           setPersonalEvents(userEvents as unknown as Event[]);
         } catch (err) {
           console.error("Error fetching personal events:", err);
         }
       }
-      
     } catch (err) {
       console.error("Error fetching events:", err);
       setError("Failed to load events. Please try again.");
@@ -233,217 +181,113 @@ export default function CalendarPage() {
       setIsLoading(false);
     }
   };
-    
+
   // Fetch events when component mounts
   useEffect(() => {
     getEvents();
-  }, [user]); // Only re-fetch when user state changes
-  
+  }, [profile]); // Only re-fetch when user state changes
+
   // Get all events (public + personal)
   const allEvents = [...events, ...personalEvents];
-  
+
   // Filter events based on category
-  const filteredEvents = allEvents.filter(event => 
-    categoryFilter === "all" || (event.event_type || event.color) === categoryFilter
+  const filteredEvents = allEvents.filter(
+    (event) =>
+      categoryFilter === "all" ||
+      (event.event_type || event.color) === categoryFilter
   );
-  
+
   // Map of event IDs to consistent colors (so same event always has same color)
   const eventColorMap = useMemo(() => {
     const colorMap = new Map<string, string>();
-    
+
     // Assign a random color to each event and store it in the map
-    filteredEvents.forEach(event => {
+    filteredEvents.forEach((event) => {
       if (!colorMap.has(event.id)) {
         colorMap.set(event.id, getRandomColor());
       }
     });
-    
+
     return colorMap;
   }, [filteredEvents]);
-  
-  // Get events for selected date
-  const eventsForSelectedDate = date 
-    ? filteredEvents.filter(event => {
-        const eventDate = event.start ? parseISO(event.start) : null;
-        return eventDate && isValid(eventDate) && 
-          eventDate.getDate() === date.getDate() &&
-          eventDate.getMonth() === date.getMonth() &&
-          eventDate.getFullYear() === date.getFullYear();
-      })
-    : [];
-  
+
   // Sort events by date
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     if (!a.start || !b.start) return 0;
     return new Date(a.start).getTime() - new Date(b.start).getTime();
   });
-  
-  // Get upcoming events (next 7 days)
-  const upcomingEvents = filteredEvents.filter(event => {
-    if (!event.start) return false;
-    const eventDate = parseISO(event.start);
-    if (!isValid(eventDate)) return false;
-    
-    const today = new Date();
-    const sevenDaysLater = addDays(today, 7);
-    const eventTime = eventDate.getTime();
-    
-    return eventTime >= today.getTime() && eventTime <= sevenDaysLater.getTime();
-  }).sort((a, b) => {
-    return new Date(a.start as string).getTime() - new Date(b.start as string).getTime();
-  });
 
   // Convert events to FullCalendarEvent format for the full calendar
   const calendarEvents: FullCalendarEvent[] = filteredEvents
-    .filter(event => event.start && event.end) // Only include events with valid dates
-    .map(event => ({
+    .filter((event) => event.start && event.end) // Only include events with valid dates
+    .map((event) => ({
       id: event.id,
       title: event.title,
       start: new Date(event.start),
       end: new Date(event.end),
       // Use random color from map instead of event type-based color
       color: eventColorMap.get(event.id) as any,
-      description: event.description || '',
-      location: event.location || '',
+      description: event.description || "",
+      location: event.location || "",
     }));
 
   // Handle calendar event click
-  const handleEventClick = (event: FullCalendarEvent) => {
-    // Find the full event data including description and location
-    const fullEvent = calendarEvents.find(e => e.id === event.id);
-    if (fullEvent) {
-      setSelectedEvent(fullEvent as ProcessedEvent);
-      setDialogOpen(true);
+  const handleEventClick = (evt: FullCalendarEvent) => {
+    const full = calendarEvents.find((e) => e.id === evt.id);
+    if (!full) return;
+    setSelectedEvent(full as ProcessedEvent);
+    setDialogOpen(true);
+  };
+
+  // Handle RSVP submission
+  const handleRSVP = async () => {
+    try {
+      await rsvpService.submitRSVP({
+        eventId: selectedEvent!.id,
+        name: profile?.full_name ?? rsvpData.name,
+        email: profile?.email ?? rsvpData.email,
+        phone: rsvpData.phone,
+        notes: rsvpData.notes,
+        userId: profile?.id,
+      });
+      setRsvpSuccess(true);
+    } catch (err: any) {
+      toast.error(err.message); // will show “You have already RSVPed …” etc.
     }
   };
 
   return (
-    <motion.div 
-      className="container max-w-7xl mx-auto p-4 space-y-4"
-      variants={pageVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-    >
-      <motion.div variants={itemVariants} className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center mb-2">
-        <div className="relative">
-          {/* Green accent background for calendar */}
-          <div className="absolute inset-0 bg-gradient-to-r from-green-50 to-transparent dark:from-green-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
-          <div className="relative z-10">
-            <h1 className="text-3xl font-bold tracking-tight">Events Calendar</h1>
-            <p className="text-muted-foreground">
-              Stay organized with upcoming events, workshops, and networking opportunities
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex space-x-2 mt-2 sm:mt-0">
-          {!user && !authLoading && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/">
-                <Home className="h-4 w-4 mr-2" />
-                Return Home
-              </Link>
-            </Button>
-          )}
-          <Tabs
-            value={view}
-            onValueChange={(v) => setView(v as "calendar" | "list")}
-            className="hidden sm:flex"
-          >
-            <TabsList className="grid w-[200px] grid-cols-2">
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              <TabsTrigger value="list">List</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {user && (
-            <Button 
-              onClick={() => router.push('/calendar/new')} 
-              size="sm" 
-              className="flex items-center bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Event
-            </Button>
-          )}
-        </div>
-      </motion.div>
-      
-      {!user && !authLoading && (
-        <motion.div variants={itemVariants}>
-          <Alert variant="info" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800 mb-2">
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <span className="font-medium">Sign in to add personal events and get personalized notifications.</span>{" "}
-              <Button variant="link" className="h-auto p-0 text-blue-600 dark:text-blue-400" onClick={() => router.push('/auth/login?redirect=/calendar')}>
-                Sign in now
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </motion.div>
-      )}
-
-      {error && (
-        <motion.div variants={itemVariants}>
-          <Alert variant="destructive" className="mb-2">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        </motion.div>
-      )}
-      
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2 p-4 rounded-lg border-l-4 border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/10">
-        {/* <Select
-          value={categoryFilter}
-          onValueChange={setCategoryFilter}
+    <>
+      <style dangerouslySetInnerHTML={{ __html: customStyles }} />
+      <motion.div
+        className="flex flex-col bg-gradient-to-br from-background via-background to-muted/20 min-h-screen"
+        variants={pageVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+      >
+        {/* Header */}
+        <motion.div
+          variants={itemVariants}
+          className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur"
         >
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Filter by category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Events</SelectItem>
-            {Object.entries(categories).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select> */}
+          <div className="container mx-auto flex flex-wrap items-center justify-between px-6 py-3 gap-4">
+            {/* Title */}
+            <h1 className="text-2xl font-bold md:text-3xl tracking-tight">
+              Events Calendar
+            </h1>
 
-        <Tabs
-          value={view}
-          onValueChange={(v) => setView(v as "calendar" | "list")}
-          className="sm:hidden w-full"
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
-            <TabsTrigger value="list">List</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </motion.div>
-      
-      <motion.div className="grid md:grid-cols-4 gap-4" variants={itemVariants}>
-        {/* Left Sidebar */}
-        <motion.div className="md:col-span-1 space-y-4">
-          <Card className="shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle>View Options</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            {/* Desktop: inline filters & stats */}
+            <div className="hidden md:flex items-center gap-6">
+              {/* Event Type */}
               <div>
-                <Tabs defaultValue={view} onValueChange={(v) => setView(v as "calendar" | "list")}>
-                  <TabsList className="w-full">
-                    <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
-                    <TabsTrigger value="list" className="flex-1">List</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium mb-2 block">Event Type</label>
-                <Select defaultValue={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                <label className="sr-only">Event Type</label>
+                <Select
+                  value={categoryFilter}
+                  onValueChange={setCategoryFilter}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="All Events" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Events</SelectItem>
@@ -455,439 +299,536 @@ export default function CalendarPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
-          
-          {view === "calendar" && date && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle>
-                    {format(date, "MMMM d, yyyy")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AnimatePresence mode="wait">
-                    {eventsForSelectedDate.length > 0 ? (
-                      <motion.div 
-                        className="space-y-2"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                      >
-                        {eventsForSelectedDate.map((event) => (
-                          <motion.div
-                            key={event.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ type: "spring", damping: 20 }}
-                            whileHover={{ x: 5 }}
-                            className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
-                            onClick={() => {
-                              const fullEvent = calendarEvents.find(e => e.id === event.id);
-                              if (fullEvent) {
-                                setSelectedEvent(fullEvent as ProcessedEvent);
-                                setDialogOpen(true);
-                              }
-                            }}
-                          >
-                            <Badge 
-                              variant="outline" 
-                              className="rounded-sm px-1 py-0 text-xs"
-                            >
-                              {categories[event.event_type as EventType] || 'Event'}
-                            </Badge>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{event.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {event.start ? format(parseISO(event.start), "h:mm a") : "Time not set"}
-                              </p>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </motion.div>
-                    ) : (
-                      <motion.p 
-                        className="text-sm text-muted-foreground text-center py-2"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                      >
-                        No events for this day
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </CardContent>
-              </Card>
+
+              {/* View Toggle */}
+              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                <TabsList className="grid grid-cols-2">
+                  <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                  <TabsTrigger value="list">List</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {profile && (
+                <Button
+                  onClick={() => router.push("/calendar/new")}
+                  size="sm"
+                  className="bg-green-600 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add Event
+                </Button>
+              )}
+            </div>
+
+            {/* Mobile: compact header with Add & Filter */}
+            <div className="md:hidden flex items-center gap-2">
+              {/* + Add button (floating style) */}
+              {profile && (
+                <Button
+                  size="icon"
+                  className="bg-green-600 text-white"
+                  onClick={() => router.push("/calendar/new")}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Filter toggle button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setFiltersOpen(!filtersOpen)}
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Mobile Filter Dropdown (with smooth animation) */}
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={
+            filtersOpen
+              ? { opacity: 1, height: "auto" }
+              : { opacity: 0, height: 0 }
+          }
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="md:hidden overflow-hidden px-6"
+        >
+          <div className="space-y-3 py-3 ">
+            {/* View Toggle */}
+            <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+              <TabsList className="grid grid-cols-2">
+                <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                <TabsTrigger value="list">List</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {/* Event Type */}
+            <div>
+              <Label
+                htmlFor="mobile-filter-type"
+                className="text-sm font-medium"
+              >
+                Event Type
+              </Label>
+              <Select
+                id="mobile-filter-type"
+                value={categoryFilter}
+                onValueChange={setCategoryFilter}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All Events" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Events</SelectItem>
+                  {Object.entries(categories).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Content (only this scrolls on desktop!) */}
+        <div className="flex-1 overflow-auto py-4">
+          {/* Auth Alert */}
+          {!profile && !authLoading && (
+            <motion.div variants={itemVariants} className="mb-6 px-4">
+              <Alert className="bg-blue-50 text-blue-800 border-blue-200">
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <span className="font-medium">
+                    Sign in to add personal events and get personalized
+                    notifications.
+                  </span>{" "}
+                  <Button
+                    variant="link"
+                    className="text-blue-600 p-0 h-auto"
+                    onClick={() =>
+                      router.push("/auth/login?redirect=/calendar")
+                    }
+                  >
+                    Sign in now
+                  </Button>
+                </AlertDescription>
+              </Alert>
             </motion.div>
           )}
-        </motion.div>
-        
-        {/* Main Calendar Area */}
-        <div className="md:col-span-3 space-y-4">
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <motion.div
-                key="loading"
-                className="flex justify-center items-center py-8"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="ml-2">Loading events...</span>
-              </motion.div>
-            ) : (
-              <>
-                {view === "calendar" ? (
-                  <motion.div 
-                    key="calendar" 
+
+          {/* Error Alert */}
+          {error && (
+            <motion.div variants={itemVariants} className="mb-6 px-4">
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+
+          {/* Main Grid */}
+          <div className="grid h-full gap-6">
+            {/* Events Pane */}
+            <section className="flex flex-col lg:col-span-3 h-full">
+              <AnimatePresence mode="wait">
+                {isLoading ? (
+                  <motion.div
+                    key="loading"
+                    className="flex-1 flex items-center justify-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </motion.div>
+                ) : view === "calendar" ? (
+                  <motion.div
+                    key="calendar"
                     ref={calendarContainerRef}
                     variants={calendarVariants}
-                    className="h-[calc(100vh-350px)] min-h-[500px]"
+                    className="h-[calc(100vh-200px)] min-h-[600px] px-4"
                   >
-                    <Card className="h-full shadow-sm">
-                      <Calendar events={calendarEvents} onEventClick={handleEventClick}>
-                        <div className="h-full flex flex-col border rounded-lg overflow-hidden dark:border-border">
-                          <div className="flex p-4 items-center gap-2 border-b dark:border-border">
-                            <CalendarViewTrigger className="aria-[current=true]:bg-accent" view="day">
-                              Day
-                            </CalendarViewTrigger>
-                            <CalendarViewTrigger view="week" className="aria-[current=true]:bg-accent">
-                              Week
-                            </CalendarViewTrigger>
-                            <CalendarViewTrigger view="month" className="aria-[current=true]:bg-accent">
-                              Month
-                            </CalendarViewTrigger>
-                            <CalendarViewTrigger view="year" className="aria-[current=true]:bg-accent">
-                              Year
-                            </CalendarViewTrigger>
+                    <Calendar
+                      events={calendarEvents}
+                      onEventClick={handleEventClick}
+                    >
+                      <div className="h-full flex flex-col border rounded-xl overflow-hidden dark:border-border shadow-sm">
+                        <div className="flex p-6 items-center gap-3 border-b dark:border-border bg-muted/30">
+                          <CalendarViewTrigger
+                            className="aria-[current=true]:bg-accent px-4 py-2 rounded-lg font-medium"
+                            view="day"
+                          >
+                            Day
+                          </CalendarViewTrigger>
+                          <CalendarViewTrigger
+                            view="week"
+                            className="aria-[current=true]:bg-accent px-4 py-2 rounded-lg font-medium"
+                          >
+                            Week
+                          </CalendarViewTrigger>
+                          <CalendarViewTrigger
+                            view="month"
+                            className="aria-[current=true]:bg-accent px-4 py-2 rounded-lg font-medium"
+                          >
+                            Month
+                          </CalendarViewTrigger>
 
-                            <span className="flex-1" />
+                          <span className="flex-1" />
 
-                            <CalendarCurrentDate />
+                          <CalendarCurrentDate className="text-lg font-semibold" />
 
-                            <CalendarPrevTrigger>
-                              <ChevronLeft size={16} />
+                          <div className="flex items-center gap-2">
+                            <CalendarPrevTrigger className="p-2 hover:bg-muted rounded-lg">
+                              <ChevronLeft size={18} />
                               <span className="sr-only">Previous</span>
                             </CalendarPrevTrigger>
 
-                            <CalendarTodayTrigger>Today</CalendarTodayTrigger>
+                            <CalendarTodayTrigger className="px-4 py-2 rounded-lg font-medium hover:bg-muted">
+                              Today
+                            </CalendarTodayTrigger>
 
-                            <CalendarNextTrigger>
-                              <ChevronRight size={16} />
+                            <CalendarNextTrigger className="p-2 hover:bg-muted rounded-lg">
+                              <ChevronRight size={18} />
                               <span className="sr-only">Next</span>
                             </CalendarNextTrigger>
                           </div>
-
-                          <div className="flex-1 overflow-auto p-4 relative">
-                            <CalendarDayView />
-                            <CalendarWeekView />
-                            <CalendarMonthView />
-                            <CalendarYearView />
-                          </div>
                         </div>
-                      </Calendar>
-                    </Card>
+
+                        <div className="flex-1 overflow-hidden p-6 relative">
+                          <CalendarDayView className="[&_.calendar-day-slot]:min-h-[120px] [&_.calendar-day-slot]:p-4 [&_.calendar-day-slot]:overflow-y-auto [&_.calendar-day-slot]:scrollbar-thin [&_.calendar-day-slot]:scrollbar-thumb-muted [&_.calendar-day-slot]:scrollbar-track-transparent" />
+                          <CalendarWeekView className="[&_.calendar-week-slot]:min-h-[140px] [&_.calendar-week-slot]:p-3 [&_.calendar-week-slot]:overflow-y-auto [&_.calendar-week-slot]:scrollbar-thin [&_.calendar-week-slot]:scrollbar-thumb-muted [&_.calendar-week-slot]:scrollbar-track-transparent" />
+                          <CalendarMonthView className="[&_.calendar-month-grid]:gap-2 [&_.calendar-month-cell]:min-h-[160px] [&_.calendar-month-cell]:p-3 [&_.calendar-month-cell]:border [&_.calendar-month-cell]:rounded-lg [&_.calendar-month-cell]:bg-background [&_.calendar-month-cell]:overflow-y-auto [&_.calendar-month-cell]:scrollbar-thin [&_.calendar-month-cell]:scrollbar-thumb-muted [&_.calendar-month-cell]:scrollbar-track-transparent [&_.calendar-month-cell:hover]:bg-muted/50 [&_.calendar-month-cell]:transition-colors" />
+                          <CalendarYearView />
+                        </div>
+                      </div>
+                    </Calendar>
                   </motion.div>
                 ) : (
-                  <motion.div 
+                  <motion.div
                     key="list"
-                    className="space-y-4"
+                    className="flex-1 overflow-auto space-y-6"
                     variants={itemVariants}
                   >
-                    <Card className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <CardTitle>Upcoming Events</CardTitle>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 px-4 py-2">
+                          <List className="h-5 w-5" /> All Events
+                          <Badge variant="secondary" className="ml-auto">
+                            {sortedEvents.length}
+                          </Badge>
+                        </CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="space-y-4 px-4 py-2">
                         {sortedEvents.length === 0 ? (
-                          <motion.p 
-                            className="text-center py-4 text-muted-foreground"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.2 }}
-                          >
-                            No events found. Try changing your filters.
-                          </motion.p>
+                          <div className="flex-1 text-center py-12">
+                            <CalendarIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                            <p className="text-muted-foreground">
+                              No events found.
+                            </p>
+                          </div>
                         ) : (
-                          <motion.ul 
-                            className="space-y-3"
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                          >
-                            {sortedEvents.map((event, index) => (
-                              <motion.li 
-                                key={event.id}
-                                variants={itemVariants}
-                                custom={index}
-                                whileHover={{ x: 5 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                          sortedEvents.map((e, i) => (
+                            <motion.div
+                              key={e.id}
+                              variants={itemVariants}
+                              custom={i}
+                              whileHover={{ scale: 1.02 }}
+                              className="group"
+                            >
+                              <Card
+                                onClick={() => {
+                                  const full = calendarEvents.find(
+                                    (c) => c.id === e.id
+                                  );
+                                  if (full) {
+                                    setSelectedEvent(full as ProcessedEvent);
+                                    setDialogOpen(true);
+                                  }
+                                }}
+                                className="cursor-pointer overflow-hidden transition-shadow hover:shadow-md border-l-4"
+                                style={{
+                                  borderLeftColor: `rgb(var(--${eventColorMap.get(
+                                    e.id
+                                  )}-500)/1)`,
+                                }}
                               >
-                                <Card 
-                                  className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                                  onClick={() => {
-                                    const fullEvent = calendarEvents.find(e => e.id === event.id);
-                                    if (fullEvent) {
-                                      setSelectedEvent(fullEvent as ProcessedEvent);
-                                      setDialogOpen(true);
-                                    }
-                                  }}
-                                >
-                                  <div className={cn(
-                                    "h-1 w-full",
-                                    {
-                                      "bg-blue-500": eventColorMap.get(event.id) === "blue",
-                                      "bg-green-500": eventColorMap.get(event.id) === "green",
-                                      "bg-yellow-500": eventColorMap.get(event.id) === "yellow",
-                                      "bg-pink-500": eventColorMap.get(event.id) === "pink",
-                                      "bg-purple-500": eventColorMap.get(event.id) === "purple",
-                                      "bg-red-500": eventColorMap.get(event.id) === "red",
-                                      "bg-orange-500": eventColorMap.get(event.id) === "orange",
-                                      "bg-indigo-500": eventColorMap.get(event.id) === "indigo",
-                                      "bg-teal-500": eventColorMap.get(event.id) === "teal",
-                                      "bg-cyan-500": eventColorMap.get(event.id) === "cyan",
-                                      "bg-emerald-500": eventColorMap.get(event.id) === "emerald",
-                                      "bg-rose-500": eventColorMap.get(event.id) === "rose",
-                                      "bg-amber-500": eventColorMap.get(event.id) === "amber",
-                                      "bg-lime-500": eventColorMap.get(event.id) === "lime",
-                                      "bg-sky-500": eventColorMap.get(event.id) === "sky",
-                                      "bg-gray-500": !eventColorMap.get(event.id),
-                                    }
-                                  )} />
-                                  <CardContent className="p-4">
-                                    <div className="flex items-start justify-between gap-4">
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <Badge 
-                                            variant="outline" 
-                                            className="rounded-sm px-1 py-0 text-xs"
-                                          >
-                                            {categories[event.event_type as EventType] || 'Event'}
-                                          </Badge>
-                                          {event.event_type === "personal" && (
-                                            <Badge variant="secondary" className="rounded-sm px-1 py-0 text-xs">
-                                              Private
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <h3 className="font-medium text-base mb-1">{event.title}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                          {event.start ? format(parseISO(event.start), "MMMM d, yyyy 'at' h:mm a") : "Date not set"}
-                                        </p>
-                                        {event.description && (
-                                          <p className="text-sm line-clamp-2">{event.description}</p>
-                                        )}
-                                      </div>
-                                      {event.organizer_id && (
-                                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                          <UserCircle2 className="h-3 w-3" />
-                                          <span className="truncate max-w-[100px]">{event.organizer_id}</span>
-                                        </div>
-                                      )}
+                                <CardContent className="space-y-2 p-4">
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {categories[e.event_type as EventType] ||
+                                        "Event"}
+                                    </Badge>
+                                    {e.event_type === "personal" && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-xs"
+                                      >
+                                        Private
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <h3 className="text-lg font-semibold group-hover:text-primary">
+                                    {e.title}
+                                  </h3>
+                                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="h-4 w-4" />
+                                      {e.start
+                                        ? format(
+                                            parseISO(e.start),
+                                            "MMM d, yyyy 'at' h:mm a"
+                                          )
+                                        : "Unknown start time"}
                                     </div>
-                                  </CardContent>
-                                </Card>
-                              </motion.li>
-                            ))}
-                          </motion.ul>
+                                    {e.location && (
+                                      <div className="flex items-center gap-1">
+                                        <MapPin className="h-4 w-4" />
+                                        <span className="truncate">
+                                          {e.location}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {e.description && (
+                                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                                      {e.description}
+                                    </p>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          ))
                         )}
                       </CardContent>
                     </Card>
                   </motion.div>
                 )}
-                
-                {/* Upcoming Events Section - Enhanced */}
-                {upcomingEvents.length > 0 && (
-                  <motion.div 
-                    variants={itemVariants}
-                    className="mt-4"
-                  >
-                    <Card className="shadow-sm border-t overflow-hidden">
-                      <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-transparent">
-                        <CardTitle className="flex items-center">
-                          <CalendarIcon className="mr-2 h-5 w-5 text-primary" />
-                          <span>Upcoming Aggie Events</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="divide-y">
-                          {/* Group events by date */}
-                          {Array.from(
-                            upcomingEvents.reduce((acc, event) => {
-                              const date = format(parseISO(event.start), "yyyy-MM-dd");
-                              if (!acc.has(date)) {
-                                acc.set(date, []);
-                              }
-                              acc.get(date)?.push(event);
-                              return acc;
-                            }, new Map<string, Event[]>())
-                          ).map(([dateStr, dayEvents], groupIndex) => {
-                            const date = new Date(dateStr);
-                            return (
-                              <motion.div 
-                                key={dateStr}
-                                initial="hidden"
-                                animate="visible"
-                                custom={groupIndex}
-                                className="p-4"
-                                variants={{
-                                  hidden: { opacity: 0 },
-                                  visible: i => ({
-                                    opacity: 1,
-                                    transition: { delay: i * 0.1 }
-                                  })
-                                }}
-                              >
-                                <h4 className="text-sm font-medium mb-3 flex items-center bg-muted/30 p-2 rounded">
-                                  <motion.div
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ delay: groupIndex * 0.1 + 0.2, type: "spring" }}
-                                    className="mr-2 h-1.5 w-1.5 rounded-full bg-primary"
-                                  />
-                                  {format(date, "EEEE, MMMM d")}
-                                </h4>
-                                <div className="ml-4 space-y-2 border-l-2 border-primary/20 pl-4">
-                                  {dayEvents.map((event, eventIndex) => (
-                                    <motion.div 
-                                      key={event.id}
-                                      variants={eventCardVariants}
-                                      whileHover="hover"
-                                      whileTap="tap"
-                                      custom={eventIndex}
-                                      className="rounded-md border bg-card shadow-sm overflow-hidden cursor-pointer"
-                                      onClick={() => {
-                                        const fullEvent = calendarEvents.find(e => e.id === event.id);
-                                        if (fullEvent) {
-                                          setSelectedEvent(fullEvent as ProcessedEvent);
-                                          setDialogOpen(true);
-                                        }
-                                      }}
-                                    >
-                                      <div className="flex items-start p-3">
-                                        <div 
-                                          className={cn(
-                                            "w-1 h-full self-stretch flex-shrink-0 rounded-full",
-                                            {
-                                              "bg-blue-500": eventColorMap.get(event.id) === "blue",
-                                              "bg-green-500": eventColorMap.get(event.id) === "green",
-                                              "bg-yellow-500": eventColorMap.get(event.id) === "yellow",
-                                              "bg-pink-500": eventColorMap.get(event.id) === "pink",
-                                              "bg-purple-500": eventColorMap.get(event.id) === "purple",
-                                              "bg-red-500": eventColorMap.get(event.id) === "red",
-                                              "bg-orange-500": eventColorMap.get(event.id) === "orange",
-                                              "bg-indigo-500": eventColorMap.get(event.id) === "indigo",
-                                              "bg-teal-500": eventColorMap.get(event.id) === "teal",
-                                              "bg-cyan-500": eventColorMap.get(event.id) === "cyan",
-                                              "bg-emerald-500": eventColorMap.get(event.id) === "emerald",
-                                              "bg-rose-500": eventColorMap.get(event.id) === "rose",
-                                              "bg-amber-500": eventColorMap.get(event.id) === "amber",
-                                              "bg-lime-500": eventColorMap.get(event.id) === "lime",
-                                              "bg-sky-500": eventColorMap.get(event.id) === "sky",
-                                              "bg-gray-500": !eventColorMap.get(event.id),
-                                            }
-                                          )}
-                                        />
-                                        <div className="ml-3 flex-1">
-                                          <div className="flex justify-between items-start">
-                                            <div>
-                                              <p className="font-medium text-sm line-clamp-1">{event.title}</p>
-                                              <p className="text-xs text-muted-foreground mt-1">
-                                                {event.start ? format(parseISO(event.start), "h:mm a") : "Time not set"}
-                                                {event.location && ` • ${event.location}`}
-                                              </p>
-                                            </div>
-                                            <Badge 
-                                              variant="outline" 
-                                              className="rounded-sm px-1 py-0 text-xs"
-                                            >
-                                              {categories[event.event_type as EventType] || 'Event'}
-                                            </Badge>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-              </>
-            )}
-          </AnimatePresence>
+              </AnimatePresence>
+            </section>
+          </div>
         </div>
-      </motion.div>
 
-      {/* Event Detail Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md overflow-hidden p-0">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            variants={dialogVariants}
-            className="p-6"
+        {/* Event Information Dialog with Integrated RSVP */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent
+            className="w-full max-h-[100dvh] p-0 overflow-hidden overflow-y-auto scrollbar-hidden 
+            sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg"
           >
-            <DialogHeader>
-              <DialogTitle>Event Details</DialogTitle>
-            </DialogHeader>
-            {selectedEvent && (
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold">{selectedEvent.title}</h3>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{format(selectedEvent.start, "MMM d, yyyy • h:mm a")} - {format(selectedEvent.end, "h:mm a")}</span>
-                </div>
-                
-                {selectedEvent.location && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedEvent.location}</span>
+            <motion.div
+              variants={dialogVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="py-5 px-4"
+            >
+              {selectedEvent && (
+                <div className="space-y-6">
+                  {/* Event Information */}
+                  <div className="space-y-2">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl py-2 font-bold">
+                        {selectedEvent.title}
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    {/* Date, Time & Location */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        {/* Calendar Icon */}
+                        <div className="w-10 h-10 rounded-sm border bg-white text-center overflow-hidden shadow-sm shrink-0">
+                          <div className="bg-gray-100 text-[10px] font-medium text-gray-700 py-[3px] leading-none">
+                            {format(selectedEvent.start, "MMM").toUpperCase()}
+                          </div>
+                          <div className="text-[15px] font-extrabold text-gray-900 leading-none pt-[3px]">
+                            {format(selectedEvent.start, "d")}
+                          </div>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="text-sm">
+                          <p className="font-semibold text-[14px]">
+                            {format(selectedEvent.start, "EEEE, MMMM d")}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {format(selectedEvent.start, "h:mm a")} –{" "}
+                            {format(selectedEvent.end, "h:mm a")}
+                          </p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="w-px h-6 bg-border" />
+
+                        {/* Location Info */}
+                        {selectedEvent.location && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="w-10 h-10 border rounded-md bg-gray-100 flex items-center justify-center">
+                              <MapPin className="h-5 w-5 text-gray-500" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-[14px]">
+                                {selectedEvent.location}
+                              </p>
+                              <p className="text-muted-foreground text-xs">
+                                {selectedEvent.location.includes("http")
+                                  ? "Online Event"
+                                  : "In-person Event"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-                
-                {selectedEvent.description && (
-                  <div className="mt-4 bg-muted/30 p-3 rounded-md">
-                    <p className="text-sm whitespace-pre-line">{selectedEvent.description}</p>
-                  </div>
-                )}
-                
-                <div className="flex justify-end pt-4">
-                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    <Button 
-                      variant="outline" 
-                      className="mr-2"
-                      onClick={() => setDialogOpen(false)}
-                    >
-                      Close
-                    </Button>
-                  </motion.div>
-                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    <Button 
-                      onClick={() => router.push(`/calendar/${selectedEvent.id}`)}
-                    >
-                      View Details
-                    </Button>
-                  </motion.div>
+
+                  {/* Join Event Card */}
+                  <Card className="border border-primary/20 bg-primary/5 p-4 space-y-4">
+                    {new Date(selectedEvent.end) < new Date() ? (
+                      // Past Event Notice
+                      <div className="text-center text-sm text-muted-foreground space-y-1">
+                        <h3 className="font-semibold text-base text-gray-800">
+                          Past Event
+                        </h3>
+                        <p>
+                          This event ended on{" "}
+                          <span className="font-medium">
+                            {format(
+                              new Date(selectedEvent.end),
+                              "MMMM d, yyyy"
+                            )}
+                          </span>
+                          .
+                        </p>
+                      </div>
+                    ) : rsvpSuccess ? (
+                      // RSVP Success
+                      <div className="text-center py-2">
+                        <div className="mb-2 mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                          <Check className="h-5 w-5 text-green-600" />
+                        </div>
+                        <h3 className="font-semibold text-green-800 text-sm">
+                          Registration Confirmed!
+                        </h3>
+                        <p className="text-xs text-green-600 mt-1">
+                          A confirmation email has been sent to you.
+                        </p>
+                      </div>
+                    ) : profile ? (
+                      // Logged-in RSVP
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-center gap-2 text-gray-800">
+                          <span className="font-semibold">
+                            Register as {profile.full_name}
+                          </span>{" "}
+                          <span className="text-muted-foreground">
+                            {profile.email}
+                          </span>
+                        </div>
+                        <Button
+                          onClick={handleRSVP}
+                          disabled={rsvpLoading}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 text-sm"
+                        >
+                          {rsvpLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Registering...
+                            </>
+                          ) : (
+                            "One-Click RSVP"
+                          )}
+                        </Button>
+                      </div>
+                    ) : (
+                      // Guest RSVP
+                      <div className="space-y-3 text-sm">
+                        <p className="font-medium text-gray-800">
+                          Welcome! To join the event, please register below.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Input
+                            id="rsvp-name"
+                            placeholder="Full name"
+                            value={rsvpData.name}
+                            onChange={(e) =>
+                              setRsvpData({ ...rsvpData, name: e.target.value })
+                            }
+                            required
+                            className="text-sm"
+                          />
+                          <Input
+                            id="rsvp-email"
+                            type="email"
+                            placeholder="your@email.com"
+                            value={rsvpData.email}
+                            onChange={(e) =>
+                              setRsvpData({
+                                ...rsvpData,
+                                email: e.target.value,
+                              })
+                            }
+                            required
+                            className="text-sm"
+                          />
+                        </div>
+                        <Textarea
+                          id="rsvp-notes"
+                          placeholder="Notes (optional)"
+                          value={rsvpData.notes}
+                          onChange={(e) =>
+                            setRsvpData({ ...rsvpData, notes: e.target.value })
+                          }
+                          rows={2}
+                          className="text-sm"
+                        />
+                        <Button
+                          onClick={handleRSVP}
+                          disabled={
+                            rsvpLoading ||
+                            !rsvpData.name.trim() ||
+                            !rsvpData.email.trim()
+                          }
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 text-sm"
+                        >
+                          {rsvpLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Registering...
+                            </>
+                          ) : (
+                            "Register for Event"
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* About Event */}
+                  {selectedEvent.description && (
+                    <>
+                      <div className="space-y-3">
+                        <h3 className="text-sm text-muted-foreground font-semibold">
+                          About Event
+                        </h3>
+                        <Separator />
+                        <div className="rounded-md bg-muted/30 p-4">
+                          <p className="whitespace-pre-line text-sm leading-relaxed">
+                            {selectedEvent.description}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </div>
-            )}
-          </motion.div>
-        </DialogContent>
-      </Dialog>
-    </motion.div>
+              )}
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+      </motion.div>
+    </>
   );
-} 
+}

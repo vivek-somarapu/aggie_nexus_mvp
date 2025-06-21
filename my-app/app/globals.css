@@ -118,6 +118,17 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 }
+/* Hide scrollbar but allow scroll */
+.scrollbar-hidden::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-hidden::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-hidden::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
 
 @layer base {
   * {

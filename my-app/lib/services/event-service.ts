@@ -1,125 +1,145 @@
-export type Event = {
+/* lib/services/event-services.ts */
+export type EventType =
+  | "workshop"
+  | "info_session"
+  | "networking"
+  | "hackathon"
+  | "deadline"
+  | "meeting"
+  | "other"
+  | "personal";
+
+export const categories: Record<EventType, string> = {
+  workshop: "Workshops",
+  info_session: "Info Sessions",
+  networking: "Networking Events",
+  hackathon: "Hackathons",
+  deadline: "Project Deadlines",
+  meeting: "Meetings",
+  other: "Other Events",
+  personal: "Personal Events",
+};
+
+export interface Event {
   id: string;
   title: string;
   description: string;
-  start_date: string;
-  end_date: string;
+  start_time: string; // ISO
+  end_time: string; // ISO
   location: string;
-  organizer_id: string;
-  event_type: string;
   is_virtual: boolean;
   link?: string;
+
+  /** NEW */
+  event_type: EventType;
+  poster_url?: string; // storage URL or null
+
+  organizer_id: string;
   attendees?: string[];
+
   created_at: string;
   updated_at: string;
-  status?: 'pending' | 'approved' | 'rejected';
+
+  status?: "pending" | "approved" | "rejected";
   approved_by?: string;
   approved_at?: string;
-};
+}
+
+const BASE = "/api/events";
+
+async function parseJSON<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 
 export const eventService = {
-  // Get all events
-  getEvents: async (): Promise<Event[]> => {
-    const response = await fetch('/api/events?status=approved');
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch events: ${response.statusText}`);
-    }
-    
-    return response.json();
+  /** fetch public, approved events */
+  async getEvents(): Promise<Event[]> {
+    const r = await fetch(`${BASE}?status=approved`);
+    return parseJSON<Event[]>(r);
   },
 
-  // Get events by status
-  getEventsByStatus: async (status: 'pending' | 'approved' | 'rejected'): Promise<Event[]> => {
-    const response = await fetch(`/api/events?status=${status}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch events: ${response.statusText}`);
-    }
-    
-    return response.json();
+  /** manager view: fetch by status */
+  async getEventsByStatus(
+    status: "pending" | "approved" | "rejected"
+  ): Promise<Event[]> {
+    const r = await fetch(`${BASE}?status=${status}`);
+    return parseJSON<Event[]>(r);
   },
 
-  // Get an event by ID
-  getEvent: async (id: string): Promise<Event | null> => {
-    const response = await fetch(`/api/events/${id}`);
-    
-    if (response.status === 404) {
-      return null;
-    }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch event: ${response.statusText}`);
-    }
-    
-    return response.json();
+  /** fetch one by id */
+  async getEvent(id: string): Promise<Event | null> {
+    const r = await fetch(`${BASE}/${id}`);
+    if (r.status === 404) return null;
+    return parseJSON<Event>(r);
   },
 
-  // Create a new event (automatically sets status to pending)
-  createEvent: async (eventData: Omit<Event, "id" | "created_at" | "updated_at" | "status" | "approved_by" | "approved_at">): Promise<Event> => {
-    const response = await fetch('/api/events', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ...eventData, status: 'pending' }),
+  /** create new event (poster_url must already be uploaded separately) */
+  async createEvent(
+    data: Omit<
+      Event,
+      | "id"
+      | "created_at"
+      | "updated_at"
+      | "approved_by"
+      | "approved_at"
+      | "status"
+    >
+  ): Promise<Event> {
+    const r = await fetch(BASE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...data, status: "pending" }),
     });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to create event: ${response.statusText}`);
-    }
-    
-    return response.json();
+    return parseJSON<Event>(r);
   },
 
-  // Update an existing event
-  updateEvent: async (id: string, eventData: Partial<Event>): Promise<Event | null> => {
-    const response = await fetch(`/api/events/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(eventData),
+  /** update core fields */
+  async updateEvent(
+    id: string,
+    data: Partial<
+      Pick<
+        Event,
+        | "title"
+        | "description"
+        | "start_time"
+        | "end_time"
+        | "location"
+        | "is_virtual"
+        | "link"
+        | "event_type"
+        | "poster_url"
+      >
+    >
+  ): Promise<Event | null> {
+    const r = await fetch(`${BASE}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
     });
-    
-    if (response.status === 404) {
-      return null;
-    }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to update event: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(await r.text());
+    return parseJSON<Event>(r);
   },
 
-  // Update event status (for manager approval/rejection)
-  updateEventStatus: async (id: string, status: 'pending' | 'approved' | 'rejected'): Promise<Event | null> => {
-    const response = await fetch(`/api/events/${id}/status`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+  /** change status (manager only) */
+  async updateEventStatus(
+    id: string,
+    status: "pending" | "approved" | "rejected"
+  ): Promise<Event | null> {
+    const r = await fetch(`${BASE}/${id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    
-    if (response.status === 404) {
-      return null;
-    }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to update event status: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(await r.text());
+    return parseJSON<Event>(r);
   },
 
-  // Delete an event
-  deleteEvent: async (id: string): Promise<boolean> => {
-    const response = await fetch(`/api/events/${id}`, {
-      method: 'DELETE',
-    });
-    
-    return response.ok;
+  /** delete event */
+  async deleteEvent(id: string): Promise<boolean> {
+    const r = await fetch(`${BASE}/${id}`, { method: "DELETE" });
+    return r.ok;
   },
-}; 
+};

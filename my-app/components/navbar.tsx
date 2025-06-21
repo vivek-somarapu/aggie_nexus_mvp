@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRef } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,10 +28,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import { inquiryService } from "@/lib/services/inquiry-service";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { authUser, profile, signOut, isLoading, isManager } = useAuth();
   const [pendingInquiries, setPendingInquiries] = useState(0);
   const [openNavigation, setOpenNavigation] = useState(false);
@@ -70,7 +73,11 @@ export default function Navbar() {
   }, [authUser]);
 
   const handleLogout = async () => {
+    setOpenNavigation(false);
+
     await signOut();
+
+    router.push("/");
   };
 
   // Common routes for signed-in users
@@ -80,8 +87,14 @@ export default function Navbar() {
     { href: "/calendar", label: "Calendar" },
   ];
 
-  // While auth state is resolving, render nothing (or a spinner)
-  if (isLoading) return null;
+  const hasResolvedOnce = useRef(false);
+  if (!hasResolvedOnce.current && !isLoading) {
+    hasResolvedOnce.current = true;
+  }
+  // Block *only* before the first auth check finishes
+  if (!hasResolvedOnce.current) {
+    return null; // or a full-screen spinner if you prefer
+  }
 
   // AUTHENTICATED navbar
   return (

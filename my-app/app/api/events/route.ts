@@ -1,116 +1,156 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAllEvents, getApprovedEvents, getEventsByStatus, createEvent } from '@/lib/models/events';
-import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
+// app/api/events/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import {
+  getApprovedEvents,
+  getEventsByStatus,
+  createEvent,
+} from "@/lib/models/events";
+import { createClient } from "@/lib/supabase/server";
+
+import type { EventType } from "@/lib/services/event-service";
+
+const allowedTypes: readonly EventType[] = [
+  "workshop",
+  "info_session",
+  "networking",
+  "hackathon",
+  "deadline",
+  "meeting",
+  "other",
+  "personal",
+];
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const status = searchParams.get('status') as 'pending' | 'approved' | 'rejected' | null;
-    
+    const status = request.nextUrl.searchParams.get("status") as
+      | "pending"
+      | "approved"
+      | "rejected"
+      | null;
+
     let events;
-    
-    // Check if user is authenticated and is a manager for non-approved events
-    if (status && status !== 'approved') {
-      const cookieStore = cookies();
+    if (status && status !== "approved") {
+      // only managers can fetch non-approved
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // If not authenticated or requesting non-approved events
-      if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      
-      // Check if user is a manager
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user)
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_manager')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("is_manager")
+        .eq("id", user.id)
         .single();
-        
-      if (!profile?.is_manager) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-      
-      // If user is authenticated and is a manager, fetch events by status
+      if (!profile?.is_manager)
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
       events = await getEventsByStatus(status);
-    } else if (status === 'approved') {
-      // Everyone can see approved events
-      events = await getApprovedEvents();
     } else {
-      // Default to showing only approved events if no status is specified
+      // approved or default → approved
       events = await getApprovedEvents();
     }
-    
-    // Format the events for the calendar component
-    const formattedEvents = events.map(event => ({
-      id: event.id,
-      title: event.title,
-      description: event.description,
-      start: event.start_time,
-      end: event.end_time,
-      location: event.location,
-      color: event.color,
-      event_type: event.color || 'other', // Backward compatibility
-      created_by: event.created_by,
-      status: event.status,
-      approved_by: event.approved_by,
-      approved_at: event.approved_at,
+
+    const formatted = events.map((e) => ({
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      start: e.start_time,
+      end: e.end_time,
+      location: e.location,
+      is_virtual: e.is_virtual,
+      link: e.link,
+      event_type: e.event_type,
+      poster_url: e.poster_url,
+      organizer_id: e.organizer_id,
+      status: e.status,
+      approved_by: e.approved_by,
+      approved_at: e.approved_at,
+      created_at: e.created_at,
+      updated_at: e.updated_at,
     }));
-    
-    return NextResponse.json(formattedEvents);
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
+
+    return NextResponse.json(formatted);
+  } catch (err) {
+    console.error("Error fetching events:", err);
+    return NextResponse.json(
+      { error: "Failed to fetch events" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if user is authenticated
-    const cookieStore = cookies();
+    // ─── AUTH CHECK ──────────────────────────────────────
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // ─── PARSE & VALIDATE BODY ───────────────────────────
     const body = await request.json();
-    
-    // Validate required fields
-    if (!body.title || !body.start_time || !body.end_time) {
+    for (const field of ["title", "start_time", "end_time", "event_type"]) {
+      if (!body[field]) {
+        return NextResponse.json(
+          { error: `${field} is required` },
+          { status: 400 }
+        );
+      }
+    }
+    if (!allowedTypes.includes(body.event_type)) {
       return NextResponse.json(
-        { error: 'Missing required fields: title, start_time, and end_time are required' },
+        { error: "Invalid event_type" },
         { status: 400 }
       );
     }
-    
-    // Add the current user as the creator
-    body.created_by = user.id;
-    
-    // Set initial status to pending
-    body.status = 'pending';
-    
-    const event = await createEvent(body);
-    
-    // Format the response for the calendar component
-    const formattedEvent = {
-      id: event.id,
-      title: event.title,
-      description: event.description,
-      start: event.start_time,
-      end: event.end_time,
-      location: event.location,
-      color: event.color,
-      event_type: event.color || 'other', // Backward compatibility
-      created_by: event.created_by,
-      status: event.status,
+
+    // ─── INSERT ──────────────────────────────────────────
+    const toInsert = {
+      title: body.title,
+      description: body.description ?? null,
+      start_time: body.start_time,
+      end_time: body.end_time,
+      location: body.location ?? null,
+      is_virtual: body.is_virtual ?? false,
+      link: body.link ?? null,
+      event_type: body.event_type as EventType,
+      poster_url: body.poster_url ?? null,
+      organizer_id: user.id,
+      status: "pending" as const,
     };
-    
-    return NextResponse.json(formattedEvent, { status: 201 });
-  } catch (error) {
-    console.error('Error creating event:', error);
-    return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
+    const ev = await createEvent(toInsert);
+
+    // ─── FORMAT RESPONSE ─────────────────────────────────
+    return NextResponse.json(
+      {
+        id: ev.id,
+        title: ev.title,
+        description: ev.description,
+        start: ev.start_time,
+        end: ev.end_time,
+        location: ev.location,
+        is_virtual: ev.is_virtual,
+        link: ev.link,
+        event_type: ev.event_type,
+        poster_url: ev.poster_url,
+        organizer_id: ev.organizer_id,
+        status: ev.status,
+        approved_by: ev.approved_by,
+        approved_at: ev.approved_at,
+        created_at: ev.created_at,
+        updated_at: ev.updated_at,
+      },
+      { status: 201 }
+    );
+  } catch (err) {
+    console.error("Error creating event:", err);
+    return NextResponse.json(
+      { error: "Failed to create event" },
+      { status: 500 }
+    );
   }
-} 
+}

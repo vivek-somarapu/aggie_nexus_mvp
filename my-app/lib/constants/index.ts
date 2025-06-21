@@ -1,10 +1,15 @@
-// Animation variants
+// ---------- Animation Variants ----------
+
+// Page-level fade with staggered children
 export const pageVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    y: 0,
-    transition: { duration: 0.5 },
+    transition: {
+      duration: 0.5,
+      when: "beforeChildren",
+      staggerChildren: 0.1,
+    },
   },
   exit: {
     opacity: 0,
@@ -12,16 +17,18 @@ export const pageVariants = {
   },
 };
 
+// For container components (e.g., list wrappers)
 export const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
+      staggerChildren: 0.07,
     },
   },
 };
 
+// Standard card appearance
 export const cardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
@@ -35,6 +42,7 @@ export const cardVariants = {
   },
 };
 
+// For list items sliding in from the side
 export const itemVariants = {
   hidden: { opacity: 0, x: -10 },
   visible: {
@@ -43,8 +51,10 @@ export const itemVariants = {
     transition: { duration: 0.4 },
   },
 };
+
+// For onboarding or step transitions
 export const stepVariants = {
-  initial: { opacity: 0, x: 50, y: 20 }, // start slightly below
+  initial: { opacity: 0, x: 50, y: 20 },
   animate: {
     opacity: 1,
     x: 0,
@@ -57,7 +67,7 @@ export const stepVariants = {
   exit: {
     opacity: 0,
     x: 0,
-    y: 20, // exit slightly below again
+    y: 20,
     transition: {
       duration: 0.3,
       ease: "easeIn",
@@ -65,7 +75,63 @@ export const stepVariants = {
   },
 };
 
-// Get industry options from the project page
+// For calendar pop-in UI elements
+export const calendarVariants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: "spring", damping: 20, stiffness: 150, delay: 0.2 },
+  },
+};
+
+// Dialog/modal transitions
+export const dialogVariants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.9,
+    y: 20,
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      damping: 25,
+      stiffness: 300,
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.95,
+    y: 10,
+    transition: { duration: 0.2 },
+  },
+};
+
+// Event card with hover/tap interaction
+export const eventCardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", damping: 15, stiffness: 120 },
+  },
+  hover: {
+    y: -5,
+    boxShadow:
+      "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+    transition: { duration: 0.2 },
+  },
+  tap: {
+    scale: 0.98,
+    transition: { duration: 0.1 },
+  },
+};
+
+// ---------- Select Options ----------
+
 export const industryOptions = [
   "Technology",
   "Healthcare",
@@ -84,7 +150,6 @@ export const industryOptions = [
   "Other",
 ];
 
-// Get skill options from the project page
 export const skillOptions = [
   "Programming",
   "Design",
@@ -102,3 +167,46 @@ export const skillOptions = [
   "Problem Solving",
   "Creativity",
 ];
+
+// ---------- Calendar event options ----------
+
+export type EventType =
+  | "workshop"
+  | "info_session"
+  | "networking"
+  | "hackathon"
+  | "deadline"
+  | "meeting"
+  | "other"
+  | "personal";
+
+// Maps event types to readable category names
+export const categories: Record<EventType, string> = {
+  workshop: "Workshops",
+  info_session: "Info Sessions",
+  networking: "Networking Events",
+  hackathon: "Hackathons",
+  deadline: "Project Deadlines",
+  meeting: "Meetings",
+  other: "Other Events",
+  personal: "Personal Events",
+};
+
+// Tailwind-safe color palette used in event variants or tags
+export const colorPalette = [
+  "blue",
+  "green",
+  "yellow",
+  "pink",
+  "purple",
+  "red",
+  "orange",
+  "indigo",
+  "teal",
+  "cyan",
+  "emerald",
+  "rose",
+  "amber",
+  "lime",
+  "sky",
+] as const;
