@@ -51,7 +51,7 @@ function AlertDescription({ children }: { children: React.ReactNode }) {
 export default function UserPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
-  const { user: currentUser } = useAuth()
+  const { authUser: currentUser, isLoading: authLoading } = useAuth()
   
   const [user, setUser] = useState<User | null>(null)
   const [userProjects, setUserProjects] = useState<Project[]>([])
@@ -74,7 +74,17 @@ export default function UserPage() {
     const fetchUser = async () => {
       try {
         setIsLoadingUser(true)
+        setError(null)
+        
+        // Add timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          setError("Loading timeout. Please refresh the page.")
+          setIsLoadingUser(false)
+        }, 10000) // 10 second timeout
+        
         const userData = await userService.getUser(id);
+        clearTimeout(timeoutId)
+        
         if (!userData) {
           return notFound();
         }

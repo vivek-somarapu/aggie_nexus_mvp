@@ -194,7 +194,7 @@ export async function updateProject(id: string, projectData: Partial<Project>): 
 export async function incrementProjectViews(id: string): Promise<void> {
   const supabase = await getSupabase();
   
-  const { error } = await supabase.rpc('increment_project_views', { project_id: id });
+  const { error } = await supabase.rpc('increment_project_views', { p_project_id: id });
   
   if (error) throw error;
 }
