@@ -127,7 +127,7 @@ export default function AuthWaitingPage() {
         sessionStorage.removeItem("awaitingVerification")
         
         setTimeout(() => {
-          if (profile && profile.bio && profile.skills?.length) {
+          if (profile && profile.bio && profile.skills && profile.skills.length > 0) {
             router.push("/")
           } else {
             router.push("/profile/setup")
@@ -252,7 +252,13 @@ export default function AuthWaitingPage() {
 
   // Handle resend verification email
   const handleResendVerification = async () => {
-    if (!userEmail) return
+    // Try multiple sources for the email
+    const emailToUse = userEmail || authUser?.email;
+    
+    if (!emailToUse) {
+      setErrorMessage("Email address not found. Please sign up again.");
+      return;
+    }
     
     try {
       setResendLoading(true)
@@ -261,17 +267,20 @@ export default function AuthWaitingPage() {
       const supabase = createClient()
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email: userEmail,
+        email: emailToUse,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
       
       if (error) {
-        setErrorMessage(error.message)
+        console.error("Resend error details:", error);
+        setErrorMessage(`Failed to resend email: ${error.message}`);
       } else {
         setEmailResent(true)
-        setMessage(`Verification email resent to ${userEmail}. Please check your inbox.`)
+        setMessage(`Verification email resent to ${emailToUse}. Please check your inbox.`)
+        // Store the email in localStorage for future use
+        localStorage.setItem("lastSignupEmail", emailToUse);
       }
     } catch (err) {
       console.error("Failed to resend verification email:", err)
@@ -452,6 +461,11 @@ export default function AuthWaitingPage() {
                   <p className="text-sm text-muted-foreground mb-6">
                     {getTimeMessage()}
                   </p>
+                  {userEmail && (
+                    <p className="text-xs text-muted-foreground mb-4">
+                      💡 You'll need to verify your email before you can access all features.
+                    </p>
+                  )}
                 </motion.div>
                 
                 {errorMessage && (
@@ -468,7 +482,7 @@ export default function AuthWaitingPage() {
                     <Button 
                       onClick={handleResendVerification} 
                       className="w-full" 
-                      disabled={resendLoading || !userEmail}
+                      disabled={resendLoading || (!userEmail && !authUser?.email)}
                     >
                       {resendLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Resend Verification Email
@@ -507,7 +521,7 @@ export default function AuthWaitingPage() {
                     onClick={handleManualCheck} 
                     variant="secondary" 
                     className="w-full mt-4" 
-                    disabled={isChecking || !userEmail}
+                    disabled={isChecking || (!userEmail && !authUser?.email)}
                   >
                     {isChecking ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

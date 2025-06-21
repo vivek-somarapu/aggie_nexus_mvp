@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 
 export async function fetchUserProfile(userId: string): Promise<any> {
   const supabase = createClient();

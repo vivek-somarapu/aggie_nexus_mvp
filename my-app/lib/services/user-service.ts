@@ -1,5 +1,4 @@
 import { User } from "@/lib/models/users";
-import { supabase } from "@/lib/db";
 import { createClient } from '@/lib/supabase/client';
 
 export interface UserSearchParams {

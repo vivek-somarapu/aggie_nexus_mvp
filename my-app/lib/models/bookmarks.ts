@@ -1,4 +1,4 @@
-import { supabase } from '../db';
+import { createClient } from '@/lib/supabase/server';
 
 export type UserBookmark = {
   id: string;
@@ -15,6 +15,7 @@ export type ProjectBookmark = {
 };
 
 export async function getUserBookmarks(userId: string): Promise<UserBookmark[]> {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('user_bookmarks')
     .select('*')
@@ -30,6 +31,7 @@ export async function getUserBookmarks(userId: string): Promise<UserBookmark[]> 
 }
 
 export async function getProjectBookmarks(userId: string): Promise<ProjectBookmark[]> {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('project_bookmarks')
     .select('*')
@@ -45,6 +47,7 @@ export async function getProjectBookmarks(userId: string): Promise<ProjectBookma
 }
 
 export async function isUserBookmarked(userId: string, bookmarkedUserId: string): Promise<boolean> {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('user_bookmarks')
     .select('id')
@@ -61,6 +64,7 @@ export async function isUserBookmarked(userId: string, bookmarkedUserId: string)
 }
 
 export async function isProjectBookmarked(userId: string, projectId: string): Promise<boolean> {
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('project_bookmarks')
     .select('id')
@@ -82,6 +86,7 @@ export async function toggleUserBookmark(userId: string, bookmarkedUserId: strin
   
   if (exists) {
     // Remove bookmark
+    const supabase = await createClient();
     const { error } = await supabase
       .from('user_bookmarks')
       .delete()
@@ -96,6 +101,7 @@ export async function toggleUserBookmark(userId: string, bookmarkedUserId: strin
     return false;
   } else {
     // Add bookmark
+    const supabase = await createClient();
     const { error } = await supabase
       .from('user_bookmarks')
       .insert({
@@ -119,6 +125,7 @@ export async function toggleProjectBookmark(userId: string, projectId: string): 
   
   if (exists) {
     // Bookmark exists, so remove it
+    const supabase = await createClient();
     const { error } = await supabase
       .from('project_bookmarks')
       .delete()
@@ -133,6 +140,7 @@ export async function toggleProjectBookmark(userId: string, projectId: string): 
     return { action: 'removed' };
   } else {
     // Bookmark doesn't exist, so add it
+    const supabase = await createClient();
     const { error } = await supabase
       .from('project_bookmarks')
       .insert({

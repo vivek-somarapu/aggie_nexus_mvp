@@ -297,8 +297,8 @@ export default function UserPage() {
                   <div>
                     <h3 className="font-semibold mb-2">Industry</h3>
                     <div className="flex flex-wrap gap-2">
-                      {user.industry.map((ind) => (
-                        <Badge key={ind} variant="secondary">
+                      {user.industry.map((ind, indIndex) => (
+                        <Badge key={`user-${id}-industry-${indIndex}`} variant="secondary">
                           {ind}
                         </Badge>
                       ))}
@@ -308,8 +308,8 @@ export default function UserPage() {
                   <div>
                     <h3 className="font-semibold mb-2">Skills</h3>
                     <div className="flex flex-wrap gap-2">
-                      {user.skills.map((skill) => (
-                        <Badge key={skill} variant="outline">
+                      {user.skills.map((skill, skillIndex) => (
+                        <Badge key={`user-${id}-skill-${skillIndex}`} variant="outline">
                           {skill}
                         </Badge>
                       ))}
