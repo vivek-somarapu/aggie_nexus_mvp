@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     // Convert to boolean (string 'true' becomes true, anything else is false)
     const justLoggedIn = justLoggedInParam === 'true';
     
-    const supabase = createClient();
+    const supabase = await createClient();
     
     // Check if user is authenticated (secure)
     const { data: { user }, error: userError } = await supabase.auth.getUser();

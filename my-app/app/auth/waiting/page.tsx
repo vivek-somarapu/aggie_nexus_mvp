@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Loader2, Mail, AlertCircle, LogOut, Home, CheckCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, Variants, Transition } from "framer-motion"
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 import { Card, CardContent } from "@/components/ui/card"
 
 // Maximum waiting time (2 minutes) in milliseconds
@@ -16,7 +17,7 @@ const MAX_WAIT_TIME = 120000
 
 export default function AuthWaitingPage() {
   const router = useRouter()
-  const { user, profile, isLoading, signOut } = useAuth()
+  const { authUser, profile, isLoading, signOut } = useAuth()
   const [message, setMessage] = useState("Please verify your email to continue...")
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [resendLoading, setResendLoading] = useState(false)
@@ -56,6 +57,46 @@ export default function AuthWaitingPage() {
       }
     }
   }, [])
+
+    // ---------------------------------------------------------------------------
+  // NEW: instant reaction to any SIGNED_IN / TOKEN_REFRESHED event in *any* tab
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const supabase = createClient()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (
+          ["SIGNED_IN", "USER_UPDATED", "TOKEN_REFRESHED"].includes(event) &&
+          session?.user?.email_confirmed_at
+        ) {
+          setIsVerified(true)
+          setMessage("Email verified! Redirecting you...")
+          setIsRedirecting(true)
+
+          // stop the poller (if still running)
+          if (checkInterval.current) {
+            clearInterval(checkInterval.current)
+            checkInterval.current = null
+          }
+
+          // let other tabs (or a future session) know
+          localStorage.setItem("emailVerified", "true")
+          sessionStorage.removeItem("awaitingVerification")
+
+          // same UX delay as elsewhere
+          setTimeout(() => {
+            router.push(
+              profile && profile.bio && profile.skills?.length ? "/" : "/profile/setup"
+            )
+          }, 1500)
+        }
+      }
+    )
+
+    // clean up when component unmounts
+    return () => subscription.unsubscribe()
+  }, [profile, router])
 
   // Handle manual verification check
   const handleManualCheck = async () => {
@@ -129,7 +170,7 @@ export default function AuthWaitingPage() {
     // Add storage listener for cross-tab communication
     window.addEventListener("storage", handleStorageChange)
     
-    if (!user && !userEmail) {
+    if (!authUser && !userEmail) {
       // If no user and no email, redirect to login
       router.push("/auth/login")
       return () => {
@@ -138,8 +179,8 @@ export default function AuthWaitingPage() {
     }
     
     // Get user email for display if available from user object
-    if (user && user.email && !userEmail) {
-      setUserEmail(user.email)
+    if (authUser && authUser.email && !userEmail) {
+      setUserEmail(authUser.email)
     }
     
     // Function to check if email is verified
@@ -207,7 +248,7 @@ export default function AuthWaitingPage() {
       }
       window.removeEventListener("storage", handleStorageChange)
     }
-  }, [user, profile, router, userEmail])
+  }, [authUser, profile, router, userEmail])
 
   // Handle resend verification email
   const handleResendVerification = async () => {
@@ -272,13 +313,13 @@ export default function AuthWaitingPage() {
     exit: { opacity: 0, transition: { duration: 0.3 } }
   }
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { y: 20, opacity: 0 },
     visible: { 
       y: 0, 
       opacity: 1,
-      transition: { type: "spring", damping: 12 }
-    }
+      transition: { type: "spring", damping: 12 } as Transition,
+    },
   }
 
   const pulseVariants = {
