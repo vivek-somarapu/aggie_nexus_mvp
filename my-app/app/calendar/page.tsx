@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Image from "next/image";
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { rsvpService } from "@/lib/services/rsvp-service";
+import { userService } from "@/lib/services/user-service";
 import {
   Info,
   Loader2,
@@ -31,6 +35,7 @@ import {
   CalendarIcon,
   Filter,
   List,
+  UserIcon,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { eventService } from "@/lib/services/event-service";
@@ -53,12 +58,7 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 /* ────── Constants ────── */
@@ -86,6 +86,7 @@ interface Event extends Omit<BaseEvent, "start_time" | "end_time"> {
 type ProcessedEvent = FullCalendarEvent & {
   description: string;
   location: string;
+  created_by?: string;
 };
 
 // Add this after the imports and before the component
@@ -129,6 +130,11 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
     null
   );
+  const [creator, setCreator] = useState<{
+    full_name: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [loadingCreator, setLoadingCreator] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -187,6 +193,25 @@ export default function CalendarPage() {
     getEvents();
   }, [profile]); // Only re-fetch when user state changes
 
+  useEffect(() => {
+    if (!selectedEvent?.created_by) {
+      setCreator(null);
+      return;
+    }
+
+    setLoadingCreator(true);
+    userService
+      .getUser(selectedEvent.created_by)
+      .then((u) => setCreator(u))
+      .catch((err) => {
+        console.error("Failed to load event creator:", err);
+        setCreator(null);
+      })
+      .finally(() => {
+        setLoadingCreator(false);
+      });
+  }, [selectedEvent?.created_by]);
+
   // Get all events (public + personal)
   const allEvents = [...events, ...personalEvents];
 
@@ -229,6 +254,7 @@ export default function CalendarPage() {
       color: eventColorMap.get(event.id) as any,
       description: event.description || "",
       location: event.location || "",
+      created_by: event.created_by,
     }));
 
   // Handle calendar event click
@@ -630,11 +656,57 @@ export default function CalendarPage() {
                 <div className="space-y-6">
                   {/* Event Information */}
                   <div className="space-y-2">
-                    <DialogHeader>
-                      <DialogTitle className="text-2xl py-2 font-bold">
+                    <div className="pb-2">
+                      <DialogTitle className="text-2xl font-bold">
                         {selectedEvent.title}
                       </DialogTitle>
-                    </DialogHeader>
+                      <div className="flex items-center gap-2 pt-2 group">
+                        <Link
+                          href={`/users/${selectedEvent?.created_by}`}
+                          className="flex items-center gap-2"
+                        >
+                          {/* Avatar */}
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 400,
+                              damping: 10,
+                            }}
+                            className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
+                          >
+                            {loadingCreator ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            ) : creator?.avatarUrl ? (
+                              <Image
+                                src={creator.avatarUrl}
+                                alt={creator.full_name}
+                                fill
+                                className="object-cover"
+                                sizes="64px"
+                                priority
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center h-full w-full bg-muted">
+                                <span className="text-xs font-medium text-[#500000]">
+                                  {creator?.full_name
+                                    ?.charAt(0)
+                                    .toUpperCase() ?? (
+                                    <UserIcon className="h-4 w-4" />
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                          </motion.div>
+
+                          {/* Host text */}
+                          <p className="text-sm text-muted-foreground font-semibold group-hover:underline group-hover:text-foreground transition-colors duration-200">
+                            Hosted by{" "}
+                            {creator?.full_name ?? selectedEvent?.created_by}
+                          </p>
+                        </Link>
+                      </div>
+                    </div>
 
                     {/* Date, Time & Location */}
                     <div className="space-y-3">

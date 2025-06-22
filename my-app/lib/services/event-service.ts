@@ -27,14 +27,13 @@ export interface Event {
   start_time: string; // ISO
   end_time: string; // ISO
   location: string;
-  is_virtual: boolean;
   event_link?: string;
 
   /** NEW */
   event_type: EventType;
   poster_url?: string; // storage URL or null
 
-  organizer_id: string;
+  created_by: string;
   attendees?: string[];
 
   created_at: string;
@@ -105,7 +104,6 @@ export const eventService = {
         | "start_time"
         | "end_time"
         | "location"
-        | "is_virtual"
         | "event_link"
         | "event_type"
         | "poster_url"

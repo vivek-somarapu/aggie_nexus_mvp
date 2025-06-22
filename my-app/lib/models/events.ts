@@ -8,12 +8,10 @@ export type Event = {
   start_time: string; // ISO
   end_time: string; // ISO
   location: string | null;
-  is_virtual: boolean;
   event_link: string | null;
   event_type: string; // must match your EventType enum
   poster_url: string | null;
-  organizer_id: string; // who created it
-  attendees: string[] | null;
+  created_by: string; // who created it
   status: "pending" | "approved" | "rejected";
   approved_by: string | null;
   approved_at: string | null;
@@ -72,12 +70,7 @@ export async function getEventById(id: string): Promise<Event | null> {
 export async function createEvent(
   e: Omit<
     Event,
-    | "id"
-    | "created_at"
-    | "updated_at"
-    | "approved_by"
-    | "approved_at"
-    | "attendees"
+    "id" | "created_at" | "updated_at" | "approved_by" | "approved_at"
   >
 ): Promise<Event> {
   const {
@@ -86,10 +79,9 @@ export async function createEvent(
     start_time,
     end_time,
     location,
-    is_virtual,
     event_type,
     poster_url,
-    organizer_id,
+    created_by,
     event_link,
     status = "pending",
   } = e;
@@ -101,14 +93,13 @@ export async function createEvent(
     start_time,
     end_time,
     location,
-    is_virtual,
     event_link, 
     event_type,
     poster_url,
-    organizer_id,
+    created_by,
     status
   ) VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
   )
    RETURNING *`,
     [
@@ -117,11 +108,10 @@ export async function createEvent(
       start_time, // $3
       end_time, // $4
       location, // $5
-      is_virtual, // $6
       event_link, // $7
       event_type, // $8
       poster_url, // $9
-      organizer_id, // $10
+      created_by, // $10
       status, // $11
     ]
   );
