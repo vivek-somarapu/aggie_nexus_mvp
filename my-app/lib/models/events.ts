@@ -79,44 +79,50 @@ export async function createEvent(
     start_time,
     end_time,
     location,
+    event_link,
     event_type,
     poster_url,
     created_by,
-    event_link,
     status = "pending",
   } = e;
 
   const result = await query(
     `INSERT INTO events (
-    title,
-    description,
-    start_time,
-    end_time,
-    location,
-    event_link, 
-    event_type,
-    poster_url,
-    created_by,
-    status
-  ) VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
-  )
-   RETURNING *`,
+       title,
+       description,
+       start_time,
+       end_time,
+       location,
+       event_link,
+       event_type,
+       poster_url,
+       created_by,
+       status
+     ) VALUES (
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
+     )
+     RETURNING *`,
     [
-      title, // $1
-      description, // $2
-      start_time, // $3
-      end_time, // $4
-      location, // $5
-      event_link, // $7
-      event_type, // $8
-      poster_url, // $9
-      created_by, // $10
-      status, // $11
+      title,
+      description,
+      start_time,
+      end_time,
+      location,
+      event_link,
+      event_type,
+      poster_url,
+      created_by,
+      status,
     ]
   );
 
-  return result.rows[0];
+  const row = result.rows[0];
+  if (!row) {
+    console.error("INSERT returned no rows:", result.rows);
+    throw new Error("Database insertion failed");
+  }
+
+  return row;
 }
 
 /** ─────── UPDATE STATUS ─────── */

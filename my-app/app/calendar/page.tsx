@@ -743,11 +743,13 @@ export default function CalendarPage() {
                             </div>
                             <div>
                               <p className="font-medium text-[14px]">
-                                {selectedEvent.location}
+                                {/^(https?:\/\/)/i.test(selectedEvent.location)
+                                  ? "Online Event"
+                                  : selectedEvent.location}
                               </p>
                               <p className="text-muted-foreground text-xs">
-                                {selectedEvent.location.includes("http")
-                                  ? "Online Event"
+                                {/^(https?:\/\/)/i.test(selectedEvent.location)
+                                  ? ""
                                   : "In-person Event"}
                               </p>
                             </div>
