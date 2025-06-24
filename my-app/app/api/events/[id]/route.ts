@@ -1,6 +1,8 @@
-// import { NextRequest, NextResponse } from "next/server";
-// import { getEventById, updateEvent, deleteEvent } from "@/lib/models/events";
+// app/api/events/[id]/route.ts
 
+import { NextRequest, NextResponse } from "next/server";
+// import { getEventById, updateEvent, deleteEvent } from "@/lib/models/events";
+import { getEventWithCreatorById } from "@/lib/models/events";
 // interface Params {
 //   id: string;
 // }
@@ -106,52 +108,18 @@
 //   }
 // }
 
-// app/api/events/[id]/route.ts
-
-import { NextRequest, NextResponse } from "next/server";
-import { getEventWithCreatorById } from "@/lib/models/events";
-
 export async function GET(
-  request: NextRequest,
+  _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = params;
-
   try {
-    // 1. Fetch the event + creator info in one go
-    const ev = await getEventWithCreatorById(id);
-
-    // 2. Not found → 404
+    const ev = await getEventWithCreatorById(params.id);
     if (!ev) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
-
-    // 3. Shape the response to match your front‐end Event interface
-    const payload = {
-      id: ev.id,
-      title: ev.title,
-      description: ev.description,
-      start_time: ev.start_time,
-      end_time: ev.end_time,
-      location: ev.location,
-      event_link: ev.event_link,
-      event_type: ev.event_type,
-      poster_url: ev.poster_url,
-      created_by: ev.created_by,
-      status: ev.status,
-      approved_by: ev.approved_by,
-      approved_at: ev.approved_at,
-      created_at: ev.created_at,
-      updated_at: ev.updated_at,
-      creator: {
-        full_name: ev.creator_full_name,
-        avatar: ev.creator_avatar,
-      },
-    };
-
-    return NextResponse.json(payload);
+    return NextResponse.json(ev);
   } catch (err) {
-    console.error("Error fetching event by ID:", err);
+    console.error(err);
     return NextResponse.json(
       { error: "Failed to fetch event" },
       { status: 500 }

@@ -1,5 +1,9 @@
 import { supabase } from "../db";
 
+type EventWithCreator = Event & {
+  creator: { full_name: string; avatar_url: string } | null;
+};
+
 export type Event = {
   id: string;
   title: string;
@@ -43,16 +47,22 @@ export const getApprovedEvents = () => getEventsByStatus("approved");
 export const getPendingEvents = () => getEventsByStatus("pending");
 export const getRejectedEvents = () => getEventsByStatus("rejected");
 
-export async function getEventWithCreatorById(
-  id: string
-): Promise<Event | null> {
+export async function getEventWithCreatorById(id: string) {
   const { data, error } = await supabase
     .from("events")
-    .select("*, profiles!created_by(*)") // assumes a profiles table keyed by id
+    .select(
+      `
+        id, title, description, start_time, end_time, location,
+        event_type, poster_url, created_by, status,
+        approved_by, approved_at, created_at, updated_at,
+        creator:users!created_by ( full_name, avatar )
+      `
+    )
     .eq("id", id)
-    .single();
+    .maybeSingle<EventWithCreator>();
+
   if (error) throw error;
-  return data as Event;
+  return data;
 }
 
 /** ────────── CREATE ────────── */

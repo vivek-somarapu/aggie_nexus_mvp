@@ -88,6 +88,7 @@ type ProcessedEvent = FullCalendarEvent & {
   description: string;
   location: string;
   created_by?: string;
+  creator?: { full_name: string; avatar: string | null };
 };
 
 export default function CalendarPage() {
@@ -102,11 +103,6 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
     null
   );
-  const [creator, setCreator] = useState<{
-    full_name: string;
-    avatarUrl?: string;
-  } | null>(null);
-  const [loadingCreator, setLoadingCreator] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -164,25 +160,6 @@ export default function CalendarPage() {
     getEvents();
   }, [profile]); // Only re-fetch when user state changes
 
-  useEffect(() => {
-    if (!selectedEvent?.created_by) {
-      setCreator(null);
-      return;
-    }
-
-    setLoadingCreator(true);
-    userService
-      .getUser(selectedEvent.created_by)
-      .then((u) => setCreator(u))
-      .catch((err) => {
-        console.error("Failed to load event creator:", err);
-        setCreator(null);
-      })
-      .finally(() => {
-        setLoadingCreator(false);
-      });
-  }, [selectedEvent?.created_by]);
-
   // Get all events (public + personal)
   const allEvents = [...events, ...personalEvents];
 
@@ -223,11 +200,28 @@ export default function CalendarPage() {
     }));
 
   // Handle calendar event click
-  const handleEventClick = (evt: FullCalendarEvent) => {
-    const full = calendarEvents.find((e) => e.id === evt.id);
-    if (!full) return;
-    setSelectedEvent(full as ProcessedEvent);
-    setDialogOpen(true);
+  const handleEventClick = async (evt: FullCalendarEvent) => {
+    try {
+      // GET /api/events/<id>  — includes creator object
+      const full = await eventService.getEvent(evt.id as string);
+
+      if (!full) return; // 404 safeguard
+      setSelectedEvent({
+        id: full.id,
+        title: full.title,
+        start: new Date(full.start_time),
+        end: new Date(full.end_time),
+        description: full.description || "",
+        location: full.location || "",
+        created_by: full.created_by,
+        creator: full.creator ?? undefined, // pass it through
+        color: eventColorMap.get(full.id),
+      } as ProcessedEvent);
+
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error("Failed to load event details");
+    }
   };
 
   // Handle RSVP submission
@@ -643,12 +637,12 @@ export default function CalendarPage() {
                             }}
                             className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
                           >
-                            {loadingCreator ? (
+                            {!selectedEvent.creator ? (
                               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                            ) : creator?.avatarUrl ? (
+                            ) : selectedEvent.creator.avatar ? (
                               <Image
-                                src={creator.avatarUrl}
-                                alt={creator.full_name}
+                                src={selectedEvent.creator.avatar}
+                                alt={selectedEvent.creator.full_name}
                                 fill
                                 className="object-cover"
                                 sizes="64px"
@@ -657,11 +651,9 @@ export default function CalendarPage() {
                             ) : (
                               <div className="flex items-center justify-center h-full w-full bg-muted">
                                 <span className="text-xs font-medium text-[#500000]">
-                                  {creator?.full_name
-                                    ?.charAt(0)
-                                    .toUpperCase() ?? (
-                                    <UserIcon className="h-4 w-4" />
-                                  )}
+                                  {selectedEvent.creator.full_name
+                                    .charAt(0)
+                                    .toUpperCase()}
                                 </span>
                               </div>
                             )}
@@ -670,7 +662,7 @@ export default function CalendarPage() {
                           {/* Host text */}
                           <p className="text-sm text-muted-foreground font-semibold group-hover:underline group-hover:text-foreground transition-colors duration-200">
                             Hosted by{" "}
-                            {creator?.full_name ?? selectedEvent?.created_by}
+                            {selectedEvent.creator?.full_name ?? "Unknown"}
                           </p>
                         </Link>
                       </div>
