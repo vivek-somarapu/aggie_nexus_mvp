@@ -326,7 +326,7 @@ export default function Navbar() {
             onClick={toggleNavigation}
             className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center"
           >
-            {/* reuse the same SVG or swap to a plain “X” */}
+            {/* reuse the same SVG or swap to a plain "X" */}
             <svg width="20" height="20" viewBox="0 0 20 20">
               <line
                 x1="0"

@@ -1,64 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
 
-// Create a Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Log environment variables (without sensitive values)
-    console.log('Environment check:', {
-      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      NODE_ENV: process.env.NODE_ENV,
-    });
+    const supabase = await createClient();
     
-    // Check database connection
-    let usersStatus = "unknown";
-    let profilesStatus = "unknown";
-    
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id')
-        .limit(1);
-        
-      usersStatus = error ? "error" : "ok";
-      console.log('Users table check:', usersStatus, error ? error : 'No error');
-    } catch (e) {
-      usersStatus = "error";
-      console.error('Error checking users table:', e);
+    // Test database connection with a simple count query
+    const { count, error } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      console.error('Database connection error:', error);
+      return NextResponse.json({ 
+        status: 'error', 
+        message: 'Database connection failed',
+        error: error.message 
+      }, { status: 500 });
     }
-    
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .limit(1);
-        
-      profilesStatus = error ? "error" : "ok";
-      console.log('Profiles table check:', profilesStatus, error ? error : 'No error');
-    } catch (e) {
-      profilesStatus = "error";
-      console.error('Error checking profiles table:', e);
-    }
-    
-    return NextResponse.json({
-      status: 'ok',
-      database: {
-        connected: true,
-        usersTable: usersStatus,
-        profilesTable: profilesStatus
-      }
-    });
-  } catch (error: any) {
-    console.error('Debug route error:', error);
+
     return NextResponse.json({ 
-      error: 'Debug check failed', 
-      details: error.message || 'Unknown error'
+      status: 'ok', 
+      message: 'Database connection successful',
+      userCount: count,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    return NextResponse.json({ 
+      status: 'error', 
+      message: 'Debug endpoint failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 } 

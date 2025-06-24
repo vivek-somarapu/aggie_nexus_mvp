@@ -46,7 +46,9 @@ export const userService = {
         throw new Error(`Failed to fetch users: ${response.statusText}`);
       }
       
-      const users = await response.json();
+      const data = await response.json();
+      // Fix: Extract users array from response object
+      const users = data.users || data; // Handle both { users: [...] } and [...] formats
       console.log(`Fetched ${users.length} users successfully`);
       return users;
     } catch (error) {
