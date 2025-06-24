@@ -1,4 +1,3 @@
-/* lib/services/event-services.ts */
 export type EventType =
   | "workshop"
   | "info_session"
@@ -27,21 +26,15 @@ export interface Event {
   start_time: string; // ISO
   end_time: string; // ISO
   location: string;
-  event_link?: string;
-
-  /** NEW */
   event_type: EventType;
-  poster_url?: string; // storage URL or null
-
+  poster_url?: string | null;
   created_by: string;
   attendees?: string[];
-
   created_at: string;
   updated_at: string;
-
   status?: "pending" | "approved" | "rejected";
-  approved_by?: string;
-  approved_at?: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
 }
 
 const BASE = "/api/events";
@@ -52,28 +45,28 @@ async function parseJSON<T>(res: Response): Promise<T> {
 }
 
 export const eventService = {
-  /** fetch public, approved events */
+  /** fetch public events (only approved) */
   async getEvents(): Promise<Event[]> {
-    const r = await fetch(`${BASE}?status=approved`);
-    return parseJSON<Event[]>(r);
+    const res = await fetch(`${BASE}?status=approved`);
+    return parseJSON<Event[]>(res);
   },
 
-  /** manager view: fetch by status */
+  /** manager view: fetch by any status */
   async getEventsByStatus(
     status: "pending" | "approved" | "rejected"
   ): Promise<Event[]> {
-    const r = await fetch(`${BASE}?status=${status}`);
-    return parseJSON<Event[]>(r);
+    const res = await fetch(`${BASE}?status=${status}`);
+    return parseJSON<Event[]>(res);
   },
 
   /** fetch one by id */
   async getEvent(id: string): Promise<Event | null> {
-    const r = await fetch(`${BASE}/${id}`);
-    if (r.status === 404) return null;
-    return parseJSON<Event>(r);
+    const res = await fetch(`${BASE}/${id}`);
+    if (res.status === 404) return null;
+    return parseJSON<Event>(res);
   },
 
-  /** create new event (poster_url must already be uploaded separately) */
+  /** create new event */
   async createEvent(
     data: Omit<
       Event,
@@ -85,12 +78,12 @@ export const eventService = {
       | "status"
     >
   ): Promise<Event> {
-    const r = await fetch(BASE, {
+    const res = await fetch(BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...data, status: "pending" }),
     });
-    return parseJSON<Event>(r);
+    return parseJSON<Event>(res);
   },
 
   /** update core fields */
@@ -104,20 +97,19 @@ export const eventService = {
         | "start_time"
         | "end_time"
         | "location"
-        | "event_link"
         | "event_type"
         | "poster_url"
       >
     >
   ): Promise<Event | null> {
-    const r = await fetch(`${BASE}/${id}`, {
+    const res = await fetch(`${BASE}/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (r.status === 404) return null;
-    if (!r.ok) throw new Error(await r.text());
-    return parseJSON<Event>(r);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(await res.text());
+    return parseJSON<Event>(res);
   },
 
   /** change status (manager only) */
@@ -125,19 +117,19 @@ export const eventService = {
     id: string,
     status: "pending" | "approved" | "rejected"
   ): Promise<Event | null> {
-    const r = await fetch(`${BASE}/${id}/status`, {
+    const res = await fetch(`${BASE}/${id}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    if (r.status === 404) return null;
-    if (!r.ok) throw new Error(await r.text());
-    return parseJSON<Event>(r);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(await res.text());
+    return parseJSON<Event>(res);
   },
 
   /** delete event */
   async deleteEvent(id: string): Promise<boolean> {
-    const r = await fetch(`${BASE}/${id}`, { method: "DELETE" });
-    return r.ok;
+    const res = await fetch(`${BASE}/${id}`, { method: "DELETE" });
+    return res.ok;
   },
 };

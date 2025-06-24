@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 export async function PATCH(
@@ -7,21 +6,22 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = cookies();
     const supabase = createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Check if user is a manager
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('is_manager')
-      .eq('id', user.id)
+      .from("profiles")
+      .select("is_manager")
+      .eq("id", user.id)
       .single();
 
     if (profileError || !profile) {
@@ -40,40 +40,45 @@ export async function PATCH(
 
     // Get request body
     const body = await req.json();
-    
-    if (!body.status || !['pending', 'approved', 'rejected'].includes(body.status)) {
+
+    if (
+      !body.status ||
+      !["pending", "approved", "rejected"].includes(body.status)
+    ) {
       return NextResponse.json(
-        { error: "Invalid status value. Must be 'pending', 'approved', or 'rejected'" },
+        {
+          error:
+            "Invalid status value. Must be 'pending', 'approved', or 'rejected'",
+        },
         { status: 400 }
       );
     }
 
     // Call RPC function for updating event status
-    const { data, error } = await supabase.rpc('update_event_status', {
+    const { data, error } = await supabase.rpc("update_event_status", {
       event_id: params.id,
       new_status: body.status,
-      manager_id: user.id
+      manager_id: user.id,
     });
 
     if (error) {
       console.error("Error updating event status:", error);
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     // Get updated event
     const { data: updatedEvent, error: eventError } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', params.id)
+      .from("events")
+      .select("*")
+      .eq("id", params.id)
       .single();
 
     if (eventError) {
       console.error("Error fetching updated event:", eventError);
       return NextResponse.json(
-        { error: "Event status updated, but failed to fetch the updated event" },
+        {
+          error: "Event status updated, but failed to fetch the updated event",
+        },
         { status: 500 }
       );
     }
@@ -86,4 +91,4 @@ export async function PATCH(
       { status: 500 }
     );
   }
-} 
+}

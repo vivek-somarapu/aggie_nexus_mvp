@@ -67,6 +67,7 @@ import {
   itemVariants,
   calendarVariants,
   dialogVariants,
+  customScrollStyles,
   type EventType,
   colorPalette,
   categories,
@@ -88,35 +89,6 @@ type ProcessedEvent = FullCalendarEvent & {
   location: string;
   created_by?: string;
 };
-
-// Add this after the imports and before the component
-const customStyles = `
-  .scrollbar-thin {
-    scrollbar-width: thin;
-  }
-  .scrollbar-thumb-muted {
-    scrollbar-color: hsl(var(--muted-foreground)) transparent;
-  }
-  .scrollbar-track-transparent {
-    scrollbar-track-color: transparent;
-  }
-  
-  /* Webkit scrollbar styles */
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground));
-    border-radius: 3px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--foreground));
-  }
-`;
 
 export default function CalendarPage() {
   const { profile, isLoading: authLoading } = useAuth();
@@ -144,7 +116,6 @@ export default function CalendarPage() {
   const [rsvpData, setRsvpData] = useState({
     name: "",
     email: "",
-    phone: "",
     notes: "",
   });
 
@@ -236,12 +207,6 @@ export default function CalendarPage() {
     return colorMap;
   }, [filteredEvents]);
 
-  // Sort events by date
-  const sortedEvents = [...filteredEvents].sort((a, b) => {
-    if (!a.start || !b.start) return 0;
-    return new Date(b.start).getTime() - new Date(a.start).getTime(); // DESC
-  });
-
   // Convert events to FullCalendarEvent format for the full calendar
   const calendarEvents: FullCalendarEvent[] = filteredEvents
     .filter((event) => event.start && event.end) // Only include events with valid dates
@@ -272,7 +237,6 @@ export default function CalendarPage() {
         eventId: selectedEvent!.id,
         name: profile?.full_name ?? rsvpData.name,
         email: profile?.email ?? rsvpData.email,
-        phone: rsvpData.phone,
         notes: rsvpData.notes,
         userId: profile?.id,
       });
@@ -284,7 +248,7 @@ export default function CalendarPage() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: customStyles }} />
+      <style dangerouslySetInnerHTML={{ __html: customScrollStyles }} />
       <motion.div
         className="flex flex-col bg-gradient-to-br from-background via-background to-muted/20 min-h-screen"
         variants={pageVariants}
@@ -542,12 +506,12 @@ export default function CalendarPage() {
                         <CardTitle className="flex items-center gap-2 px-4 py-2">
                           <List className="h-5 w-5" /> All Events
                           <Badge variant="secondary" className="ml-auto">
-                            {sortedEvents.length}
+                            {filteredEvents.length}
                           </Badge>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4 px-4 py-2">
-                        {sortedEvents.length === 0 ? (
+                        {filteredEvents.length === 0 ? (
                           <div className="flex-1 text-center py-12">
                             <CalendarIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
                             <p className="text-muted-foreground">
@@ -555,7 +519,7 @@ export default function CalendarPage() {
                             </p>
                           </div>
                         ) : (
-                          sortedEvents.map((e, i) => (
+                          filteredEvents.map((e, i) => (
                             <motion.div
                               key={e.id}
                               variants={itemVariants}
@@ -615,7 +579,11 @@ export default function CalendarPage() {
                                       <div className="flex items-center gap-1">
                                         <MapPin className="h-4 w-4" />
                                         <span className="truncate">
-                                          {e.location}
+                                          <p className="font-medium text-[14px]">
+                                            {/^(https?:\/\/)/i.test(e.location)
+                                              ? "Online Event"
+                                              : e.location}
+                                          </p>
                                         </span>
                                       </div>
                                     )}
@@ -802,6 +770,19 @@ export default function CalendarPage() {
                             {profile.email}
                           </span>
                         </div>
+                        <Textarea
+                          id="rsvp-notes"
+                          placeholder="Notes (optional)"
+                          value={rsvpData.notes}
+                          onChange={(e) =>
+                            setRsvpData({
+                              ...rsvpData,
+                              notes: e.target.value,
+                            })
+                          }
+                          rows={2}
+                          className="text-sm"
+                        />
                         <Button
                           onClick={handleRSVP}
                           disabled={rsvpLoading}
@@ -882,20 +863,19 @@ export default function CalendarPage() {
                   </Card>
 
                   {/* About Event */}
-                  {selectedEvent.description && (
-                    <>
-                      <div className="space-y-3">
-                        <h3 className="text-sm text-muted-foreground font-semibold">
-                          About Event
-                        </h3>
-                        <Separator />
-                        <div className="rounded-md bg-muted/30 p-4">
-                          <p className="whitespace-pre-line text-sm leading-relaxed">
-                            {selectedEvent.description}
-                          </p>
-                        </div>
+
+                  {selectedEvent.description?.trim() && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground">
+                        About Event
+                      </h3>
+                      <Separator />
+                      <div className="rounded-md px-4 py-2">
+                        <p className="text-sm leading-relaxed">
+                          {selectedEvent.description.trimStart()}
+                        </p>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               )}
