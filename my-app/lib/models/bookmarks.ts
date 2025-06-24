@@ -156,4 +156,106 @@ export async function toggleProjectBookmark(userId: string, projectId: string): 
     
     return { action: 'added' };
   }
+}
+
+// RELATIONSHIP QUERIES - Leverage Supabase's join capabilities
+
+export type UserBookmarkWithDetails = UserBookmark & {
+  bookmarked_user: {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar: string | null;
+    bio: string | null;
+    industry: string[];
+    skills: string[];
+  };
+};
+
+export type ProjectBookmarkWithDetails = ProjectBookmark & {
+  project: {
+    id: string;
+    title: string;
+    description: string;
+    project_status: string;
+    is_idea: boolean;
+    owner: {
+      id: string;
+      full_name: string;
+      email: string;
+    };
+  };
+};
+
+export async function getUserBookmarksWithDetails(userId: string): Promise<UserBookmarkWithDetails[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('user_bookmarks')
+    .select(`
+      *,
+      bookmarked_user:users!user_bookmarks_bookmarked_user_id_fkey (
+        id,
+        full_name,
+        email,
+        avatar,
+        bio,
+        industry,
+        skills
+      )
+    `)
+    .eq('user_id', userId)
+    .order('saved_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching user bookmarks with details:', error);
+    throw new Error('Failed to fetch user bookmarks with details');
+  }
+  
+  return data || [];
+}
+
+export async function getProjectBookmarksWithDetails(userId: string): Promise<ProjectBookmarkWithDetails[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('project_bookmarks')
+    .select(`
+      *,
+      project:projects!project_bookmarks_project_id_fkey (
+        id,
+        title,
+        description,
+        project_status,
+        is_idea,
+        owner:users!projects_owner_id_fkey (
+          id,
+          full_name,
+          email
+        )
+      )
+    `)
+    .eq('user_id', userId)
+    .eq('project.deleted', false)
+    .order('saved_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching project bookmarks with details:', error);
+    throw new Error('Failed to fetch project bookmarks with details');
+  }
+  
+  return data || [];
+}
+
+export async function getAllBookmarksForUser(userId: string): Promise<{
+  userBookmarks: UserBookmarkWithDetails[];
+  projectBookmarks: ProjectBookmarkWithDetails[];
+}> {
+  const [userBookmarks, projectBookmarks] = await Promise.all([
+    getUserBookmarksWithDetails(userId),
+    getProjectBookmarksWithDetails(userId)
+  ]);
+  
+  return {
+    userBookmarks,
+    projectBookmarks
+  };
 } 

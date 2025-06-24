@@ -251,3 +251,107 @@ export async function hardDeleteProject(id: string): Promise<boolean> {
 }
 
 // Add more functions for filtering, searching, etc. 
+
+// RELATIONSHIP QUERIES - Leverage Supabase's join capabilities
+
+export type ProjectWithOwner = Project & {
+  owner: {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar: string | null;
+  };
+};
+
+export type ProjectWithDetails = Project & {
+  owner: {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar: string | null;
+  };
+  bookmark_count?: number;
+};
+
+export async function getProjectsWithOwners(): Promise<ProjectWithOwner[]> {
+  const supabase = await getSupabase();
+  
+  const { data, error } = await supabase
+    .from('projects')
+    .select(`
+      *,
+      owner:users!projects_owner_id_fkey (
+        id,
+        full_name,
+        email,
+        avatar
+      )
+    `)
+    .eq('deleted', false)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  
+  return data.map(row => ({
+    ...row,
+    contact_info: row.contact_info || {}
+  }));
+}
+
+export async function getProjectWithOwnerById(id: string): Promise<ProjectWithOwner | null> {
+  const supabase = await getSupabase();
+  
+  const { data, error } = await supabase
+    .from('projects')
+    .select(`
+      *,
+      owner:users!projects_owner_id_fkey (
+        id,
+        full_name,
+        email,
+        avatar
+      )
+    `)
+    .eq('id', id)
+    .eq('deleted', false)
+    .single();
+  
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Record not found
+    throw error;
+  }
+  
+  return {
+    ...data,
+    contact_info: data.contact_info || {}
+  };
+}
+
+export async function getProjectsWithBookmarkCounts(): Promise<ProjectWithDetails[]> {
+  const supabase = await getSupabase();
+  
+  const { data, error } = await supabase
+    .from('projects')
+    .select(`
+      *,
+      owner:users!projects_owner_id_fkey (
+        id,
+        full_name,
+        email,
+        avatar
+      ),
+      project_bookmarks (
+        id
+      )
+    `)
+    .eq('deleted', false)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  
+  return data.map(row => ({
+    ...row,
+    contact_info: row.contact_info || {},
+    bookmark_count: row.project_bookmarks?.length || 0
+  }));
+} 
