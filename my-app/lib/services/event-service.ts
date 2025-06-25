@@ -1,3 +1,7 @@
+// lib/services/event-service.ts
+//--------------------------------------------------------------
+// Types
+//--------------------------------------------------------------
 export type EventType =
   | "workshop"
   | "info_session"
@@ -22,74 +26,94 @@ export const categories: Record<EventType, string> = {
 export interface Event {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   start_time: string; // ISO
   end_time: string; // ISO
-  location: string;
+  location: string | null;
   event_type: EventType;
-  poster_url?: string | null;
+  poster_url: string | null;
   created_by: string;
-  attendees?: string[];
+
+  // denormalised creator (from /api/events/[id])
+  creator?: { full_name: string; avatar: string | null };
+
   created_at: string;
   updated_at: string;
-  status?: "pending" | "approved" | "rejected";
-  approved_by?: string | null;
-  approved_at?: string | null;
+  status: "pending" | "approved" | "rejected";
+  approved_by: string | null;
+  approved_at: string | null;
 }
 
+//--------------------------------------------------------------
+// Internals
+//--------------------------------------------------------------
 const BASE = "/api/events";
 
-async function parseJSON<T>(res: Response): Promise<T> {
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+async function api<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const res = await fetch(input, init);
+  if (!res.ok) {
+    const { error } = (await res.json().catch(() => ({}))) as { error?: any };
+    throw new Error(error || res.statusText);
+  }
+  return res.json() as Promise<T>;
 }
 
+//--------------------------------------------------------------
+// Public service
+//--------------------------------------------------------------
 export const eventService = {
-  /** fetch public events (only approved) */
+  //------------------------------------------------------------
+  // CRUD
+  //------------------------------------------------------------
   async getEvents(): Promise<Event[]> {
-    const res = await fetch(`${BASE}?status=approved`);
-    return parseJSON<Event[]>(res);
+    return api<Event[]>(`${BASE}?status=approved`);
   },
 
-  /** manager view: fetch by any status */
   async getEventsByStatus(
     status: "pending" | "approved" | "rejected"
   ): Promise<Event[]> {
-    const res = await fetch(`${BASE}?status=${status}`);
-    return parseJSON<Event[]>(res);
+    return api<Event[]>(`${BASE}?status=${status}`);
   },
 
-  /** fetch one by id */
+  async getEventsByCreator(
+    creatorId: string,
+    status: "pending" | "approved" | "rejected" = "approved"
+  ): Promise<Event[]> {
+    return api<Event[]>(
+      `${BASE}?status=${status}&creator=${encodeURIComponent(creatorId)}`
+    );
+  },
+
   async getEvent(id: string): Promise<Event | null> {
-    const res = await fetch(`${BASE}/${id}`);
-    if (res.status === 404) return null;
-    return parseJSON<Event>(res);
+    try {
+      return await api<Event>(`${BASE}/${id}`);
+    } catch (err) {
+      if ((err as Error).message.includes("404")) return null;
+      throw err;
+    }
   },
 
-  /** create new event */
   async createEvent(
     data: Omit<
       Event,
       | "id"
       | "created_at"
       | "updated_at"
-      | "approved_by"
       | "approved_at"
+      | "approved_by"
       | "status"
     >
   ): Promise<Event> {
-    const res = await fetch(BASE, {
+    return api<Event>(BASE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...data, status: "pending" }),
     });
-    return parseJSON<Event>(res);
   },
 
-  /** update core fields */
   async updateEvent(
     id: string,
-    data: Partial<
+    fields: Partial<
       Pick<
         Event,
         | "title"
@@ -102,34 +126,63 @@ export const eventService = {
       >
     >
   ): Promise<Event | null> {
-    const res = await fetch(`${BASE}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(await res.text());
-    return parseJSON<Event>(res);
+    try {
+      return await api<Event>(`${BASE}/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      });
+    } catch (err) {
+      if ((err as Error).message.includes("404")) return null;
+      throw err;
+    }
   },
 
-  /** change status (manager only) */
   async updateEventStatus(
     id: string,
     status: "pending" | "approved" | "rejected"
   ): Promise<Event | null> {
-    const res = await fetch(`${BASE}/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(await res.text());
-    return parseJSON<Event>(res);
+    try {
+      return await api<Event>(`${BASE}/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+    } catch (err) {
+      if ((err as Error).message.includes("404")) return null;
+      throw err;
+    }
   },
 
-  /** delete event */
   async deleteEvent(id: string): Promise<boolean> {
-    const res = await fetch(`${BASE}/${id}`, { method: "DELETE" });
-    return res.ok;
+    await api(`${BASE}/${id}`, { method: "DELETE" });
+    return true;
+  },
+
+  //------------------------------------------------------------
+  // Poster handling (bucket: event-posters)
+  //------------------------------------------------------------
+  async uploadPhoto(file: File): Promise<string> {
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch("/api/upload/event-posters", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      throw new Error(error || "Poster upload failed");
+    }
+    return (await res.json()).publicUrl as string;
+  },
+
+  async deletePhoto(publicUrl: string): Promise<void> {
+    await api("/api/upload/event-posters", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: publicUrl }),
+    });
   },
 };

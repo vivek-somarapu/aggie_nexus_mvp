@@ -21,7 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { rsvpService } from "@/lib/services/rsvp-service";
-import { userService } from "@/lib/services/user-service";
+
 import {
   Info,
   Loader2,
@@ -35,7 +35,6 @@ import {
   CalendarIcon,
   Filter,
   List,
-  UserIcon,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { eventService } from "@/lib/services/event-service";
@@ -88,6 +87,7 @@ type ProcessedEvent = FullCalendarEvent & {
   description: string;
   location: string;
   created_by?: string;
+  poster_url?: string;
   creator?: { full_name: string; avatar: string | null };
 };
 
@@ -214,7 +214,8 @@ export default function CalendarPage() {
         description: full.description || "",
         location: full.location || "",
         created_by: full.created_by,
-        creator: full.creator ?? undefined, // pass it through
+        creator: full.creator ?? undefined,
+        poster_url: full.poster_url,
         color: eventColorMap.get(full.id),
       } as ProcessedEvent);
 
@@ -244,7 +245,7 @@ export default function CalendarPage() {
     <>
       <style dangerouslySetInnerHTML={{ __html: customScrollStyles }} />
       <motion.div
-        className="flex flex-col bg-gradient-to-br from-background via-background to-muted/20 min-h-screen"
+        className="flex flex-col bg-gradient-to-br from-background via-background to-muted/20"
         variants={pageVariants}
         initial="hidden"
         animate="visible"
@@ -296,7 +297,7 @@ export default function CalendarPage() {
                 <Button
                   onClick={() => router.push("/calendar/new")}
                   size="sm"
-                  className="bg-green-600 text-white"
+                  className="bg-green-600 text-white hover:bg-green-700 hover:text-white dark:hover:text-white"
                 >
                   <Plus className="h-4 w-4 mr-1" /> Add Event
                 </Button>
@@ -309,7 +310,7 @@ export default function CalendarPage() {
               {profile && (
                 <Button
                   size="icon"
-                  className="bg-green-600 text-white"
+                  className="bg-green-600 text-white hover:bg-green-700 hover:text-white dark:hover:text-white"
                   onClick={() => router.push("/calendar/new")}
                 >
                   <Plus className="h-4 w-4" />
@@ -495,7 +496,7 @@ export default function CalendarPage() {
                     className="flex-1 overflow-auto space-y-6"
                     variants={itemVariants}
                   >
-                    <Card>
+                    <div className="min-h-0 px-4 py-2">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 px-4 py-2">
                           <List className="h-5 w-5" /> All Events
@@ -593,7 +594,7 @@ export default function CalendarPage() {
                           ))
                         )}
                       </CardContent>
-                    </Card>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -618,6 +619,21 @@ export default function CalendarPage() {
                 <div className="space-y-6">
                   {/* Event Information */}
                   <div className="space-y-2">
+                    {/* Poster preview */}
+                    {selectedEvent?.poster_url && (
+                      <div className="relative w-full max-w-sm mx-auto mb-4 overflow-hidden rounded-lg border shadow-lg shadow-black/10">
+                        <Image
+                          src={selectedEvent.poster_url}
+                          alt={`${selectedEvent.title} poster`}
+                          width={480}
+                          height={480}
+                          unoptimized
+                          className="w-full h-auto object-contain"
+                          sizes="(max-width:600px) 100vw, 320px"
+                        />
+                      </div>
+                    )}
+
                     <div className="pb-2">
                       <DialogTitle className="text-2xl font-bold">
                         {selectedEvent.title}
@@ -672,11 +688,15 @@ export default function CalendarPage() {
                     <div className="space-y-3">
                       <div className="flex items-center gap-4 flex-wrap">
                         {/* Calendar Icon */}
-                        <div className="w-10 h-10 rounded-sm border bg-white text-center overflow-hidden shadow-sm shrink-0">
-                          <div className="bg-gray-100 text-[10px] font-medium text-gray-700 py-[3px] leading-none">
+
+                        <div
+                          className="w-10 h-10 rounded-sm border bg-background text-center
+                            overflow-hidden shadow-sm shrink-0"
+                        >
+                          <div className="bg-muted text-[10px] font-medium py-[3px] leading-none">
                             {format(selectedEvent.start, "MMM").toUpperCase()}
                           </div>
-                          <div className="text-[15px] font-extrabold text-gray-900 leading-none pt-[3px]">
+                          <div className="text-[15px] font-extrabold text-foreground leading-none pt-[3px]">
                             {format(selectedEvent.start, "d")}
                           </div>
                         </div>
@@ -698,8 +718,8 @@ export default function CalendarPage() {
                         {/* Location Info */}
                         {selectedEvent.location && (
                           <div className="flex items-center gap-2 text-sm">
-                            <div className="w-10 h-10 border rounded-md bg-gray-100 flex items-center justify-center">
-                              <MapPin className="h-5 w-5 text-gray-500" />
+                            <div className="w-10 h-10 border rounded-md bg-background flex items-center justify-center">
+                              <MapPin className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
                               <p className="font-medium text-[14px]">
@@ -720,7 +740,10 @@ export default function CalendarPage() {
                   </div>
 
                   {/* Join Event Card */}
-                  <Card className="border border-primary/20 bg-primary/5 p-4 space-y-4">
+                  <Card
+                    className="border border-primary/20 dark:border-primary/40
+                      bg-primary/5 dark:bg-primary/10 p-4 space-y-4"
+                  >
                     {new Date(selectedEvent.end) < new Date() ? (
                       // Past Event Notice
                       <div className="text-center text-sm text-muted-foreground space-y-1">
@@ -754,7 +777,7 @@ export default function CalendarPage() {
                     ) : profile ? (
                       // Logged-in RSVP
                       <div className="space-y-3 text-sm">
-                        <div className="flex items-center gap-2 text-gray-800">
+                        <div className="flex items-center gap-2 text-foreground">
                           <span className="font-semibold">
                             Register as {profile.full_name}
                           </span>{" "}
@@ -762,6 +785,7 @@ export default function CalendarPage() {
                             {profile.email}
                           </span>
                         </div>
+
                         <Textarea
                           id="rsvp-notes"
                           placeholder="Notes (optional)"
@@ -863,7 +887,7 @@ export default function CalendarPage() {
                       </h3>
                       <Separator />
                       <div className="rounded-md px-4 py-2">
-                        <p className="text-sm leading-relaxed">
+                        <p className="text-sm leading-relaxed ">
                           {selectedEvent.description.trimStart()}
                         </p>
                       </div>
