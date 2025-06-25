@@ -7,10 +7,12 @@ import { useForm } from "react-hook-form";
 import { useAuth } from "@/lib";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { SquarePoster } from "@/components/ui/SquarePoster";
 import { formatISO, set } from "date-fns";
 import { FileUpload } from "@/components/file-upload";
 import DateTimePicker from "@/components/DateTimePicker";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -37,14 +39,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  LinkIcon,
-  MapPin,
-  ChevronLeft,
-  Loader2,
-  TriangleAlert,
-} from "lucide-react";
-
+import { LinkIcon, MapPin, ChevronLeft, Loader2 } from "lucide-react";
+import { pageVariants, calendarVariants, categories } from "@/lib/constants";
 import {
   Select,
   SelectTrigger,
@@ -54,7 +50,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { eventService } from "@/lib/services/event-service";
-import { categories } from "@/lib/constants";
+
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
@@ -253,7 +249,13 @@ export default function NewEventPage() {
 
   /* -------------------------------- UI -------------------------------- */
   return (
-    <div className=" p-2">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="p-2"
+    >
       <div className="max-w-5xl mx-auto">
         {/* heading row */}
         <div className="mb-0 md:mb-4 flex items-center gap-3">
@@ -273,12 +275,20 @@ export default function NewEventPage() {
           </h1>
         </div>
 
-        <Card className="border-0 shadow-none md:border md:shadow-lg bg-card/80 dark:bg-card/70 backdrop-blur-sm">
+        <Card
+          className="border-0 shadow-none md:border md:shadow-lg
+            bg-card/80  sm:dark:bg-slate-900/80
+            md:border-slate-200 dark:md:border-slate-700
+            backdrop-blur-sm"
+        >
           <CardContent className="p-0 md:px-6 md:py-3 space-y-4">
             <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
+              <motion.form
+                variants={calendarVariants}
+                initial="hidden"
+                animate="visible"
                 className="space-y-4"
+                onSubmit={form.handleSubmit(onSubmit)}
               >
                 {/* ── Title + Date/Time (responsive row) ────────────────────────── */}
                 <div className="grid gap-4 lg:grid-cols-4">
@@ -289,7 +299,7 @@ export default function NewEventPage() {
                       control={form.control}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">
+                          <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
                             Event Title
                           </FormLabel>
                           <div className="relative">
@@ -297,7 +307,7 @@ export default function NewEventPage() {
                               <Input
                                 {...field}
                                 placeholder="Enter your event title..."
-                                className="h-10 pr-36" /* space for category dropdown */
+                                className="h-10 pr-36 dark:bg-slate-900/80 dark:text-slate-200"
                               />
                             </FormControl>
 
@@ -343,7 +353,7 @@ export default function NewEventPage() {
 
                 {/* Location Section - Switch and Input on Same Line */}
                 <div className="space-y-3">
-                  <FormLabel className="text-sm font-medium">
+                  <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Event Location
                   </FormLabel>
                   <div className="flex items-center gap-4">
@@ -358,7 +368,7 @@ export default function NewEventPage() {
                             ) : (
                               <MapPin className="h-4 w-4 text-green-600" />
                             )}
-                            <span className="font-medium text-sm whitespace-nowrap">
+                            <span className="font-medium text-sm whitespace-nowrap text-slate-700 dark:text-slate-200">
                               {field.value ? "Online" : "In-Person"}
                             </span>
                             <FormControl>
@@ -383,7 +393,7 @@ export default function NewEventPage() {
                                 <Input
                                   placeholder="https://zoom.us/j/..."
                                   {...field}
-                                  className="h-10"
+                                  className="h-10 dark:bg-slate-900/80 dark:text-slate-200"
                                 />
                               </FormControl>
                               <FormMessage />
@@ -400,7 +410,7 @@ export default function NewEventPage() {
                                 <Input
                                   placeholder="123 Main St, City, State"
                                   {...field}
-                                  className="h-10"
+                                  className="h-10 dark:bg-slate-900/80 dark:text-slate-200"
                                 />
                               </FormControl>
                               <FormMessage />
@@ -438,7 +448,7 @@ export default function NewEventPage() {
                               "font-medium",
                               descWords > 350
                                 ? "text-destructive"
-                                : "text-muted-foreground"
+                                : "text-muted-foreground dark:text-slate-400"
                             )}
                           >
                             {descWords}/350 words
@@ -457,7 +467,7 @@ export default function NewEventPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1 h-10"
+                    className="flex-1 h-10 dark:bg-slate-800 dark:border-slate-600"
                     onClick={() => setShowPreview(true)}
                   >
                     Preview Event Page
@@ -468,8 +478,8 @@ export default function NewEventPage() {
                       <Button
                         type="button" // no immediate submit
                         className="flex-1 h-10 font-medium bg-gradient-to-r
-                 from-primary to-primary/90
-                 hover:from-primary/90 hover:to-primary"
+                          from-primary to-primary/90
+                          hover:from-primary/90 hover:to-primary"
                         disabled={submitting}
                       >
                         {submitting ? (
@@ -484,7 +494,7 @@ export default function NewEventPage() {
                     </AlertDialogTrigger>
 
                     {/* confirmation dialog */}
-                    <AlertDialogContent>
+                    <AlertDialogContent className="dark:bg-slate-800 dark:border-slate-700">
                       <AlertDialogHeader>
                         <AlertDialogTitle>Heads-up!</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -516,29 +526,19 @@ export default function NewEventPage() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
-              </form>
+              </motion.form>
             </Form>
           </CardContent>
         </Card>
       </div>
       {/* Event Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="w-full max-h-[100dvh] p-0 overflow-hidden scrollbar-hidden overflow-y-auto sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg">
+        <DialogContent className="w-full max-h-[100dvh] p-0 overflow-hidden scrollbar-hidden overflow-y-auto sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:text-slate-1500 dark:bg-slate-800/70">
           <div className="py-5 px-4">
             <div className="space-y-6">
               {/* Poster preview (only if a file was chosen) */}
               {posterPreview && (
-                <div className="relative w-full max-w-sm mx-auto mb-4 overflow-hidden rounded-lg border shadow-lg shadow-black/10">
-                  <Image
-                    src={posterPreview}
-                    alt={`${posterPreview} poster`}
-                    width={480}
-                    height={480}
-                    unoptimized
-                    className="w-full h-auto object-contain"
-                    sizes="(max-width:600px) 100vw, 320px"
-                  />
-                </div>
+                <SquarePoster src={posterPreview} alt={`Preview poster`} />
               )}
 
               {/* Event Information */}
@@ -674,6 +674,6 @@ export default function NewEventPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }

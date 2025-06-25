@@ -6,10 +6,10 @@ import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Image from "next/image";
 import Link from "next/link";
+import { SquarePoster } from "@/components/ui/SquarePoster";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -31,29 +31,24 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
-  Clock,
   CalendarIcon,
+  Link as LinkIcon,
   Filter,
-  List,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
 import { eventService } from "@/lib/services/event-service";
 import { motion, AnimatePresence } from "framer-motion";
+import { format, parseISO, isToday, isYesterday } from "date-fns";
 import {
   Calendar,
   CalendarCurrentDate,
-  CalendarDayView,
   CalendarMonthView,
   CalendarTodayTrigger,
-  CalendarViewTrigger,
-  CalendarWeekView,
-  CalendarYearView,
   type CalendarEvent as FullCalendarEvent,
 } from "@/components/ui/full-calendar";
 import {
   CalendarPrevTrigger,
   CalendarNextTrigger,
-} from "@/components/ui/full-calendar"; // Import CalendarPrevTrigger and CalendarNextTrigger
+} from "@/components/ui/full-calendar";
 
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -67,7 +62,6 @@ import {
   calendarVariants,
   dialogVariants,
   customScrollStyles,
-  type EventType,
   colorPalette,
   categories,
 } from "@/lib/constants";
@@ -91,6 +85,23 @@ type ProcessedEvent = FullCalendarEvent & {
   creator?: { full_name: string; avatar: string | null };
 };
 
+// It hides the calendar view on mobile and uses a list view instead. The calendar view is only available on desktop screens.
+function useMediaQuery(query: string) {
+  const getMatch = () =>
+    typeof window !== "undefined" && window.matchMedia(query).matches;
+
+  const [matches, setMatches] = useState(getMatch); // ← initialised correctly
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const listener = () => setMatches(media.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, [query]);
+
+  return matches;
+}
+
 export default function CalendarPage() {
   const { profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -98,7 +109,6 @@ export default function CalendarPage() {
   const [personalEvents, setPersonalEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<"calendar" | "list">("calendar");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
     null
@@ -114,6 +124,17 @@ export default function CalendarPage() {
     email: "",
     notes: "",
   });
+
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [view, setView] = useState<"calendar" | "list">(
+    isDesktop ? "calendar" : "list"
+  );
+  const effectiveView = isDesktop ? view : "list";
+
+  // If the user shrinks the window below md, force-switch to list
+  useEffect(() => {
+    if (!isDesktop) setView("list");
+  }, [isDesktop]);
 
   // Function to get a random color from our palette
   const getRandomColor = () => {
@@ -240,6 +261,26 @@ export default function CalendarPage() {
       toast.error(err.message); // will show “You have already RSVPed …” etc.
     }
   };
+  const dayLabel = (d: Date) => {
+    if (isToday(d)) return "Today " + format(d, "EEEE");
+    if (isYesterday(d)) return "Yesterday " + format(d, "EEEE");
+    return format(d, "EEEE, MMM d");
+  };
+
+  const groupedEvents = useMemo(() => {
+    // Sort by start date ASC (most recent first)
+    const sorted = [...filteredEvents].sort(
+      (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+    );
+
+    const map = new Map<string, Event[]>();
+    sorted.forEach((ev) => {
+      const key = dayLabel(parseISO(ev.start));
+      map.set(key, [...(map.get(key) ?? []), ev]);
+    });
+
+    return Array.from(map.entries()); // → [ [label, events[]], … ]
+  }, [filteredEvents]);
 
   return (
     <>
@@ -285,13 +326,15 @@ export default function CalendarPage() {
                 </Select>
               </div>
 
-              {/* View Toggle */}
-              <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                <TabsList className="grid grid-cols-2">
-                  <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                  <TabsTrigger value="list">List</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              {/* View Toggle – only show on desktop */}
+              {isDesktop && (
+                <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                  <TabsList className="grid grid-cols-2">
+                    <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                    <TabsTrigger value="list">List</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
 
               {profile && (
                 <Button
@@ -341,18 +384,11 @@ export default function CalendarPage() {
           className="md:hidden overflow-hidden px-6"
         >
           <div className="space-y-3 py-3 ">
-            {/* View Toggle */}
-            <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-              <TabsList className="grid grid-cols-2">
-                <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                <TabsTrigger value="list">List</TabsTrigger>
-              </TabsList>
-            </Tabs>
             {/* Event Type */}
             <div>
               <Label
                 htmlFor="mobile-filter-type"
-                className="text-sm font-medium"
+                className="text-sm py-2 font-medium"
               >
                 Event Type
               </Label>
@@ -377,7 +413,6 @@ export default function CalendarPage() {
           </div>
         </motion.div>
 
-        {/* Content (only this scrolls on desktop!) */}
         <div className="flex-1 overflow-auto py-4">
           {/* Auth Alert */}
           {!profile && !authLoading && (
@@ -428,170 +463,185 @@ export default function CalendarPage() {
                   >
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </motion.div>
-                ) : view === "calendar" ? (
+                ) : effectiveView === "calendar" ? (
+                  // Calendarview of Events
                   <motion.div
                     key="calendar"
                     ref={calendarContainerRef}
                     variants={calendarVariants}
-                    className="h-[calc(100vh-200px)] min-h-[600px] px-4"
+                    className="h-[calc(100vh-200px)] min-h-[600px]"
                   >
                     <Calendar
                       events={calendarEvents}
+                      /** keep the calendar locked to “month” view */
+                      view="month"
                       onEventClick={handleEventClick}
                     >
-                      <div className="h-full flex flex-col border rounded-xl overflow-hidden dark:border-border shadow-sm">
-                        <div className="flex p-6 items-center gap-3 border-b dark:border-border bg-muted/30">
-                          <CalendarViewTrigger
-                            className="aria-[current=true]:bg-accent px-4 py-2 rounded-lg font-medium"
-                            view="day"
-                          >
-                            Day
-                          </CalendarViewTrigger>
-                          <CalendarViewTrigger
-                            view="week"
-                            className="aria-[current=true]:bg-accent px-4 py-2 rounded-lg font-medium"
-                          >
-                            Week
-                          </CalendarViewTrigger>
-                          <CalendarViewTrigger
-                            view="month"
-                            className="aria-[current=true]:bg-accent px-4 py-2 rounded-lg font-medium"
-                          >
-                            Month
-                          </CalendarViewTrigger>
+                      <div className="h-full flex flex-col border rounded-lg overflow-hidden">
+                        {/* header -------------------------------------------------------- */}
+                        <div className="flex flex-wrap items-center gap-2 p-4 border-b bg-muted/30">
+                          <div className="relative flex flex-1 items-center justify-center">
+                            <CalendarCurrentDate
+                              className="
+                              absolute left-1/2 -translate-x-1/2
+                              pointer-events-none select-none
+                              text-3xl md:text-4xl font-black tracking-tight
+                              !text-foreground         
+                            "
+                            />
+                          </div>
 
-                          <span className="flex-1" />
-
-                          <CalendarCurrentDate className="text-lg font-semibold" />
-
-                          <div className="flex items-center gap-2">
-                            <CalendarPrevTrigger className="p-2 hover:bg-muted rounded-lg">
-                              <ChevronLeft size={18} />
+                          {/* prev / today / next controls */}
+                          <div className="flex gap-1">
+                            <CalendarPrevTrigger className="p-2">
+                              <ChevronLeft size={16} />
                               <span className="sr-only">Previous</span>
                             </CalendarPrevTrigger>
 
-                            <CalendarTodayTrigger className="px-4 py-2 rounded-lg font-medium hover:bg-muted">
+                            <CalendarTodayTrigger className="text-xs px-2 py-1">
                               Today
                             </CalendarTodayTrigger>
 
-                            <CalendarNextTrigger className="p-2 hover:bg-muted rounded-lg">
-                              <ChevronRight size={18} />
+                            <CalendarNextTrigger className="p-2">
+                              <ChevronRight size={16} />
                               <span className="sr-only">Next</span>
                             </CalendarNextTrigger>
                           </div>
                         </div>
 
-                        <div className="flex-1 overflow-hidden p-6 relative">
-                          <CalendarDayView className="[&_.calendar-day-slot]:min-h-[120px] [&_.calendar-day-slot]:p-4 [&_.calendar-day-slot]:overflow-y-auto [&_.calendar-day-slot]:scrollbar-thin [&_.calendar-day-slot]:scrollbar-thumb-muted [&_.calendar-day-slot]:scrollbar-track-transparent" />
-                          <CalendarWeekView className="[&_.calendar-week-slot]:min-h-[140px] [&_.calendar-week-slot]:p-3 [&_.calendar-week-slot]:overflow-y-auto [&_.calendar-week-slot]:scrollbar-thin [&_.calendar-week-slot]:scrollbar-thumb-muted [&_.calendar-week-slot]:scrollbar-track-transparent" />
-                          <CalendarMonthView className="[&_.calendar-month-grid]:gap-2 [&_.calendar-month-cell]:min-h-[160px] [&_.calendar-month-cell]:p-3 [&_.calendar-month-cell]:border [&_.calendar-month-cell]:rounded-lg [&_.calendar-month-cell]:bg-background [&_.calendar-month-cell]:overflow-y-auto [&_.calendar-month-cell]:scrollbar-thin [&_.calendar-month-cell]:scrollbar-thumb-muted [&_.calendar-month-cell]:scrollbar-track-transparent [&_.calendar-month-cell:hover]:bg-muted/50 [&_.calendar-month-cell]:transition-colors" />
-                          <CalendarYearView />
+                        {/* body –- only MONTH view -------------------------------------- */}
+                        <div className="flex-1 overflow-auto p-4">
+                          <CalendarMonthView />
                         </div>
                       </div>
                     </Calendar>
                   </motion.div>
                 ) : (
+                  // Listview of Events
                   <motion.div
                     key="list"
                     className="flex-1 overflow-auto space-y-6"
                     variants={itemVariants}
                   >
-                    <div className="min-h-0 px-4 py-2">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 px-4 py-2">
-                          <List className="h-5 w-5" /> All Events
-                          <Badge variant="secondary" className="ml-auto">
-                            {filteredEvents.length}
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4 px-4 py-2">
+                    <div className="min-h-0">
+                      <CardContent className="px-0 md:px-6 space-y-8 pb-8">
                         {filteredEvents.length === 0 ? (
-                          <div className="flex-1 text-center py-12">
+                          <div className="text-center py-12">
                             <CalendarIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
                             <p className="text-muted-foreground">
                               No events found.
                             </p>
                           </div>
                         ) : (
-                          filteredEvents.map((e, i) => (
-                            <motion.div
-                              key={e.id}
-                              variants={itemVariants}
-                              custom={i}
-                              whileHover={{ scale: 1.02 }}
-                              className="group"
-                            >
-                              <Card
-                                onClick={() => {
-                                  const full = calendarEvents.find(
-                                    (c) => c.id === e.id
-                                  );
-                                  if (full) {
-                                    setSelectedEvent(full as ProcessedEvent);
-                                    setDialogOpen(true);
-                                  }
-                                }}
-                                className="cursor-pointer overflow-hidden transition-shadow hover:shadow-md border-l-4"
-                                style={{
-                                  borderLeftColor: `rgb(var(--${eventColorMap.get(
-                                    e.id
-                                  )}-500)/1)`,
-                                }}
+                          <div className="relative">
+                            {/* single vertical spine */}
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute left-2 sm:left-5 top-1 bottom-0
+                                border-l border-dashed border-muted-foreground/30
+                                dark:border-muted-foreground/40"
+                            />
+
+                            {/* all the dated sections */}
+                            {groupedEvents.map(([label, dayEvents]) => (
+                              <section
+                                key={label}
+                                className="relative space-y-4"
                               >
-                                <CardContent className="space-y-2 p-4">
-                                  <div className="flex items-center gap-2">
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
+                                {/* Timeline dot */}
+                                <div
+                                  className="absolute left-2 sm:left-5 top-1 -translate-x-1/2
+                                    w-3 h-3 bg-gray-500 dark:bg-gray-400
+                                    rounded-full border-2 border-white dark:border-gray-900
+                                    shadow-lg z-10"
+                                />
+                                {/* date heading */}
+                                <h3 className="sm:pl-10 pl-7 text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                                  {label}
+                                </h3>
+
+                                {/* events for that day */}
+                                <div>
+                                  {dayEvents.map((e, index) => (
+                                    <motion.div
+                                      key={e.id}
+                                      initial={{ opacity: 0, x: -20 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: index * 0.1 }}
+                                      onClick={() =>
+                                        handleEventClick({ id: e.id } as any)
+                                      }
+                                      className="relative group cursor-pointer"
                                     >
-                                      {categories[e.event_type as EventType] ||
-                                        "Event"}
-                                    </Badge>
-                                    {e.event_type === "personal" && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="text-xs"
+                                      {/* Event card */}
+                                      <div
+                                        className="sm:ml-10 ml-6 my-5
+                                          bg-white/80 dark:bg-slate-800/70 backdrop-blur
+                                          rounded-xl border border-slate-200 dark:border-slate-700
+                                          transition-all duration-200
+                                          group-hover:ring-2 group-hover:ring-gray-300 dark:group-hover:ring-gray-600"
                                       >
-                                        Private
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <h3 className="text-lg font-semibold group-hover:text-primary">
-                                    {e.title}
-                                  </h3>
-                                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="h-4 w-4" />
-                                      {e.start
-                                        ? format(
-                                            parseISO(e.start),
-                                            "MMM d, yyyy 'at' h:mm a"
-                                          )
-                                        : "Unknown start time"}
-                                    </div>
-                                    {e.location && (
-                                      <div className="flex items-center gap-1">
-                                        <MapPin className="h-4 w-4" />
-                                        <span className="truncate">
-                                          <p className="font-medium text-[14px]">
-                                            {/^(https?:\/\/)/i.test(e.location)
-                                              ? "Online Event"
-                                              : e.location}
-                                          </p>
-                                        </span>
+                                        <div className="flex items-start gap-6 p-6">
+                                          <div className="flex-1 min-w-0">
+                                            {/* Time badge */}
+                                            <div className="inline-flex items-center text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                                              {format(e.start, "h:mm a")} -{" "}
+                                              {format(e.end, "h:mm a")} •{" "}
+                                              {format(e.end, "MMM d")}
+                                            </div>
+
+                                            {/* Title */}
+                                            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                                              {e.title}
+                                            </h3>
+
+                                            {/* Location */}
+                                            <div className="flex items-center gap-2 text-xs sm:text-sm dark:text-slate-300 text-slate-600">
+                                              {/^(https?:\/\/)/i.test(
+                                                e.location
+                                              ) ? (
+                                                <>
+                                                  <LinkIcon className="h-5 w-5 text-muted-foreground" />
+                                                  <p className="font-medium text-[14px]">
+                                                    Online Event
+                                                  </p>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                                                  <p className="font-medium text-[14px]">
+                                                    {e.location}
+                                                  </p>
+                                                </>
+                                              )}
+                                            </div>
+
+                                            {/* Description */}
+                                            <p className="text-xs sm:text-sm text-gray-500 mt-2 dark:text-gray-400 line-clamp-2">
+                                              {e.description}
+                                            </p>
+                                          </div>
+
+                                          {/* Poster */}
+                                          {e.poster_url && (
+                                            <div className="flex-shrink-0">
+                                              <div className="group-hover:scale-105 transition-transform duration-300">
+                                                <SquarePoster
+                                                  src={e.poster_url}
+                                                  alt={`${e.title} poster`}
+                                                  className="sm:w-36 sm:h-36 w-28 h-28 ring-2 ring-white dark:ring-gray-900 shadow-lg"
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
-                                    )}
-                                  </div>
-                                  {e.description && (
-                                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                                      {e.description}
-                                    </p>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          ))
+                                    </motion.div>
+                                  ))}
+                                </div>
+                              </section>
+                            ))}
+                          </div>
                         )}
                       </CardContent>
                     </div>
@@ -606,7 +656,7 @@ export default function CalendarPage() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent
             className="w-full max-h-[100dvh] p-0 overflow-hidden overflow-y-auto scrollbar-hidden 
-            sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg"
+            sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:bg-slate-900/80"
           >
             <motion.div
               variants={dialogVariants}
@@ -621,21 +671,13 @@ export default function CalendarPage() {
                   <div className="space-y-2">
                     {/* Poster preview */}
                     {selectedEvent?.poster_url && (
-                      <div className="relative w-full max-w-sm mx-auto mb-4 overflow-hidden rounded-lg border shadow-lg shadow-black/10">
-                        <Image
-                          src={selectedEvent.poster_url}
-                          alt={`${selectedEvent.title} poster`}
-                          width={480}
-                          height={480}
-                          unoptimized
-                          className="w-full h-auto object-contain"
-                          sizes="(max-width:600px) 100vw, 320px"
-                        />
-                      </div>
+                      <SquarePoster
+                        src={selectedEvent.poster_url}
+                        alt={`${selectedEvent.title} poster`}
+                      />
                     )}
-
                     <div className="pb-2">
-                      <DialogTitle className="text-2xl font-bold">
+                      <DialogTitle className="text-2xl font-bold dark:text-slate-100">
                         {selectedEvent.title}
                       </DialogTitle>
                       <div className="flex items-center gap-2 pt-2 group">
@@ -693,16 +735,16 @@ export default function CalendarPage() {
                           className="w-10 h-10 rounded-sm border bg-background text-center
                             overflow-hidden shadow-sm shrink-0"
                         >
-                          <div className="bg-muted text-[10px] font-medium py-[3px] leading-none">
+                          <div className="bg-muted text-[10px] dark:text-slate-100 font-medium py-[3px] leading-none">
                             {format(selectedEvent.start, "MMM").toUpperCase()}
                           </div>
-                          <div className="text-[15px] font-extrabold text-foreground leading-none pt-[3px]">
+                          <div className="text-[15px] dark:text-slate-100 font-extrabold text-foreground leading-none pt-[3px]">
                             {format(selectedEvent.start, "d")}
                           </div>
                         </div>
 
                         {/* Date & Time */}
-                        <div className="text-sm">
+                        <div className="text-sm dark:text-slate-100">
                           <p className="font-semibold text-[14px]">
                             {format(selectedEvent.start, "EEEE, MMMM d")}
                           </p>
@@ -717,7 +759,7 @@ export default function CalendarPage() {
 
                         {/* Location Info */}
                         {selectedEvent.location && (
-                          <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-2 text-sm dark:text-slate-100">
                             <div className="w-10 h-10 border rounded-md bg-background flex items-center justify-center">
                               <MapPin className="h-5 w-5 text-muted-foreground" />
                             </div>
@@ -741,7 +783,7 @@ export default function CalendarPage() {
 
                   {/* Join Event Card */}
                   <Card
-                    className="border border-primary/20 dark:border-primary/40
+                    className="border border-primary/20 dark:border-primary/40 dark:text-slate-100
                       bg-primary/5 dark:bg-primary/10 p-4 space-y-4"
                   >
                     {new Date(selectedEvent.end) < new Date() ? (
@@ -887,7 +929,7 @@ export default function CalendarPage() {
                       </h3>
                       <Separator />
                       <div className="rounded-md px-4 py-2">
-                        <p className="text-sm leading-relaxed ">
+                        <p className="text-sm leading-relaxed dark:text-slate-200">
                           {selectedEvent.description.trimStart()}
                         </p>
                       </div>

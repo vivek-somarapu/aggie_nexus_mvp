@@ -167,7 +167,7 @@ export default function DateTimePicker() {
             <PopoverContent
               sideOffset={8}
               align="start"
-              className="w-[450px] p-0"
+              className="w-[450px] p-0 dark:bg-slate-900 dark:text-slate-200"
             >
               <div className="flex">
                 {/* calendar */}

@@ -101,9 +101,9 @@ export default function Navbar() {
     <>
       {/* ---------- TOP BAR ---------- */}
       <div className="sticky top-0 z-50 w-full border-b bg-background/95 dark:bg-[#0e0e0e]/90 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:border-[#262626] px-4 py-3">
-        <div className="flex w-full items-center justify-between px-4 text-muted-foreground dark:text-white">
+        <div className="flex w-full items-center justify-between px-0 sm:px-4 text-muted-foreground dark:text-white">
           {/* Left: Logo + menu */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-0 md:gap-4">
             {/* Menu Button (mobile only) */}
             <button
               className="flex items-center justify-center w-10 h-10 md:hidden text-muted-foreground dark:text-white"
@@ -146,22 +146,33 @@ export default function Navbar() {
 
             {/* Logo */}
             <Link href="/" className="flex items-center">
-              <Image
-                src="/images/logo_png_white.png"
-                alt="Aggie Nexus"
-                width={120}
-                height={30}
-                priority
-                className="object-contain dark:block hidden"
-              />
-              <Image
-                src="/images/AggieNexus_LogoHorizontal.png"
-                alt="Aggie Nexus"
-                width={120}
-                height={30}
-                priority
-                className="object-contain dark:hidden block"
-              />
+              {/* dark-mode logo */}
+              <div className="relative w-24 sm:w-28 md:w-32 h-6 sm:h-7 md:h-8 dark:block hidden">
+                <Image
+                  src="/images/logo_png_white.png"
+                  alt="Aggie Nexus"
+                  fill
+                  priority
+                  sizes="(max-width: 640px) 96px,
+                    (max-width: 768px) 112px,
+                    128px"
+                  className="object-contain"
+                />
+              </div>
+
+              {/* light-mode logo */}
+              <div className="relative w-24 sm:w-28 md:w-32 h-6 sm:h-7 md:h-8 dark:hidden block">
+                <Image
+                  src="/images/AggieNexus_LogoHorizontal.png"
+                  alt="Aggie Nexus"
+                  fill
+                  priority
+                  sizes="(max-width: 640px) 96px,
+                    (max-width: 768px) 112px,
+                    128px"
+                  className="object-contain"
+                />
+              </div>
             </Link>
           </div>
 
