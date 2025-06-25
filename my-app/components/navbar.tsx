@@ -25,6 +25,7 @@ import {
   Users,
   FileText,
   MessageSquare,
+  Bookmark,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
@@ -267,12 +268,6 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/profile/settings" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
                     <Link
                       href="/profile?tab=inquiries"
                       className="cursor-pointer flex items-center justify-between"
@@ -289,6 +284,18 @@ export default function Navbar() {
                           {pendingInquiries}
                         </Badge>
                       )}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile?tab=bookmarks" className="cursor-pointer">
+                      <Bookmark className="mr-2 h-4 w-4" />
+                      Bookmarks
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile/settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
                     </Link>
                   </DropdownMenuItem>
                   {isManager && (
