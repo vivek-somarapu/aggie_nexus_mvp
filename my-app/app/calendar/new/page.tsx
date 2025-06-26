@@ -24,6 +24,7 @@ import {
   AlertDialogCancel,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,14 +85,15 @@ const schema = z
   /*  ❶ address / link requirement (your old rule)                  */
   /* -------------------------------------------------------------- */
   .refine(
-    (d) => (d.is_online ? d.event_link : d.location),
+    (d) => (d.is_online ? !!d.event_link : !!d.location),
     (d) => ({
       message: d.is_online
         ? "Link required for online events"
         : "Address required",
-      path: ["location"],
+      path: d.is_online ? ["event_link"] : ["location"],
     })
   )
+
   /* -------------------------------------------------------------- */
   /*  ❷ NO events in the past ↴                                     */
   /* -------------------------------------------------------------- */
@@ -223,9 +225,7 @@ export default function NewEventPage() {
           : (data.location as string),
         poster_url,
       } as any);
-      toast.success(
-        "Event submitted successfully 🎉 Wait for updates on email!"
-      );
+
       router.push("/calendar");
     } catch (err) {
       console.error(err);
@@ -274,6 +274,13 @@ export default function NewEventPage() {
             New Event Request
           </h1>
         </div>
+        <Alert className="mb-4 bg-blue-50" variant="info">
+          <AlertDescription className="text-sm">
+            Please submit your event at least{" "}
+            <strong>1 week before the event date</strong> to allow{" "}
+            <strong>1–2 days</strong> for Nexus Support to review.
+          </AlertDescription>
+        </Alert>
 
         <Card
           className="border-0 shadow-none md:border md:shadow-lg
@@ -474,7 +481,7 @@ export default function NewEventPage() {
                   </Button>
                   <AlertDialog>
                     {/* primary button just OPENS the dialog */}
-                    <AlertDialogTrigger asChild>
+                    <AlertDialogTrigger asChild onClick={() => form.trigger()}>
                       <Button
                         type="button" // no immediate submit
                         className="flex-1 h-10 font-medium bg-gradient-to-r
@@ -516,7 +523,9 @@ export default function NewEventPage() {
                           onClick={() =>
                             form.handleSubmit(async (data) => {
                               await onSubmit(data); // your existing submit fn
-                              toast.success("Event submitted successfully 🎉");
+                              toast.success(
+                                "Event submitted successfully 🎉 Wait for updates on email!"
+                              );
                             })()
                           }
                         >

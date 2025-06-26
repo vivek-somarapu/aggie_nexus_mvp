@@ -106,7 +106,6 @@ export default function CalendarPage() {
   const { profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
-  const [personalEvents, setPersonalEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -119,6 +118,7 @@ export default function CalendarPage() {
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
+
   const [rsvpData, setRsvpData] = useState({
     name: "",
     email: "",
@@ -130,7 +130,7 @@ export default function CalendarPage() {
     isDesktop ? "calendar" : "list"
   );
   const effectiveView = isDesktop ? view : "list";
-
+  const allEvents = events;
   // If the user shrinks the window below md, force-switch to list
   useEffect(() => {
     if (!isDesktop) setView("list");
@@ -153,21 +153,6 @@ export default function CalendarPage() {
       const publicEvents = await eventService.getEvents();
       // Safe cast since we know the API returns the correct shape
       setEvents(publicEvents as unknown as Event[]);
-
-      // Get personal events if user is authenticated
-      if (profile) {
-        try {
-          // Since getUserEvents doesn't exist, we'll filter the events for this user
-          // This is a temporary solution - ideally we'd implement proper getUserEvents in the service
-          const userEvents = publicEvents.filter(
-            (event) => event.organizer_id === profile.id
-          );
-          // Safe cast since we know the API returns the correct shape
-          setPersonalEvents(userEvents as unknown as Event[]);
-        } catch (err) {
-          console.error("Error fetching personal events:", err);
-        }
-      }
     } catch (err) {
       console.error("Error fetching events:", err);
       setError("Failed to load events. Please try again.");
@@ -180,9 +165,6 @@ export default function CalendarPage() {
   useEffect(() => {
     getEvents();
   }, [profile]); // Only re-fetch when user state changes
-
-  // Get all events (public + personal)
-  const allEvents = [...events, ...personalEvents];
 
   // Filter events based on category
   const filteredEvents = allEvents.filter(
@@ -286,7 +268,7 @@ export default function CalendarPage() {
     <>
       <style dangerouslySetInnerHTML={{ __html: customScrollStyles }} />
       <motion.div
-        className="flex flex-col bg-gradient-to-br from-background via-background to-muted/20"
+        className="flex flex-col max-w-6xl bg-gradient-to-br from-background via-background to-muted/20"
         variants={pageVariants}
         initial="hidden"
         animate="visible"
@@ -413,7 +395,7 @@ export default function CalendarPage() {
           </div>
         </motion.div>
 
-        <div className="flex-1 overflow-auto py-4">
+        <div className="flex-1 overflow-hidden pt-4">
           {/* Auth Alert */}
           {!profile && !authLoading && (
             <motion.div variants={itemVariants} className="mb-6 px-4">
@@ -469,7 +451,7 @@ export default function CalendarPage() {
                     key="calendar"
                     ref={calendarContainerRef}
                     variants={calendarVariants}
-                    className="h-[calc(100vh-200px)] min-h-[600px]"
+                    className="flex-1 flex flex-col"
                   >
                     <Calendar
                       events={calendarEvents}
@@ -477,9 +459,9 @@ export default function CalendarPage() {
                       view="month"
                       onEventClick={handleEventClick}
                     >
-                      <div className="h-full flex flex-col border rounded-lg overflow-hidden">
+                      <div className="h-full flex flex-col overflow-hidden">
                         {/* header -------------------------------------------------------- */}
-                        <div className="flex flex-wrap items-center gap-2 p-4 border-b bg-muted/30">
+                        <div className="flex flex-wrap items-center gap-2 p-3 border rounded-t-lg bg-muted/30">
                           <div className="relative flex flex-1 items-center justify-center">
                             <CalendarCurrentDate
                               className="
@@ -510,7 +492,7 @@ export default function CalendarPage() {
                         </div>
 
                         {/* body –- only MONTH view -------------------------------------- */}
-                        <div className="flex-1 overflow-auto p-4">
+                        <div className="flex-1 overflow-hidden">
                           <CalendarMonthView />
                         </div>
                       </div>
