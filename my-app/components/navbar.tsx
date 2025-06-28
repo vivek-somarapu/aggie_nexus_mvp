@@ -293,11 +293,18 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/profile?tab=events" className="cursor-pointer">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Events
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/profile/settings" className="cursor-pointer">
                       <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </Link>
                   </DropdownMenuItem>
+
                   {isManager && (
                     <>
                       <DropdownMenuSeparator />
