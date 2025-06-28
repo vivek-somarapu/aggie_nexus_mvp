@@ -154,6 +154,8 @@ export default function ProfileSetupPage() {
         industry: selectedIndustries,
         skills: selectedSkills,
         contact: formData.contact,
+        profile_setup_completed: true,
+        profile_setup_skipped: false,
       };
 
       // 4) update user profile
@@ -164,8 +166,8 @@ export default function ProfileSetupPage() {
       setPendingAvatarFile(null);
       setPendingResumeFile(null);
 
-      toast.success("Profile updated!");
-      router.push("/profile");
+      toast.success("Profile setup completed!");
+      router.push("/");
     } catch (err) {
       console.error("Error updating profile:", err);
       toast.error("Failed to update profile, please try again.");
@@ -293,14 +295,16 @@ export default function ProfileSetupPage() {
       if (profile) {
         await userService.updateUser(profile.id, {
           profile_setup_skipped: true,
-          // Add a timestamp to record when setup was skipped
+          profile_setup_completed: false, // Ensure completion flag is cleared
           profile_setup_skipped_at: new Date().toISOString(),
         });
       }
+      toast.success("Profile setup skipped");
       router.push("/");
     } catch (err) {
       console.error("Error recording skip preference:", err);
       // Continue to home page even if there's an error
+      toast.error("Failed to record skip preference, but continuing to home page");
       router.push("/");
     }
   };
@@ -348,7 +352,7 @@ export default function ProfileSetupPage() {
                   Your profile is incomplete
                 </p>
                 <p className="text-sm text-green-600 dark:text-green-400">
-                  You’re almost there — finish setting up your profile!
+                  You're almost there — finish setting up your profile!
                 </p>
               </div>
             </CardDescription>
@@ -477,7 +481,7 @@ export default function ProfileSetupPage() {
                               Your profile is incomplete
                             </p>
                             <p className="text-sm text-green-600 dark:text-green-400">
-                              You’re almost there — finish setting up your
+                              You're almost there — finish setting up your
                               profile!
                             </p>
                           </div>

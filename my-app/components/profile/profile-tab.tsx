@@ -156,11 +156,16 @@ export function ProfileTab<T extends BaseFormFields>({
                       <div className="border rounded-xl p-6">
                         <h3 className="font-semibold mb-2 text-lg">Skills</h3>
                         <div className="flex flex-wrap gap-2">
-                          {user.skills.map((skill) => (
-                            <Badge key={skill} variant="outline">
+                          {user.skills.slice(0, 6).map((skill, skillIndex) => (
+                            <Badge key={`profile-skill-${skillIndex}`} variant="outline">
                               {skill}
                             </Badge>
                           ))}
+                          {user.skills && user.skills.length > 6 && (
+                            <Badge variant="outline">
+                              +{user.skills.length - 6} more
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     )}

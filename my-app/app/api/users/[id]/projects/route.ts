@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProjectsByOwner } from '@/lib/models/projects';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const userId = params.id;
-    const projects = await getProjectsByOwner(userId);
+    const { id } = await params;
+    const projects = await getProjectsByOwner(id);
     
     return NextResponse.json(projects);
   } catch (error) {
