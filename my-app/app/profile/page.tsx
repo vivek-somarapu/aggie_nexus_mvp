@@ -556,10 +556,11 @@ export default function ProfilePage() {
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6">
+          <TabsList className="m-auto">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="projects">My Projects</TabsTrigger>
             <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
+            <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
           </TabsList>
 
@@ -1026,6 +1027,18 @@ export default function ProfilePage() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </TabsContent>
+
+          {/* Events Tab */}
+          <TabsContent value="events" className="space-y-6">
+            <motion.div
+              className="flex justify-between items-center mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <h2 className="text-xl font-semibold">My Events</h2>
+            </motion.div>
           </TabsContent>
 
           {/* Bookmarks Tab */}

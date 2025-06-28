@@ -273,7 +273,7 @@ export default function Navbar() {
                       className="cursor-pointer flex items-center justify-between"
                     >
                       <div className="flex items-center">
-                        <MessageSquare className="mr-2 h-4 w-4" />
+                        <MessageSquare className="mr-4 h-4 w-4" />
                         Project Inquiries
                       </div>
                       {pendingInquiries > 0 && (

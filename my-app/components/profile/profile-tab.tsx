@@ -132,7 +132,7 @@ export function ProfileTab<T extends BaseFormFields>({
                     variants={itemVariants}
                   >
                     {/* About */}
-                    <div>
+                    <div className="border rounded-xl p-6">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-lg">About</h3>
                         <DialogTrigger asChild>
@@ -153,7 +153,7 @@ export function ProfileTab<T extends BaseFormFields>({
 
                     {/* Skills */}
                     {user?.skills && user.skills.length > 0 && (
-                      <div>
+                      <div className="border rounded-xl p-6">
                         <h3 className="font-semibold mb-2 text-lg">Skills</h3>
                         <div className="flex flex-wrap gap-2">
                           {user.skills.map((skill) => (
@@ -168,12 +168,12 @@ export function ProfileTab<T extends BaseFormFields>({
 
                   <motion.div className="space-y-5" variants={itemVariants}>
                     {/* Contact */}
-                    <div>
+                    <div className="border rounded-xl p-6">
                       <h3 className="font-semibold mb-2 text-lg">Contact</h3>
                       <div className="space-y-3">
                         {user?.contact?.email && (
                           <div className="flex items-center gap-3">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <a
                               href={`mailto:${user.contact.email}`}
                               className="text-sm hover:underline text-primary"
@@ -189,7 +189,7 @@ export function ProfileTab<T extends BaseFormFields>({
                     {(user?.linkedin_url ||
                       user?.website_url ||
                       (user?.additional_links?.length ?? 0) > 0) && (
-                      <div>
+                      <div className="border rounded-xl p-6">
                         <h3 className="font-semibold mb-2 text-lg">Links</h3>
                         <div className="space-y-3">
                           {user?.linkedin_url && (
