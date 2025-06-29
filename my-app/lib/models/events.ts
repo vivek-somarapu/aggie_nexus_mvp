@@ -7,7 +7,6 @@ export type Event = {
   start_time: string;
   end_time: string;
   location: string | null;
-  color: string;
   created_by: string;
   created_at: string | null;
   updated_at: string | null;
@@ -18,11 +17,16 @@ export type Event = {
   poster_url?: string | null;
 };
 
+type EventWithCreator = Event & {
+  creator: { full_name: string; avatar: string | null } | null;
+};
+
 // Helper function to get Supabase client
 const getSupabase = async () => {
   return await createClient();
 };
 
+/** ─────────── READ ─────────── */
 export async function getAllEvents(): Promise<Event[]> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
@@ -31,7 +35,7 @@ export async function getAllEvents(): Promise<Event[]> {
     .order('start_time');
   
   if (error) throw error;
-  return data;
+  return data || [];
 }
 
 export async function getEventsByStatus(status: 'pending' | 'approved' | 'rejected'): Promise<Event[]> {
@@ -43,20 +47,12 @@ export async function getEventsByStatus(status: 'pending' | 'approved' | 'reject
     .order('start_time');
   
   if (error) throw error;
-  return data;
+  return data || [];
 }
 
-export async function getApprovedEvents(): Promise<Event[]> {
-  return getEventsByStatus('approved');
-}
-
-export async function getPendingEvents(): Promise<Event[]> {
-  return getEventsByStatus('pending');
-}
-
-export async function getRejectedEvents(): Promise<Event[]> {
-  return getEventsByStatus('rejected');
-}
+export const getApprovedEvents = () => getEventsByStatus("approved");
+export const getPendingEvents = () => getEventsByStatus("pending");
+export const getRejectedEvents = () => getEventsByStatus("rejected");
 
 export async function getEventById(id: string): Promise<Event | null> {
   const supabase = await getSupabase();
@@ -74,6 +70,26 @@ export async function getEventById(id: string): Promise<Event | null> {
   return data;
 }
 
+export async function getEventWithCreatorById(id: string): Promise<EventWithCreator | null> {
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from("events")
+    .select(
+      `
+        id, title, description, start_time, end_time, location,
+        event_type, poster_url, created_by, status,
+        approved_by, approved_at, created_at, updated_at,
+        creator:users!events_created_by_fkey ( full_name, avatar )
+      `
+    )
+    .eq("id", id)
+    .maybeSingle<EventWithCreator>();
+
+  if (error) throw error;
+  return data;
+}
+
+/** ────────── CREATE ────────── */
 export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | 'updated_at' | 'approved_by' | 'approved_at'>): Promise<Event> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
@@ -84,7 +100,6 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
       start_time: eventData.start_time,
       end_time: eventData.end_time,
       location: eventData.location,
-      color: eventData.color,
       created_by: eventData.created_by,
       status: eventData.status || 'pending',
       event_type: eventData.event_type || 'other',
@@ -97,9 +112,10 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
   return data;
 }
 
+/** ─────── UPDATE STATUS ─────── */
 export async function updateEventStatus(
-  id: string, 
-  status: 'pending' | 'approved' | 'rejected', 
+  id: string,
+  status: "pending" | "approved" | "rejected",
   managerId?: string
 ): Promise<Event | null> {
   const supabase = await getSupabase();
@@ -131,6 +147,7 @@ export async function updateEventStatus(
   return data;
 }
 
+/** ───────── UPDATE ───────── */
 export async function updateEvent(id: string, eventData: Partial<Event>): Promise<Event | null> {
   const supabase = await getSupabase();
   
@@ -152,6 +169,7 @@ export async function updateEvent(id: string, eventData: Partial<Event>): Promis
   return data;
 }
 
+/** ───────── DELETE ───────── */
 export async function deleteEvent(id: string): Promise<boolean> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
@@ -164,7 +182,7 @@ export async function deleteEvent(id: string): Promise<boolean> {
   return data && data.length > 0;
 }
 
-// New functions to leverage Supabase relationships
+// RELATIONSHIP QUERIES - Leverage Supabase's join capabilities
 export async function getEventsWithCreators(): Promise<(Event & { creator: { id: string; full_name: string; email: string } })[]> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
@@ -180,7 +198,7 @@ export async function getEventsWithCreators(): Promise<(Event & { creator: { id:
     .order('start_time');
   
   if (error) throw error;
-  return data;
+  return data || [];
 }
 
 export async function getEventsWithApprovers(): Promise<(Event & { 
@@ -206,5 +224,5 @@ export async function getEventsWithApprovers(): Promise<(Event & {
     .order('start_time');
   
   if (error) throw error;
-  return data;
-} 
+  return data || [];
+}

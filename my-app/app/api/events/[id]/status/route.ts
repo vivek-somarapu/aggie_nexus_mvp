@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth-middleware";
+import { cookies } from "next/headers";
 
 export async function PATCH(
   request: NextRequest,
@@ -11,7 +11,6 @@ export async function PATCH(
   return withAuth(request, async (userId, req) => {
     try {
       const { id } = await params;
-      const cookieStore = cookies();
       const supabase = await createClient();
 
       // Check authentication
@@ -23,7 +22,7 @@ export async function PATCH(
 
       // Check if user is a manager
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
+        .from('users')
         .select('is_manager')
         .eq('id', user.id)
         .single();
@@ -91,4 +90,4 @@ export async function PATCH(
       );
     }
   });
-} 
+}
