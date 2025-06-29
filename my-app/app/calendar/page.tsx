@@ -9,7 +9,7 @@ import Link from "next/link";
 import { SquarePoster } from "@/components/ui/SquarePoster";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { rsvpService } from "@/lib/services/rsvp-service";
 
@@ -34,10 +34,14 @@ import {
   CalendarIcon,
   Link as LinkIcon,
   Filter,
+  Clock,
+  UserCircle2,
+  Home,
+  CircleUser,
 } from "lucide-react";
 import { eventService } from "@/lib/services/event-service";
 import { motion, AnimatePresence } from "framer-motion";
-import { format, parseISO, isToday, isYesterday } from "date-fns";
+import { format, parseISO, isToday, isYesterday, isValid, addDays, isWithinInterval } from "date-fns";
 import {
   Calendar,
   CalendarCurrentDate,
@@ -85,14 +89,16 @@ type ProcessedEvent = FullCalendarEvent & {
   creator?: { full_name: string; avatar: string | null };
 };
 
-// It hides the calendar view on mobile and uses a list view instead. The calendar view is only available on desktop screens.
+// Media query hook for responsive behavior
 function useMediaQuery(query: string) {
-  const getMatch = () =>
-    typeof window !== "undefined" && window.matchMedia(query).matches;
-
-  const [matches, setMatches] = useState(getMatch); // ← initialised correctly
+  const [matches, setMatches] = useState(false);
 
   useEffect(() => {
+    const getMatch = () =>
+      typeof window !== "undefined" && window.matchMedia(query).matches;
+    
+    setMatches(getMatch());
+    
     const media = window.matchMedia(query);
     const listener = () => setMatches(media.matches);
     media.addEventListener("change", listener);
@@ -108,6 +114,9 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isSmUp = useMediaQuery("(min-width: 640px)");
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [view, setView] = useState<"calendar" | "list">(isSmUp ? "calendar" : "list");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
     null
@@ -125,16 +134,15 @@ export default function CalendarPage() {
     notes: "",
   });
 
-  const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [view, setView] = useState<"calendar" | "list">(
-    isDesktop ? "calendar" : "list"
-  );
   const effectiveView = isDesktop ? view : "list";
   const allEvents = events;
-  // If the user shrinks the window below md, force-switch to list
+  
+  // Force list view on mobile
   useEffect(() => {
-    if (!isDesktop) setView("list");
-  }, [isDesktop]);
+    if (!isSmUp && view !== "list") {
+      setView("list");
+    }
+  }, [isSmUp]);
 
   // Function to get a random color from our palette
   const getRandomColor = () => {
@@ -240,7 +248,7 @@ export default function CalendarPage() {
       });
       setRsvpSuccess(true);
     } catch (err: any) {
-      toast.error(err.message); // will show “You have already RSVPed …” etc.
+      toast.error(err.message); // will show "You have already RSVPed ..." etc.
     }
   };
   const dayLabel = (d: Date) => {
@@ -265,37 +273,139 @@ export default function CalendarPage() {
   }, [filteredEvents]);
 
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: customScrollStyles }} />
-      <motion.div
-        className="flex flex-col max-w-6xl bg-gradient-to-br from-background via-background to-muted/20"
-        variants={pageVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-      >
-        {/* Header */}
-        <motion.div
-          variants={itemVariants}
-          className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur"
-        >
-          <div className="container mx-auto flex flex-wrap items-center justify-between px-6 py-3 gap-4">
-            {/* Title */}
-            <h1 className="text-2xl font-bold md:text-3xl tracking-tight">
-              Events Calendar
-            </h1>
+    <motion.div 
+      className="container max-w-7xl mx-auto p-4 space-y-4"
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
+      <motion.div variants={itemVariants} className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center mb-2">
+        <div className="relative">
+          {/* Green accent background for calendar */}
+          <div className="absolute inset-0 bg-gradient-to-r from-green-50 to-transparent dark:from-green-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
+          <div className="relative z-10">
+            <h1 className="text-3xl font-bold tracking-tight">Events Calendar</h1>
+            <p className="text-muted-foreground">
+              Stay organized with upcoming events, workshops, and networking opportunities
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex space-x-2 mt-2 sm:mt-0">
+          {!profile && !authLoading && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/">
+                <Home className="h-4 w-4 mr-2" />
+                Return Home
+              </Link>
+            </Button>
+          )}
+          <Tabs
+            value={view}
+            onValueChange={(v) => setView(v as "calendar" | "list")}
+          >
+            {isSmUp && (
+              <TabsList className="grid w-[200px] grid-cols-2 mb-4">
+                <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                <TabsTrigger value="list">List</TabsTrigger>
+              </TabsList>
+            )}
 
-            {/* Desktop: inline filters & stats */}
-            <div className="hidden md:flex items-center gap-6">
-              {/* Event Type */}
+            {isSmUp && (
+              <TabsContent value="calendar"/>
+            )}
+          </Tabs>
+          {profile && (
+            <Button 
+              onClick={() => router.push('/calendar/new')} 
+              size="sm" 
+              className="flex items-center bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Event
+            </Button>
+          )}
+        </div>
+      </motion.div>
+      
+      {!profile && !authLoading && (
+        <motion.div variants={itemVariants}>
+          <Alert variant="info" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800 mb-2">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              <span className="font-medium">Sign in to add personal events and get personalized notifications.</span>{" "}
+              <Button variant="link" className="h-auto p-0 text-blue-600 dark:text-blue-400" onClick={() => router.push('/auth/login?redirect=/calendar')}>
+                Sign in now
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </motion.div>
+      )}
+
+      {error && (
+        <motion.div variants={itemVariants}>
+          <Alert variant="destructive" className="mb-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </motion.div>
+      )}
+      
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2 p-4 rounded-lg border-l-4 border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/10">
+        <Tabs
+          value={view}
+          onValueChange={(v) => setView(v as "calendar" | "list")}
+          className="sm:hidden w-full"
+        >
+          <TabsList className="grid w-full grid-cols-1">
+            <TabsTrigger className="hidden sm:inline-flex sm:flex-1" value="calendar">Calendar</TabsTrigger>
+            <TabsTrigger value="list">List</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </motion.div>
+      
+      <motion.div className="grid md:grid-cols-4 gap-4" variants={itemVariants}>
+        {/* Left Sidebar */}
+        <motion.div className="md:col-span-1 space-y-4">
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle>View Options</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <label className="sr-only">Event Type</label>
-                <Select
-                  value={categoryFilter}
-                  onValueChange={setCategoryFilter}
+                <Tabs
+                  value={view}
+                  onValueChange={(v) => setView(v as "calendar" | "list")}
                 >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="All Events" />
+                  {isSmUp && (
+                    <TabsList className="w-full">
+                      <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
+                      <TabsTrigger value="list" className="flex-1">List</TabsTrigger>
+                    </TabsList>
+                  )}
+
+                  {isSmUp && (
+                    <TabsContent value="calendar"/>
+                  )}
+                </Tabs>
+                <Tabs
+                  value={view}
+                  onValueChange={(v) => setView(v as "calendar" | "list")}
+                  className="sm:hidden w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-1">
+                    <TabsTrigger className="hidden sm:inline-flex sm:flex-1" value="calendar">Calendar</TabsTrigger>
+                    <TabsTrigger value="list">List</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">Event Type</label>
+                <Select defaultValue={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Events</SelectItem>
@@ -327,31 +437,8 @@ export default function CalendarPage() {
                   <Plus className="h-4 w-4 mr-1" /> Add Event
                 </Button>
               )}
-            </div>
-
-            {/* Mobile: compact header with Add & Filter */}
-            <div className="md:hidden flex items-center gap-2">
-              {/* + Add button (floating style) */}
-              {profile && (
-                <Button
-                  size="icon"
-                  className="bg-green-600 text-white hover:bg-green-700 hover:text-white dark:hover:text-white"
-                  onClick={() => router.push("/calendar/new")}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
-
-              {/* Filter toggle button */}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setFiltersOpen(!filtersOpen)}
-              >
-                <Filter className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Mobile Filter Dropdown (with smooth animation) */}
@@ -455,7 +542,7 @@ export default function CalendarPage() {
                   >
                     <Calendar
                       events={calendarEvents}
-                      /** keep the calendar locked to “month” view */
+                      /** keep the calendar locked to "month" view */
                       view="month"
                       onEventClick={handleEventClick}
                     >
@@ -923,6 +1010,6 @@ export default function CalendarPage() {
           </DialogContent>
         </Dialog>
       </motion.div>
-    </>
+    </motion.div>
   );
 }

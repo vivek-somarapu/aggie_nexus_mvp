@@ -52,7 +52,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function ProjectPage() {
   const { id } = useParams() as { id: string };
-  const { authUser: currentUser } = useAuth();
+  const { authUser: currentUser, isAuthReady } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
   const [owner, setOwner] = useState<UserType | null>(null);
@@ -69,7 +69,7 @@ export default function ProjectPage() {
   const [inquiryError, setInquiryError] = useState<string | null>(null);
   const [inquirySuccess, setInquirySuccess] = useState(false);
 
-  // Fetch project data
+  // Fetch project data - independent of auth state
   useEffect(() => {
     const fetchProjectData = async () => {
       try {
@@ -101,17 +101,6 @@ export default function ProjectPage() {
           )
           .slice(0, 3);
         setSimilarProjects(similar);
-
-        // Check if project is bookmarked
-        if (currentUser) {
-          const bookmarks = await bookmarkService.getProjectBookmarks(
-            currentUser.id
-          );
-          const isProjectBookmarked = bookmarks.some(
-            (b) => b.project_id === id
-          );
-          setIsBookmarked(isProjectBookmarked);
-        }
       } catch (err) {
         console.error("Error fetching project:", err);
         setError("Failed to load project details. Please try again later.");
@@ -121,9 +110,35 @@ export default function ProjectPage() {
     };
 
     fetchProjectData();
-    console.log(currentUser);
-  }, [id, currentUser]);
-  
+  }, [id]); // Only depend on project ID, not auth state
+
+  // Separate effect for bookmark data - only runs when auth is ready and user exists
+  useEffect(() => {
+    const fetchBookmarkData = async () => {
+      if (!currentUser || !project) return;
+      
+      try {
+        setIsBookmarkLoading(true);
+        const bookmarks = await bookmarkService.getProjectBookmarks(
+          currentUser.id
+        );
+        const isProjectBookmarked = bookmarks.some(
+          (b) => b.project_id === id
+        );
+        setIsBookmarked(isProjectBookmarked);
+      } catch (err) {
+        console.error("Error fetching bookmark data:", err);
+        // Don't show error for bookmark fetch failure
+      } finally {
+        setIsBookmarkLoading(false);
+      }
+    };
+
+    if (isAuthReady && currentUser && project) {
+      fetchBookmarkData();
+    }
+  }, [isAuthReady, currentUser?.id, project?.id]); // Use stable auth ready state
+
   const handleEdit = async () => {
     redirect(`/projects/edit/${project?.id}`);
   };
@@ -342,16 +357,16 @@ export default function ProjectPage() {
                 <div className="space-y-2">
                   <h3 className="font-semibold">Industry & Skills</h3>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {project.industry.map((ind) => (
-                      <Badge key={ind} variant="secondary">
+                    {project.industry.map((ind, indIndex) => (
+                      <Badge key={`project-${project.id}-industry-${indIndex}`} variant="secondary">
                         {ind}
                       </Badge>
                     ))}
                   </div>
                   <h4 className="text-sm font-medium">Required Skills</h4>
                   <div className="flex flex-wrap gap-2">
-                    {project.required_skills.map((skill) => (
-                      <Badge key={skill} variant="outline">
+                    {project.required_skills.map((skill, skillIndex) => (
+                      <Badge key={`project-${project.id}-skill-${skillIndex}`} variant="outline">
                         {skill}
                       </Badge>
                     ))}

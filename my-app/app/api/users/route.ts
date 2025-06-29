@@ -1,141 +1,112 @@
+import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Create a Supabase client with better error handling
-const getSupabaseClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase credentials in environment variables');
-  }
-  
-  return createClient(supabaseUrl, supabaseKey);
-};
 
 export async function GET(request: NextRequest) {
-  const startTime = Date.now();
-  console.log('API: GET /api/users - Request received');
-  
   try {
-    const supabase = getSupabaseClient();
-    const searchParams = request.nextUrl.searchParams;
-    const searchTerm = searchParams.get('search');
+    const supabase = await createClient();
+    
+    // Get search parameters
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
     const skill = searchParams.get('skill');
     const tamuParam = searchParams.get('tamu');
     
-    // Log request parameters for debugging
-    console.log('API: Fetching users with params:', {
-      search: searchTerm,
-      skill,
-      tamu: tamuParam
-    });
+    let query = supabase
+      .from('users')
+      .select('*')
+      .order('full_name');
     
-    // Create a simpler query structure to avoid potential issues
-    let query = supabase.from('users').select('*');
+    // Filter for complete profiles only (users with bio and skills)
+    query = query
+      .not('bio', 'is', null)
+      .not('bio', 'eq', '')
+      .not('skills', 'is', null)
+      .gt('skills', '{}'); // Ensure skills array is not empty
     
-    // Apply simple filters via Supabase
-    // Filter by search term
-    if (searchTerm) {
-      query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
-      if (searchTerm.length > 3) { // Only search bio for longer terms to avoid excessive matches
-        query = query.or(`bio.ilike.%${searchTerm}%`);
-      }
+    // Apply search filter if provided
+    if (search) {
+      query = query.or(
+        `full_name.ilike.%${search}%,email.ilike.%${search}%,bio.ilike.%${search}%`
+      );
     }
     
-    // Filter by skill
+    // Apply skill filter if provided
     if (skill) {
       query = query.contains('skills', [skill]);
     }
     
-    // Filter by TAMU affiliation
-    if (tamuParam === 'true' || tamuParam === 'false') {
-      query = query.eq('is_texas_am_affiliate', tamuParam === 'true');
+    // Apply TAMU filter if provided
+    if (tamuParam === 'true') {
+      query = query.eq('is_texas_am_affiliate', true);
+    } else if (tamuParam === 'false') {
+      query = query.eq('is_texas_am_affiliate', false);
     }
     
-    // Exclude deleted users
-    query = query.eq('deleted', false);
-    
-    // Only show users with complete profiles
-    // A complete profile has a bio and at least one skill
-    query = query.not('bio', 'is', null)
-                .not('bio', 'eq', '')
-                .not('skills', 'is', null)
-                .not('skills', 'eq', '{}');
-    
-    const { data: users, error } = await query;
+    const { data, error } = await query;
     
     if (error) {
-      console.error('API Error: Supabase query error:', error);
-      return NextResponse.json({ error: 'Database query failed: ' + error.message }, { status: 500 });
+      console.error('Error fetching users:', error);
+      return NextResponse.json({ 
+        error: 'Failed to fetch users',
+        details: error.message 
+      }, { status: 500 });
     }
     
-    const responseTime = Date.now() - startTime;
-    console.log(`API: Fetched ${users?.length || 0} users successfully in ${responseTime}ms`);
+    // Normalize data structure and ensure complete profiles
+    const users = (data || []).filter((user: any) => {
+      // Double-check that user has complete profile
+      return user.bio && user.bio.trim() !== '' && 
+             user.skills && Array.isArray(user.skills) && user.skills.length > 0;
+    }).map((user: any) => ({
+      ...user,
+      additional_links: user.additional_links || [],
+      contact: user.contact || {},
+    }));
     
-    return NextResponse.json(users || []);
-  } catch (error: any) {
-    console.error('API Critical Error: Error fetching users:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch users: ' + (error.message || 'Unknown error') }, 
-      { status: 500 }
-    );
+    console.log(`Filtered ${users.length} complete profiles from ${data?.length || 0} total users`);
+    
+    return NextResponse.json({ users });
+  } catch (error) {
+    console.error('Users API error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
-    const body = await request.json();
+    const supabase = await createClient();
+    const userData = await request.json();
     
-    // Validate required fields
-    if (!body.full_name || !body.email) {
-      return NextResponse.json(
-        { error: 'Missing required fields: full_name and email are required' },
-        { status: 400 }
-      );
-    }
-    
-    const { data: user, error } = await supabase
+    const { data, error } = await supabase
       .from('users')
-      .insert([{
-        full_name: body.full_name,
-        email: body.email,
-        bio: body.bio || null,
-        industry: body.industry || [],
-        skills: body.skills || [],
-        linkedin_url: body.linkedin_url || null,
-        website_url: body.website_url || null,
-        resume_url: body.resume_url || null,
-        additional_links: body.additional_links || [],
-        contact: body.contact || {},
-        graduation_year: body.graduation_year || null,
-        is_texas_am_affiliate: body.is_texas_am_affiliate || false,
-        avatar: body.avatar || null,
-      }])
-      .select()
+      .insert(userData)
+      .select('*')
       .single();
     
     if (error) {
-      console.error('API Error: Error creating user:', error);
-      
-      // Check for duplicate email
-      if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'A user with this email already exists' },
-          { status: 409 }
-        );
-      }
-      
-      return NextResponse.json({ error: 'Failed to create user: ' + error.message }, { status: 500 });
+      console.error('Error creating user:', error);
+      return NextResponse.json({ 
+        error: 'Failed to create user',
+        details: error.message 
+      }, { status: 500 });
     }
     
-    return NextResponse.json(user, { status: 201 });
-  } catch (error: any) {
-    console.error('API Critical Error: Error creating user:', error);
-    return NextResponse.json(
-      { error: 'Failed to create user: ' + (error.message || 'Unknown error') }, 
-      { status: 500 }
-    );
+    // Normalize data structure
+    const user = {
+      ...data,
+      additional_links: data.additional_links || [],
+      contact: data.contact || {},
+    };
+    
+    return NextResponse.json({ user }, { status: 201 });
+  } catch (error) {
+    console.error('Users POST API error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'  
+    }, { status: 500 });
   }
 } 

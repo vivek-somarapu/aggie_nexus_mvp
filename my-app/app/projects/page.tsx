@@ -524,9 +524,9 @@ export default function ProjectsPage() {
                           </div>
                         </CardContent>
                         <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                          {project.industry.slice(0, 3).map((ind: string) => (
+                          {project.industry.slice(0, 3).map((ind: string, indIndex: number) => (
                             <Badge
-                              key={ind}
+                              key={`${project.id}-industry-${indIndex}`}
                               variant="secondary"
                               className="text-xs"
                             >

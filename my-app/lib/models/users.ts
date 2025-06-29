@@ -1,4 +1,4 @@
-import { supabase } from "../db";
+import { getClient } from "../db";
 
 export type User = {
   id: string;
@@ -27,6 +27,7 @@ export type User = {
 export async function createUser(
   userData: Omit<User, "id" | "views" | "created_at" | "updated_at">
 ): Promise<User> {
+  const supabase = await getClient();
   const { data, error } = await supabase
     .from("users")
     .insert({
@@ -57,6 +58,7 @@ export async function createUser(
 
 // READ
 export async function getAllUsers(): Promise<User[]> {
+  const supabase = await getClient();
   const { data, error } = await supabase
     .from("users")
     .select("*")
@@ -67,7 +69,7 @@ export async function getAllUsers(): Promise<User[]> {
     throw new Error("Failed to fetch users");
   }
 
-  return (data || []).map((user) => ({
+  return (data || []).map((user: any) => ({
     ...user,
     additional_links: user.additional_links || [],
     contact: user.contact || {},
@@ -75,6 +77,7 @@ export async function getAllUsers(): Promise<User[]> {
 }
 
 export async function getUserById(id: string): Promise<User | null> {
+  const supabase = await getClient();
   const { data, error } = await supabase
     .from("users")
     .select("*")
@@ -98,6 +101,7 @@ export async function getUserById(id: string): Promise<User | null> {
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
+  const supabase = await getClient();
   const { data, error } = await supabase
     .from("users")
     .select("*")
@@ -121,6 +125,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 export async function searchUsers(searchTerm: string): Promise<User[]> {
+  const supabase = await getClient();
   const { data, error } = await supabase
     .from("users")
     .select("*")
@@ -134,7 +139,7 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
     throw new Error("Failed to search users");
   }
 
-  return (data || []).map((user) => ({
+  return (data || []).map((user: any) => ({
     ...user,
     additional_links: user.additional_links || [],
     contact: user.contact || {},
@@ -142,6 +147,7 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
 }
 
 export async function filterUsersBySkill(skill: string): Promise<User[]> {
+  const supabase = await getClient();
   const { data, error } = await supabase
     .from("users")
     .select("*")
@@ -153,7 +159,7 @@ export async function filterUsersBySkill(skill: string): Promise<User[]> {
     throw new Error("Failed to filter users by skill");
   }
 
-  return (data || []).map((user) => ({
+  return (data || []).map((user: any) => ({
     ...user,
     additional_links: user.additional_links || [],
     contact: user.contact || {},
@@ -165,6 +171,7 @@ export async function updateUser(
   id: string,
   userData: Partial<User>
 ): Promise<User | null> {
+  const supabase = await getClient();
   const { data, error } = await supabase
     .from("users")
     .update(userData)
@@ -185,38 +192,189 @@ export async function updateUser(
 }
 
 export async function incrementUserViews(id: string): Promise<void> {
-  const { data: userData, error: fetchError } = await supabase
-    .from("users")
-    .select("views")
-    .eq("id", id)
-    .single();
+  const supabase = await getClient();
+  const { error } = await supabase.rpc('increment_user_views', { user_id: id });
 
-  if (fetchError) {
-    console.error("Error fetching user views:", fetchError);
-    throw new Error("Failed to fetch user views");
-  }
-
-  const { error: updateError } = await supabase
-    .from("users")
-    .update({ views: (userData.views || 0) + 1 })
-    .eq("id", id);
-
-  if (updateError) {
-    console.error("Error incrementing user views:", updateError);
+  if (error) {
+    console.error("Error incrementing user views:", error);
     throw new Error("Failed to increment user views");
   }
 }
 
+export async function setUserProfileSetupSkipped(id: string): Promise<User | null> {
+  const supabase = await getClient();
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      profile_setup_skipped: true,
+      profile_setup_skipped_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("Error setting profile setup skipped:", error);
+    return null;
+  }
+
+  return {
+    ...data,
+    additional_links: data.additional_links || [],
+    contact: data.contact || {},
+  };
+}
+
+export async function setUserProfileSetupCompleted(id: string): Promise<User | null> {
+  const supabase = await getClient();
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      profile_setup_completed: true,
+      profile_setup_skipped: false,
+      profile_setup_skipped_at: null,
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("Error setting profile setup completed:", error);
+    return null;
+  }
+
+  return {
+    ...data,
+    additional_links: data.additional_links || [],
+    contact: data.contact || {},
+  };
+}
+
 // DELETE
 export async function deleteUser(id: string): Promise<boolean> {
-  const { data, error } = await supabase.from("users").delete().eq("id", id);
+  const supabase = await getClient();
+  const { error } = await supabase.from("users").delete().eq("id", id);
 
   if (error) {
     console.error("Error deleting user:", error);
-    throw new Error("Failed to delete user");
+    return false;
   }
 
-  return true; // If no error occurred, we can assume successful deletion
+  return true;
 }
 
 // Add more functions as needed for searching, filtering, etc.
+
+// RELATIONSHIP QUERIES - Leverage Supabase's join capabilities
+
+export type UserWithProjects = User & {
+  projects: {
+    id: string;
+    title: string;
+    description: string;
+    project_status: string;
+    is_idea: boolean;
+    created_at: string;
+  }[];
+};
+
+export type UserWithBookmarksCount = User & {
+  bookmark_count: number;
+  project_count: number;
+};
+
+export async function getUsersWithProjects(): Promise<UserWithProjects[]> {
+  const supabase = await getClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select(`
+      *,
+      projects!projects_owner_id_fkey (
+        id,
+        title,
+        description,
+        project_status,
+        is_idea,
+        created_at
+      )
+    `)
+    .eq("deleted", false)
+    .order("full_name");
+
+  if (error) {
+    console.error("Error fetching users with projects:", error);
+    throw new Error("Failed to fetch users with projects");
+  }
+
+  return (data || []).map((user: any) => ({
+    ...user,
+    additional_links: user.additional_links || [],
+    contact: user.contact || {},
+    projects: user.projects || []
+  }));
+}
+
+export async function getUserWithProjectsById(id: string): Promise<UserWithProjects | null> {
+  const supabase = await getClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select(`
+      *,
+      projects!projects_owner_id_fkey (
+        id,
+        title,
+        description,
+        project_status,
+        is_idea,
+        created_at
+      )
+    `)
+    .eq("id", id)
+    .eq("deleted", false)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      return null;
+    }
+    console.error("Error fetching user with projects:", error);
+    throw new Error("Failed to fetch user with projects");
+  }
+
+  return {
+    ...data,
+    additional_links: data.additional_links || [],
+    contact: data.contact || {},
+    projects: data.projects || []
+  };
+}
+
+export async function getUsersWithCounts(): Promise<UserWithBookmarksCount[]> {
+  const supabase = await getClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select(`
+      *,
+      user_bookmarks_user_id_fkey!inner (
+        id
+      ),
+      projects!projects_owner_id_fkey (
+        id
+      )
+    `)
+    .eq("deleted", false)
+    .order("full_name");
+
+  if (error) {
+    console.error("Error fetching users with counts:", error);
+    throw new Error("Failed to fetch users with counts");
+  }
+
+  return (data || []).map((user: any) => ({
+    ...user,
+    additional_links: user.additional_links || [],
+    contact: user.contact || {},
+    bookmark_count: user.user_bookmarks_user_id_fkey?.length || 0,
+    project_count: user.projects?.length || 0
+  }));
+}

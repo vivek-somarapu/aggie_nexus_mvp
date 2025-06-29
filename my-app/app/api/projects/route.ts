@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(request: NextRequest) {
   try {
     // Create Supabase client inside the function, not at module level
-    const supabase = createClient();
+    const supabase = await createClient();
     console.log('Fetching projects from API');
     const searchParams = request.nextUrl.searchParams;
     const searchTerm = searchParams.get('search');
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return withAuth(request, async (userId, req) => {
     try {
-      const supabase = createClient();
+      const supabase = await createClient();
       const body = await req.json();
       
       // Validate required fields

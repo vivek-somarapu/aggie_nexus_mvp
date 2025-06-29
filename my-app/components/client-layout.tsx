@@ -5,6 +5,16 @@ import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import AuthRedirect from "@/components/auth-redirect";
 
+// Enhanced logging for client layout
+const layoutLog = (message: string, data?: any) => {
+  const timestamp = new Date().toISOString();
+  if (data) {
+    console.log(`[CLIENT LAYOUT ${timestamp}] ${message}`, data);
+  } else {
+    console.log(`[CLIENT LAYOUT ${timestamp}] ${message}`);
+  }
+};
+
 export default function ClientLayout({
   children,
 }: {
@@ -12,23 +22,41 @@ export default function ClientLayout({
 }) {
   const { authUser, isLoading: authLoading, error } = useAuth();
   const [showLoadingUI, setShowLoadingUI] = useState(true);
+  const [timeoutReached, setTimeoutReached] = useState(false);
+
+  layoutLog("ClientLayout: Rendering with auth state", {
+    hasAuthUser: !!authUser,
+    authLoading,
+    hasError: !!error,
+    showLoadingUI,
+    timeoutReached
+  });
 
   // Only show loading UI for up to 3 seconds to prevent infinite loading state
   useEffect(() => {
+    layoutLog("ClientLayout: Setting up loading timeout", { authLoading, showLoadingUI });
+    
     if (!authLoading) {
+      layoutLog("ClientLayout: Auth loading complete, hiding loading UI");
       setShowLoadingUI(false);
       return;
     }
 
     const timeout = setTimeout(() => {
+      layoutLog("ClientLayout: Loading timeout reached, forcing loading UI off");
       setShowLoadingUI(false);
-    }, 3000);
+      setTimeoutReached(true);
+    }, 4000); // Increased to 4 seconds to match auth timeout
 
-    return () => clearTimeout(timeout);
+    return () => {
+      layoutLog("ClientLayout: Cleaning up loading timeout");
+      clearTimeout(timeout);
+    };
   }, [authLoading]);
 
   // During initial auth check show loading state, but only for a limited time
-  if (authLoading && showLoadingUI) {
+  if (authLoading && showLoadingUI && !timeoutReached) {
+    layoutLog("ClientLayout: Showing loading UI");
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
@@ -45,11 +73,16 @@ export default function ClientLayout({
   // Even if there's an error with full profile loading, we can still show the UI
   // as long as we have the minimal user data
   const hasMinimalUserData = !!authUser && !!authUser.id && !!authUser.email;
+  layoutLog("ClientLayout: Evaluating user data", { 
+    hasMinimalUserData,
+    authUserId: authUser?.id,
+    authUserEmail: authUser?.email
+  });
 
   // Show error message only if it's a critical auth error (not just profile fetch issues)
   // and we don't have minimal user data
   if (error && !hasMinimalUserData && !authLoading) {
-    console.error("Auth error in layout:", error);
+    layoutLog("ClientLayout: Showing critical auth error", { error });
     // Return fallback UI for critical auth errors
     return (
       <div className="flex flex-col">
@@ -70,6 +103,12 @@ export default function ClientLayout({
   }
 
   // After auth state is resolved, render appropriate layout
+  layoutLog("ClientLayout: Rendering main layout", { 
+    hasMinimalUserData,
+    hasError: !!error,
+    timeoutReached
+  });
+
   return (
     <div className="flex flex-col">
       {/* Include the AuthRedirect component to check profile status */}
@@ -82,10 +121,20 @@ export default function ClientLayout({
               <p>Notice: {error}</p>
             </div>
           )}
+          {timeoutReached && (
+            <div className="container mx-auto mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-sm rounded">
+              <p>Debug: Authentication timeout reached - if you're seeing this, there may be an auth issue.</p>
+            </div>
+          )}
           <main className="flex-1 container mx-auto py-5 px-4">{children}</main>
         </>
       ) : (
         <>
+          {timeoutReached && (
+            <div className="container mx-auto mt-2 p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300 text-sm rounded">
+              <p>Debug: No user data available after timeout - this may indicate an authentication problem.</p>
+            </div>
+          )}
           <main className="flex-1 container mx-auto py-5 px-4">{children}</main>
         </>
       )}
