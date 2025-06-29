@@ -7,7 +7,6 @@ export type Event = {
   start_time: string;
   end_time: string;
   location: string | null;
-  color: string;
   created_by: string;
   created_at: string | null;
   updated_at: string | null;
@@ -36,7 +35,7 @@ export async function getAllEvents(): Promise<Event[]> {
     .order('start_time');
   
   if (error) throw error;
-  return data;
+  return data || [];
 }
 
 export async function getEventsByStatus(status: 'pending' | 'approved' | 'rejected'): Promise<Event[]> {
@@ -48,7 +47,7 @@ export async function getEventsByStatus(status: 'pending' | 'approved' | 'reject
     .order('start_time');
   
   if (error) throw error;
-  return data;
+  return data || [];
 }
 
 export const getApprovedEvents = () => getEventsByStatus("approved");
@@ -74,22 +73,19 @@ export async function getEventById(id: string): Promise<Event | null> {
 export async function getEventWithCreatorById(id: string): Promise<EventWithCreator | null> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
-    .from('events')
-    .select(`
-      *,
-      creator:users!events_created_by_fkey (
-        full_name,
-        avatar
-      )
-    `)
-    .eq('id', id)
-    .single();
+    .from("events")
+    .select(
+      `
+        id, title, description, start_time, end_time, location,
+        event_type, poster_url, created_by, status,
+        approved_by, approved_at, created_at, updated_at,
+        creator:users!events_created_by_fkey ( full_name, avatar )
+      `
+    )
+    .eq("id", id)
+    .maybeSingle<EventWithCreator>();
 
-  if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw error;
-  }
-  
+  if (error) throw error;
   return data;
 }
 
@@ -104,7 +100,6 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
       start_time: eventData.start_time,
       end_time: eventData.end_time,
       location: eventData.location,
-      color: eventData.color,
       created_by: eventData.created_by,
       status: eventData.status || 'pending',
       event_type: eventData.event_type || 'other',
@@ -124,58 +119,70 @@ export async function updateEventStatus(
   managerId?: string
 ): Promise<Event | null> {
   const supabase = await getSupabase();
-  const updateFields: Partial<Event> = { status };
   
-  if (status === "approved") {
-    updateFields.approved_by = managerId ?? null;
-    updateFields.approved_at = new Date().toISOString();
+  let updateData: any = { status };
+  
+  if (status === 'approved' && managerId) {
+    // For approved events, set the approver and timestamp
+    updateData.approved_by = managerId;
+    updateData.approved_at = new Date().toISOString();
   } else {
-    updateFields.approved_by = null;
-    updateFields.approved_at = null;
+    // For other status changes, clear approver info
+    updateData.approved_by = null;
+    updateData.approved_at = null;
   }
   
   const { data, error } = await supabase
     .from('events')
-    .update(updateFields)
+    .update(updateData)
     .eq('id', id)
-    .select('*')
+    .select()
     .single();
   
-  if (error) throw error;
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Record not found
+    throw error;
+  }
+  
   return data;
 }
 
-/** ─────── UPDATE EVENT ─────── */
-export async function updateEvent(
-  id: string,
-  fields: Partial<Omit<Event, "id" | "created_at" | "updated_at">>
-): Promise<Event | null> {
+/** ───────── UPDATE ───────── */
+export async function updateEvent(id: string, eventData: Partial<Event>): Promise<Event | null> {
+  const supabase = await getSupabase();
+  
+  // Filter out fields we don't want to update directly
+  const { id: _, created_at, updated_at, approved_by, approved_at, ...updateData } = eventData as any;
+  
+  const { data, error } = await supabase
+    .from('events')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Record not found
+    throw error;
+  }
+  
+  return data;
+}
+
+/** ───────── DELETE ───────── */
+export async function deleteEvent(id: string): Promise<boolean> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
     .from('events')
-    .update(fields)
-    .eq('id', id)
-    .select('*')
-    .single();
-  
-  if (error) throw error;
-  return data;
-}
-
-/** ─────── DELETE ─────── */
-export async function deleteEvent(id: string): Promise<boolean> {
-  const supabase = await getSupabase();
-  const { error } = await supabase
-    .from('events')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   
   if (error) throw error;
-  return true;
+  return data && data.length > 0;
 }
 
 // RELATIONSHIP QUERIES - Leverage Supabase's join capabilities
-
 export async function getEventsWithCreators(): Promise<(Event & { creator: { id: string; full_name: string; email: string } })[]> {
   const supabase = await getSupabase();
   const { data, error } = await supabase
@@ -191,7 +198,7 @@ export async function getEventsWithCreators(): Promise<(Event & { creator: { id:
     .order('start_time');
   
   if (error) throw error;
-  return data;
+  return data || [];
 }
 
 export async function getEventsWithApprovers(): Promise<(Event & { 
@@ -217,5 +224,5 @@ export async function getEventsWithApprovers(): Promise<(Event & {
     .order('start_time');
   
   if (error) throw error;
-  return data;
+  return data || [];
 }
