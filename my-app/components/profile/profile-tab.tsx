@@ -98,14 +98,14 @@ export function ProfileTab<T extends BaseFormFields>({
   const additionalLinks = formData.additional_links || [];
   /* ---------------------------- UI -------------------------*/
   return (
-    <TabsContent value="profile" className="space-y-6 mx-2">
+    <TabsContent value="profile" className="space-y-6">
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         {/* ---------- MAIN VIEW ---------- */}
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.div
               key="loading"
-              className="flex justify-center items-center py-12"
+              className="flex justify-center items-center py-1"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -120,9 +120,9 @@ export function ProfileTab<T extends BaseFormFields>({
               animate="visible"
               className="flex justify-center"
             >
-              <div className="w-full max-w-4xl">
+              <div className="w-full">
                 <motion.div
-                  className="grid md:grid-cols-3 gap-8 py-6"
+                  className="grid md:grid-cols-3 gap-8"
                   variants={containerVariants}
                   initial="hidden"
                   animate="visible"

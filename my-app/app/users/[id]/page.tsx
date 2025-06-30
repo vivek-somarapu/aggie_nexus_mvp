@@ -231,10 +231,13 @@ export default function UserPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/users">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center"
+          >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Users
-          </Link>
+            Back
+          </button>
         </Button>
         
         <Button variant="ghost" size="sm" asChild>
@@ -258,9 +261,7 @@ export default function UserPage() {
                   </Avatar>
                   <div>
                     <CardTitle className="text-2xl">{user.full_name}</CardTitle>
-                    <CardDescription className="flex items-center gap-2 mt-1">
-                      <Eye className="h-4 w-4" />
-                      {user.views} profile views
+                    <CardDescription className="flex items-center mt-1">
                       {user.is_texas_am_affiliate && (
                         <>
                           <Separator orientation="vertical" className="h-4" />
@@ -458,7 +459,7 @@ export default function UserPage() {
         {/* Right Column - User Information and Similar Users */}
         <div className="space-y-6">
           <Card className="shadow-sm">
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardTitle className="text-lg">User Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -468,10 +469,6 @@ export default function UserPage() {
                   <span>Graduation Year: {user.graduation_year}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4 text-muted-foreground" />
-                <span>Profile Views: {user.views}</span>
-              </div>
               <Button className="w-full mt-2" onClick={() => setIsMessageOpen(true)} disabled={!currentUser}>
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Send Message

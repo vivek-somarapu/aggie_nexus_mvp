@@ -410,14 +410,9 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
               className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
               variants={itemVariants}
             >
-              <div className="flex items-center">
-                <Eye className="h-4 w-4 mr-1" />
-                <span>0 profile views</span>
-              </div>
-
               {user?.is_texas_am_affiliate && (
                 <div className="flex items-center">
-                  <Separator orientation="vertical" className="h-4 mx-2" />
+                  <Separator orientation="vertical" className="h-4" />
                   <GraduationCap className="h-4 w-4 mr-1" />
                   <span>Texas A&M Affiliate</span>
                 </div>

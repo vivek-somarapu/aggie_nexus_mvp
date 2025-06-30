@@ -2,7 +2,7 @@
 
 /* ────── React & Next ────── */
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -60,6 +60,7 @@ import {
   CalendarIcon,
   Filter,
   Loader2,
+  Mail,
   MessageSquare,
   PenLine,
   Plus,
@@ -72,6 +73,7 @@ import { toast } from "sonner";
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
+  
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
 
@@ -82,6 +84,8 @@ export default function ProfilePage() {
   const [inquiriesLoading, setInquiriesLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const router = useRouter();
 
   const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([]);
   const [bookmarkedUsers, setBookmarkedUsers] = useState<ProfileType[]>([]);
@@ -132,6 +136,14 @@ export default function ProfilePage() {
     contact: { email: "", phone: "" } as { email: string; phone: string },
     additional_links: [] as { url: string; title: string }[],
   });
+
+  // update profile tab url
+  const onTabChange = (value: string) => {
+    setActiveTab(value)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', value)
+    router.replace(url.toString(), { scroll: false })
+  }
 
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
 
@@ -539,7 +551,7 @@ export default function ProfilePage() {
 
   return (
     <motion.div
-      className="space-y-6"
+      className="space-y-6 w-full"
       variants={pageVariants}
       initial="hidden"
       animate="visible"
@@ -563,7 +575,7 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="w-full mx-auto space-y-6">
         {/* Profile Card */}
         <ProfileCard
           user={profile}
@@ -577,14 +589,32 @@ export default function ProfilePage() {
           showCompletionBanner={showCompletionBanner}
         />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="m-auto">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="projects">My Projects</TabsTrigger>
-            <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
-            <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
-            <TabsTrigger value="events">Events</TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={onTabChange} className="w-full"> 
+          <div className="hidden sm:flex justify-center mb-4">
+            <TabsList className="flex flex-wrap gap-2">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="projects">My Projects</TabsTrigger>
+              <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
+              <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Dropdown for mobile */}
+          <div className="sm:hidden mb-4">
+          <Select value={activeTab} onValueChange={onTabChange}>
+            <SelectTrigger className="w-full h-10 px-3 text-sm border rounded-lg">
+              <SelectValue placeholder="Select a section" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="profile">Profile</SelectItem>
+              <SelectItem value="projects">My Projects</SelectItem>
+              <SelectItem value="inquiries">Project Inquiries</SelectItem>
+              <SelectItem value="bookmarks">Bookmarks</SelectItem>
+              <SelectItem value="events">Events</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
           {/* Profile Tab */}
           <ProfileTab
