@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
-// UI primitives
+// UI Components
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -15,39 +15,34 @@ import { Textarea } from "@/components/ui/textarea";
 import { SquarePoster } from "@/components/ui/SquarePoster";
 
 // Icons
-import { Check, Loader2, MapPin, Link as LinkIcon } from "lucide-react";
+import { Check, Loader2, MapPin, ChevronLeft } from "lucide-react";
 
-// Services & hooks
+// Services
 import { eventService } from "@/lib/services/event-service";
 import { rsvpService } from "@/lib/services/rsvp-service";
 import { useAuth } from "@/lib";
 
-/**
- * Event details & one-click RSVP page.
- * Route suggestion: `app/events/[id]/page.tsx`
- */
 export default function EventPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
-  const { profile } = useAuth();
-
-  const [event, setEvent] = useState<any | null>(null);
+  const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const [rsvpData, setRsvpData] = useState({ name: "", email: "", notes: "" });
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [rsvpSuccess, setRsvpSuccess] = useState(false);
-  const [rsvpData, setRsvpData] = useState({ name: "", email: "", notes: "" });
+  const { profile } = useAuth();
+  const router = useRouter();
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Fetch event once on mount
-  // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await eventService.getEvent(params.id);
-        setEvent(res);
-      } catch (e) {
-        setError("Unable to load event. Please try again later.");
+        const data = await eventService.getEvent(params.id);
+        if (!data) {
+          setError("Event not found");
+        } else {
+          setEvent(data);
+        }
+      } catch (err) {
+        setError("Failed to fetch event");
       } finally {
         setLoading(false);
       }
@@ -55,23 +50,19 @@ export default function EventPage({ params }: { params: { id: string } }) {
     fetchEvent();
   }, [params.id]);
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // RSVP handler
-  // ─────────────────────────────────────────────────────────────────────────────
   const handleRSVP = async () => {
-    if (!event) return;
-    setRsvpLoading(true);
     try {
-      await rsvpService.rsvp({
-        event_id: event.id,
-        name: rsvpData.name || profile?.full_name,
-        email: rsvpData.email || profile?.email,
+      setRsvpLoading(true);
+      await rsvpService.submitRSVP({
+        eventId: event.id,
+        name: profile?.full_name || rsvpData.name,
+        email: profile?.email || rsvpData.email,
         notes: rsvpData.notes,
+        userId: profile?.id,
       });
       setRsvpSuccess(true);
-    } catch (e) {
-      // handle error with toast / alert if you have a Toast system
-      console.error(e);
+    } catch (err) {
+      setError("RSVP failed");
     } finally {
       setRsvpLoading(false);
     }
@@ -95,28 +86,35 @@ export default function EventPage({ params }: { params: { id: string } }) {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────────
+  const start = parseISO(event.start_time);
+  const end = parseISO(event.end_time);
+
   return (
     <main className="min-h-screen bg-background/95 py-8 px-4 dark:bg-slate-900/80">
       <div className="mx-auto max-w-2xl space-y-8">
-        {/* — Poster ———————————————————————————— */}
-        {event.poster_url && (
-          <SquarePoster src={event.poster_url} alt={`${event.title} poster`} />
-        )}
-
-        {/* — Title & Host ——————————————————— */}
+        {/* heading row */}
         <header className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight dark:text-slate-100">
-            {event.title}
-          </h1>
+          <div className="mb-0 md:mb-4 flex items-center gap-3">
+            {/* BACK → Calendar */}
+            <Button
+              type="button"
+              onClick={() => router.push("/calendar")}
+              className="h-9 px-3 rounded-md bg-muted/90 hover:bg-muted text-foreground font-medium shadow-sm"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              <span className="hidden xs:inline">Back</span>
+            </Button>
+
+            <h1 className="text-3xl font-bold tracking-tight dark:text-slate-100">
+              {event.title}
+            </h1>
+          </div>
+
           {event.creator && (
             <Link
               href={`/users/${event.created_by}`}
               className="flex items-center gap-2 group"
             >
-              {/* Avatar */}
               {event.creator.avatar ? (
                 <Image
                   src={event.creator.avatar}
@@ -137,30 +135,29 @@ export default function EventPage({ params }: { params: { id: string } }) {
           )}
         </header>
 
-        {/* — Date / Time / Location ——————————————————— */}
+        {event.poster_url && (
+          <SquarePoster src={event.poster_url} alt={`${event.title} poster`} />
+        )}
+
         <section className="space-y-4">
           <div className="flex flex-wrap items-center gap-4 text-sm dark:text-slate-100">
-            {/* Mini calendar-style badge */}
             <div className="flex h-10 w-10 shrink-0 flex-col overflow-hidden rounded-sm border bg-background text-center shadow-sm">
               <div className="bg-muted py-[3px] text-[10px] font-medium leading-none dark:text-slate-100">
-                {format(event.start, "MMM").toUpperCase()}
+                {format(start, "MMM").toUpperCase()}
               </div>
               <div className="pt-[3px] text-[15px] font-extrabold leading-none text-foreground dark:text-slate-100">
-                {format(event.start, "d")}
+                {format(start, "d")}
               </div>
             </div>
-            {/* Date & Time */}
             <div>
               <p className="text-[14px] font-semibold">
-                {format(event.start, "EEEE, MMMM d")}
+                {format(start, "EEEE, MMMM d")}
               </p>
               <p className="text-muted-foreground">
-                {format(event.start, "h:mm a")} – {format(event.end, "h:mm a")}
+                {format(start, "h:mm a")} – {format(end, "h:mm a")}
               </p>
             </div>
-            {/* Divider */}
             <div className="h-6 w-px bg-border" />
-            {/* Location */}
             {event.location && (
               <div className="flex items-center gap-2">
                 <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
@@ -183,36 +180,30 @@ export default function EventPage({ params }: { params: { id: string } }) {
           </div>
         </section>
 
-        {/* — RSVP / Past-event notice ——————————— */}
         <Card className="space-y-4 border border-primary/20 bg-primary/5 p-4 dark:border-primary/40 dark:bg-primary/10 dark:text-slate-100">
-          {new Date(event.end) < new Date() ? (
-            <div className="space-y-1 text-center text-sm text-muted-foreground">
-              <h3 className="text-base font-semibold text-gray-800 dark:text-slate-200">
-                Past Event
-              </h3>
+          {new Date(event.end_time) < new Date() ? (
+            <div className="text-center text-sm text-muted-foreground">
+              <h3 className="text-base font-semibold">Past Event</h3>
               <p>
                 This event ended on{" "}
-                <span className="font-medium">
-                  {format(new Date(event.end), "MMMM d, yyyy")}
-                </span>
-                .
+                {format(new Date(event.end_time), "MMMM d, yyyy")}.
               </p>
             </div>
           ) : rsvpSuccess ? (
-            <div className="py-2 text-center">
-              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+            <div className="text-center py-2">
+              <div className="mb-2 mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
                 <Check className="h-5 w-5 text-green-600" />
               </div>
               <h3 className="text-sm font-semibold text-green-800">
                 Registration Confirmed!
               </h3>
-              <p className="mt-1 text-xs text-green-600">
+              <p className="text-xs text-green-600 mt-1">
                 A confirmation email has been sent to you.
               </p>
             </div>
           ) : profile ? (
             <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-foreground">
                 <span className="font-semibold">
                   Register as {profile.full_name}
                 </span>
@@ -225,12 +216,11 @@ export default function EventPage({ params }: { params: { id: string } }) {
                 onChange={(e) =>
                   setRsvpData({ ...rsvpData, notes: e.target.value })
                 }
-                className="text-sm"
               />
               <Button
                 onClick={handleRSVP}
                 disabled={rsvpLoading}
-                className="w-full bg-green-600 py-2 text-sm text-white hover:bg-green-700"
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-2 text-sm"
               >
                 {rsvpLoading ? (
                   <>
@@ -255,7 +245,6 @@ export default function EventPage({ params }: { params: { id: string } }) {
                     setRsvpData({ ...rsvpData, name: e.target.value })
                   }
                   required
-                  className="text-sm"
                 />
                 <Input
                   type="email"
@@ -265,7 +254,6 @@ export default function EventPage({ params }: { params: { id: string } }) {
                     setRsvpData({ ...rsvpData, email: e.target.value })
                   }
                   required
-                  className="text-sm"
                 />
               </div>
               <Textarea
@@ -275,14 +263,13 @@ export default function EventPage({ params }: { params: { id: string } }) {
                 onChange={(e) =>
                   setRsvpData({ ...rsvpData, notes: e.target.value })
                 }
-                className="text-sm"
               />
               <Button
                 onClick={handleRSVP}
                 disabled={
                   rsvpLoading || !rsvpData.name.trim() || !rsvpData.email.trim()
                 }
-                className="w-full bg-green-600 py-2 text-sm text-white hover:bg-green-700"
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-2 text-sm"
               >
                 {rsvpLoading ? (
                   <>
@@ -297,7 +284,6 @@ export default function EventPage({ params }: { params: { id: string } }) {
           )}
         </Card>
 
-        {/* — About ——————————————————————————— */}
         {event.description?.trim() && (
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-muted-foreground">
