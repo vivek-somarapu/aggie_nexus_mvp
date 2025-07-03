@@ -9,7 +9,7 @@ import Link from "next/link";
 import { SquarePoster } from "@/components/ui/SquarePoster";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { rsvpService } from "@/lib/services/rsvp-service";
 
@@ -34,10 +34,13 @@ import {
   CalendarIcon,
   Link as LinkIcon,
   Filter,
+  Clock,
+  Home,
+  UserCircle2,
 } from "lucide-react";
+import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { eventService } from "@/lib/services/event-service";
 import { motion, AnimatePresence } from "framer-motion";
-import { format, parseISO, isToday, isYesterday } from "date-fns";
 import {
   Calendar,
   CalendarCurrentDate,
@@ -73,7 +76,6 @@ import type { Event as BaseEvent } from "@/lib/services/event-service";
 interface Event extends Omit<BaseEvent, "start_time" | "end_time"> {
   start: string;
   end: string;
-  color?: string;
 }
 
 // Type for the processed events
@@ -85,15 +87,12 @@ type ProcessedEvent = FullCalendarEvent & {
   creator?: { full_name: string; avatar: string | null };
 };
 
-// It hides the calendar view on mobile and uses a list view instead. The calendar view is only available on desktop screens.
 function useMediaQuery(query: string) {
-  const getMatch = () =>
-    typeof window !== "undefined" && window.matchMedia(query).matches;
-
-  const [matches, setMatches] = useState(getMatch); // ← initialised correctly
+  const [matches, setMatches] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia(query);
+    setMatches(media.matches);
     const listener = () => setMatches(media.matches);
     media.addEventListener("change", listener);
     return () => media.removeEventListener("change", listener);
@@ -108,6 +107,11 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isSmUp = useMediaQuery("(min-width: 640px)");
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [view, setView] = useState<"calendar" | "list">(
+    isSmUp ? "calendar" : "list"
+  );
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
     null
@@ -125,13 +129,10 @@ export default function CalendarPage() {
     notes: "",
   });
 
-  const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [view, setView] = useState<"calendar" | "list">(
-    isDesktop ? "calendar" : "list"
-  );
   const effectiveView = isDesktop ? view : "list";
   const allEvents = events;
-  // If the user shrinks the window below md, force-switch to list
+
+  // If the user shrinks the window below desktop, force-switch to list
   useEffect(() => {
     if (!isDesktop) setView("list");
   }, [isDesktop]);
@@ -168,9 +169,7 @@ export default function CalendarPage() {
 
   // Filter events based on category
   const filteredEvents = allEvents.filter(
-    (event) =>
-      categoryFilter === "all" ||
-      (event.event_type || event.color) === categoryFilter
+    (event) => categoryFilter === "all" || event.event_type === categoryFilter
   );
 
   // Map of event IDs to consistent colors (so same event always has same color)
@@ -240,9 +239,10 @@ export default function CalendarPage() {
       });
       setRsvpSuccess(true);
     } catch (err: any) {
-      toast.error(err.message); // will show “You have already RSVPed …” etc.
+      toast.error(err.message); // will show "You have already RSVPed …" etc.
     }
   };
+
   const dayLabel = (d: Date) => {
     if (isToday(d)) return "Today " + format(d, "EEEE");
     if (isYesterday(d)) return "Yesterday " + format(d, "EEEE");
@@ -277,362 +277,335 @@ export default function CalendarPage() {
         {/* Header */}
         <motion.div
           variants={itemVariants}
-          className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur"
+          className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:items-center mb-2"
         >
-          <div className="container mx-auto flex flex-wrap items-center justify-between px-6 py-3 gap-4">
-            {/* Title */}
-            <h1 className="text-2xl font-bold md:text-3xl tracking-tight">
-              Events Calendar
-            </h1>
-
-            {/* Desktop: inline filters & stats */}
-            <div className="hidden md:flex items-center gap-6">
-              {/* Event Type */}
-              <div>
-                <label className="sr-only">Event Type</label>
-                <Select
-                  value={categoryFilter}
-                  onValueChange={setCategoryFilter}
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="All Events" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Events</SelectItem>
-                    {Object.entries(categories).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* View Toggle – only show on desktop */}
-              {isDesktop && (
-                <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                  <TabsList className="grid grid-cols-2">
-                    <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                    <TabsTrigger value="list">List</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
-
-              {profile && (
-                <Button
-                  onClick={() => router.push("/calendar/new")}
-                  size="sm"
-                  className="bg-green-600 text-white hover:bg-green-700 hover:text-white dark:hover:text-white"
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Add Event
-                </Button>
-              )}
+          <div className="relative">
+            {/* Green accent background for calendar */}
+            <div className="absolute inset-0 bg-gradient-to-r from-green-50 to-transparent dark:from-green-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
+            <div className="relative z-10">
+              <h1 className="text-3xl font-bold tracking-tight">
+                Events Calendar
+              </h1>
+              <p className="text-muted-foreground">
+                Stay organized with upcoming events, workshops, and networking
+                opportunities
+              </p>
             </div>
+          </div>
 
-            {/* Mobile: compact header with Add & Filter */}
-            <div className="md:hidden flex items-center gap-2">
-              {/* + Add button (floating style) */}
-              {profile && (
-                <Button
-                  size="icon"
-                  className="bg-green-600 text-white hover:bg-green-700 hover:text-white dark:hover:text-white"
-                  onClick={() => router.push("/calendar/new")}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
-
-              {/* Filter toggle button */}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setFiltersOpen(!filtersOpen)}
-              >
-                <Filter className="h-4 w-4" />
+          <div className="flex space-x-2 mt-2 sm:mt-0">
+            {!profile && !authLoading && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/">
+                  <Home className="h-4 w-4 mr-2" />
+                  Return Home
+                </Link>
               </Button>
-            </div>
+            )}
+            {profile && (
+              <Button
+                onClick={() => router.push("/calendar/new")}
+                size="sm"
+                className="flex items-center bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Event
+              </Button>
+            )}
           </div>
         </motion.div>
 
-        {/* Mobile Filter Dropdown (with smooth animation) */}
+        {!profile && !authLoading && (
+          <motion.div variants={itemVariants}>
+            <Alert
+              variant="info"
+              className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800 mb-2"
+            >
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <span className="font-medium">
+                  Sign in to add personal events and get personalized
+                  notifications.
+                </span>{" "}
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-blue-600 dark:text-blue-400"
+                  onClick={() => router.push("/auth/login?redirect=/calendar")}
+                >
+                  Sign in now
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
+        {error && (
+          <motion.div variants={itemVariants}>
+            <Alert variant="destructive" className="mb-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={
-            filtersOpen
-              ? { opacity: 1, height: "auto" }
-              : { opacity: 0, height: 0 }
-          }
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="md:hidden overflow-hidden px-6"
+          className="grid md:grid-cols-4 gap-4"
+          variants={itemVariants}
         >
-          <div className="space-y-3 py-3 ">
-            {/* Event Type */}
-            <div>
-              <Label
-                htmlFor="mobile-filter-type"
-                className="text-sm py-2 font-medium"
-              >
-                Event Type
-              </Label>
-              <Select
-                id="mobile-filter-type"
-                value={categoryFilter}
-                onValueChange={setCategoryFilter}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All Events" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Events</SelectItem>
-                  {Object.entries(categories).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </motion.div>
-
-        <div className="flex-1 overflow-hidden pt-4">
-          {/* Auth Alert */}
-          {!profile && !authLoading && (
-            <motion.div variants={itemVariants} className="mb-6 px-4">
-              <Alert className="bg-blue-50 text-blue-800 border-blue-200">
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  <span className="font-medium">
-                    Sign in to add personal events and get personalized
-                    notifications.
-                  </span>{" "}
-                  <Button
-                    variant="link"
-                    className="text-blue-600 p-0 h-auto"
-                    onClick={() =>
-                      router.push("/auth/login?redirect=/calendar")
-                    }
-                  >
-                    Sign in now
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-
-          {/* Error Alert */}
-          {error && (
-            <motion.div variants={itemVariants} className="mb-6 px-4">
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-
-          {/* Main Grid */}
-          <div className="grid h-full gap-6">
-            {/* Events Pane */}
-            <section className="flex flex-col lg:col-span-3 h-full">
-              <AnimatePresence mode="wait">
-                {isLoading ? (
-                  <motion.div
-                    key="loading"
-                    className="flex-1 flex items-center justify-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </motion.div>
-                ) : effectiveView === "calendar" ? (
-                  // Calendarview of Events
-                  <motion.div
-                    key="calendar"
-                    ref={calendarContainerRef}
-                    variants={calendarVariants}
-                    className="flex-1 flex flex-col"
-                  >
-                    <Calendar
-                      events={calendarEvents}
-                      /** keep the calendar locked to “month” view */
-                      view="month"
-                      onEventClick={handleEventClick}
+          {/* Left Sidebar */}
+          <motion.div className="md:col-span-1 space-y-4">
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle>View Options</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  {isDesktop && (
+                    <Tabs
+                      value={view}
+                      onValueChange={(v) => setView(v as "calendar" | "list")}
                     >
-                      <div className="h-full flex flex-col overflow-hidden">
-                        {/* header -------------------------------------------------------- */}
-                        <div className="flex flex-wrap items-center gap-2 p-3 border rounded-t-lg bg-muted/30">
-                          <div className="relative flex flex-1 items-center justify-center">
-                            <CalendarCurrentDate
-                              className="
-                              absolute left-1/2 -translate-x-1/2
-                              pointer-events-none select-none
-                              text-3xl md:text-4xl font-black tracking-tight
-                              !text-foreground         
-                            "
-                            />
-                          </div>
+                      <TabsList className="w-full">
+                        <TabsTrigger value="calendar" className="flex-1">
+                          Calendar
+                        </TabsTrigger>
+                        <TabsTrigger value="list" className="flex-1">
+                          List
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  )}
 
-                          {/* prev / today / next controls */}
-                          <div className="flex gap-1">
-                            <CalendarPrevTrigger className="p-2">
-                              <ChevronLeft size={16} />
-                              <span className="sr-only">Previous</span>
-                            </CalendarPrevTrigger>
+                  <Tabs
+                    value={view}
+                    onValueChange={(v) => setView(v as "calendar" | "list")}
+                    className="sm:hidden w-full"
+                  >
+                    <TabsList className="grid w-full grid-cols-1">
+                      <TabsTrigger value="list">List</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
 
-                            <CalendarTodayTrigger className="text-xs px-2 py-1">
-                              Today
-                            </CalendarTodayTrigger>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Event Type
+                  </label>
+                  <Select
+                    value={categoryFilter}
+                    onValueChange={setCategoryFilter}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Events</SelectItem>
+                      {Object.entries(categories).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-                            <CalendarNextTrigger className="p-2">
-                              <ChevronRight size={16} />
-                              <span className="sr-only">Next</span>
-                            </CalendarNextTrigger>
-                          </div>
+          {/* Main Content */}
+          <motion.div className="md:col-span-3">
+            <AnimatePresence mode="wait">
+              {isLoading ? (
+                <motion.div
+                  key="loading"
+                  className="flex-1 flex items-center justify-center h-64"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </motion.div>
+              ) : effectiveView === "calendar" ? (
+                // Calendar view of Events
+                <motion.div
+                  key="calendar"
+                  ref={calendarContainerRef}
+                  variants={calendarVariants}
+                  className="flex-1 flex flex-col"
+                >
+                  <Calendar
+                    events={calendarEvents}
+                    view="month"
+                    onEventClick={handleEventClick}
+                  >
+                    <div className="h-full flex flex-col overflow-hidden">
+                      {/* header */}
+                      <div className="flex flex-wrap items-center gap-2 p-3 border rounded-t-lg bg-muted/30">
+                        <div className="relative flex flex-1 items-center justify-center">
+                          <CalendarCurrentDate />
                         </div>
 
-                        {/* body –- only MONTH view -------------------------------------- */}
-                        <div className="flex-1 overflow-hidden">
-                          <CalendarMonthView />
+                        {/* prev / today / next controls */}
+                        <div className="flex gap-1">
+                          <CalendarPrevTrigger className="p-2">
+                            <ChevronLeft size={16} />
+                            <span className="sr-only">Previous</span>
+                          </CalendarPrevTrigger>
+
+                          <CalendarTodayTrigger className="text-xs px-2 py-1">
+                            Today
+                          </CalendarTodayTrigger>
+
+                          <CalendarNextTrigger className="p-2">
+                            <ChevronRight size={16} />
+                            <span className="sr-only">Next</span>
+                          </CalendarNextTrigger>
                         </div>
                       </div>
-                    </Calendar>
-                  </motion.div>
-                ) : (
-                  // Listview of Events
-                  <motion.div
-                    key="list"
-                    className="flex-1 overflow-auto space-y-6"
-                    variants={itemVariants}
-                  >
-                    <div className="min-h-0">
-                      <CardContent className="px-0 md:px-6 space-y-8 pb-8">
-                        {filteredEvents.length === 0 ? (
-                          <div className="text-center py-12">
-                            <CalendarIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                            <p className="text-muted-foreground">
-                              No events found.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            {/* single vertical spine */}
-                            <span
-                              aria-hidden
-                              className="pointer-events-none absolute left-2 sm:left-5 top-1 bottom-0
-                                border-l border-dashed border-muted-foreground/30
-                                dark:border-muted-foreground/40"
-                            />
 
-                            {/* all the dated sections */}
-                            {groupedEvents.map(([label, dayEvents]) => (
-                              <section
-                                key={label}
-                                className="relative space-y-4"
-                              >
-                                {/* Timeline dot */}
-                                <div
-                                  className="absolute left-2 sm:left-5 top-1 -translate-x-1/2
-                                    w-3 h-3 bg-gray-500 dark:bg-gray-400
-                                    rounded-full border-2 border-white dark:border-gray-900
-                                    shadow-lg z-10"
-                                />
-                                {/* date heading */}
-                                <h3 className="sm:pl-10 pl-7 text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                                  {label}
-                                </h3>
+                      {/* body – only MONTH view */}
+                      <div className="flex-1 overflow-hidden">
+                        <CalendarMonthView />
+                      </div>
+                    </div>
+                  </Calendar>
+                </motion.div>
+              ) : (
+                // List view of Events
+                <motion.div
+                  key="list"
+                  className="flex-1 overflow-auto space-y-6"
+                  variants={itemVariants}
+                >
+                  <div className="min-h-0">
+                    <CardContent className="px-0 md:px-6 space-y-8 pb-8">
+                      {filteredEvents.length === 0 ? (
+                        <div className="text-center py-12">
+                          <CalendarIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                          <p className="text-muted-foreground">
+                            No events found.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          {/* single vertical spine */}
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-2 sm:left-5 top-1 bottom-0
+                              border-l border-dashed border-muted-foreground/30
+                              dark:border-muted-foreground/40"
+                          />
 
-                                {/* events for that day */}
-                                <div>
-                                  {dayEvents.map((e, index) => (
-                                    <motion.div
-                                      key={e.id}
-                                      initial={{ opacity: 0, x: -20 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{ delay: index * 0.1 }}
-                                      onClick={() =>
-                                        handleEventClick({ id: e.id } as any)
-                                      }
-                                      className="relative group cursor-pointer"
+                          {/* all the dated sections */}
+                          {groupedEvents.map(([label, dayEvents]) => (
+                            <section key={label} className="relative space-y-4">
+                              {/* Timeline dot */}
+                              <div
+                                className="absolute left-2 sm:left-5 top-1 -translate-x-1/2
+                                  w-3 h-3 bg-gray-500 dark:bg-gray-400
+                                  rounded-full border-2 border-white dark:border-gray-900
+                                  shadow-lg z-10"
+                              />
+                              {/* date heading */}
+                              <h3 className="sm:pl-10 pl-7 text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                                {label}
+                              </h3>
+
+                              {/* events for that day */}
+                              <div>
+                                {dayEvents.map((e, index) => (
+                                  <motion.div
+                                    key={e.id}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    onClick={() =>
+                                      handleEventClick({ id: e.id } as any)
+                                    }
+                                    className="relative group cursor-pointer"
+                                  >
+                                    {/* Event card */}
+                                    <div
+                                      className="sm:ml-10 ml-6 my-5
+                                        bg-white/80 dark:bg-slate-800/70 backdrop-blur
+                                        rounded-xl border border-slate-200 dark:border-slate-700
+                                        transition-all duration-200
+                                        group-hover:ring-2 group-hover:ring-gray-300 dark:group-hover:ring-gray-600"
                                     >
-                                      {/* Event card */}
-                                      <div
-                                        className="sm:ml-10 ml-6 my-5
-                                          bg-white/80 dark:bg-slate-800/70 backdrop-blur
-                                          rounded-xl border border-slate-200 dark:border-slate-700
-                                          transition-all duration-200
-                                          group-hover:ring-2 group-hover:ring-gray-300 dark:group-hover:ring-gray-600"
-                                      >
-                                        <div className="flex items-start gap-6 p-6">
-                                          <div className="flex-1 min-w-0">
-                                            {/* Time badge */}
-                                            <div className="inline-flex items-center text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
-                                              {format(e.start, "h:mm a")} -{" "}
-                                              {format(e.end, "h:mm a")} •{" "}
-                                              {format(e.end, "MMM d")}
-                                            </div>
-
-                                            {/* Title */}
-                                            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">
-                                              {e.title}
-                                            </h3>
-
-                                            {/* Location */}
-                                            <div className="flex items-center gap-2 text-xs sm:text-sm dark:text-slate-300 text-slate-600">
-                                              {/^(https?:\/\/)/i.test(
-                                                e.location
-                                              ) ? (
-                                                <>
-                                                  <LinkIcon className="h-5 w-5 text-muted-foreground" />
-                                                  <p className="font-medium text-[14px]">
-                                                    Online Event
-                                                  </p>
-                                                </>
-                                              ) : (
-                                                <>
-                                                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                                                  <p className="font-medium text-[14px]">
-                                                    {e.location}
-                                                  </p>
-                                                </>
-                                              )}
-                                            </div>
-
-                                            {/* Description */}
-                                            <p className="text-xs sm:text-sm text-gray-500 mt-2 dark:text-gray-400 line-clamp-2">
-                                              {e.description}
-                                            </p>
+                                      <div className="flex items-start gap-6 p-6">
+                                        <div className="flex-1 min-w-0">
+                                          {/* Time badge */}
+                                          <div className="inline-flex items-center text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                                            {format(
+                                              parseISO(e.start),
+                                              "h:mm a"
+                                            )}{" "}
+                                            -{" "}
+                                            {format(parseISO(e.end), "h:mm a")}{" "}
+                                            • {format(parseISO(e.end), "MMM d")}
                                           </div>
 
-                                          {/* Poster */}
-                                          {e.poster_url && (
-                                            <div className="flex-shrink-0">
-                                              <div className="group-hover:scale-105 transition-transform duration-300">
-                                                <SquarePoster
-                                                  src={e.poster_url}
-                                                  alt={`${e.title} poster`}
-                                                  className="sm:w-36 sm:h-36 w-28 h-28 ring-2 ring-white dark:ring-gray-900 shadow-lg"
-                                                />
-                                              </div>
-                                            </div>
-                                          )}
+                                          {/* Title */}
+                                          <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                                            {e.title}
+                                          </h3>
+
+                                          {/* Location */}
+                                          <div className="flex items-center gap-2 text-xs sm:text-sm dark:text-slate-300 text-slate-600">
+                                            {e.location &&
+                                            /^(https?:\/\/)/i.test(
+                                              e.location
+                                            ) ? (
+                                              <>
+                                                <LinkIcon className="h-5 w-5 text-muted-foreground" />
+                                                <p className="font-medium text-[14px]">
+                                                  Online Event
+                                                </p>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <MapPin className="h-5 w-5 text-muted-foreground" />
+                                                <p className="font-medium text-[14px]">
+                                                  {e.location || "Location TBD"}
+                                                </p>
+                                              </>
+                                            )}
+                                          </div>
+
+                                          {/* Description */}
+                                          <p className="text-xs sm:text-sm text-gray-500 mt-2 dark:text-gray-400 line-clamp-2">
+                                            {e.description}
+                                          </p>
                                         </div>
+
+                                        {/* Poster */}
+                                        {e.poster_url && (
+                                          <div className="flex-shrink-0">
+                                            <div className="group-hover:scale-105 transition-transform duration-300">
+                                              <SquarePoster
+                                                src={e.poster_url}
+                                                alt={`${e.title} poster`}
+                                                className="sm:w-36 sm:h-36 w-28 h-28 ring-2 ring-white dark:ring-gray-900 shadow-lg"
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              </section>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </section>
-          </div>
-        </div>
+                                    </div>
+                                  </motion.div>
+                                ))}
+                              </div>
+                            </section>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
 
         {/* Event Information Dialog with Integrated RSVP */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -660,7 +633,7 @@ export default function CalendarPage() {
                     )}
                     <div className="pb-2">
                       <DialogTitle className="text-2xl font-bold dark:text-slate-100">
-                        {selectedEvent.title}
+                        {selectedEvent?.title}
                       </DialogTitle>
                       <div className="flex items-center gap-2 pt-2 group">
                         <Link
@@ -677,7 +650,7 @@ export default function CalendarPage() {
                             }}
                             className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
                           >
-                            {!selectedEvent.creator ? (
+                            {!selectedEvent?.creator ? (
                               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                             ) : selectedEvent.creator.avatar ? (
                               <Image
@@ -702,7 +675,7 @@ export default function CalendarPage() {
                           {/* Host text */}
                           <p className="text-sm text-muted-foreground font-semibold group-hover:underline group-hover:text-foreground transition-colors duration-200">
                             Hosted by{" "}
-                            {selectedEvent.creator?.full_name ?? "Unknown"}
+                            {selectedEvent?.creator?.full_name ?? "Unknown"}
                           </p>
                         </Link>
                       </div>
@@ -712,7 +685,6 @@ export default function CalendarPage() {
                     <div className="space-y-3">
                       <div className="flex items-center gap-4 flex-wrap">
                         {/* Calendar Icon */}
-
                         <div
                           className="w-10 h-10 rounded-sm border bg-background text-center
                             overflow-hidden shadow-sm shrink-0"
@@ -903,7 +875,6 @@ export default function CalendarPage() {
                   </Card>
 
                   {/* About Event */}
-
                   {selectedEvent.description?.trim() && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">

@@ -1,58 +1,93 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { profileSetupStatus } from '@/lib/profile-utils'
+
+// Enhanced logging for auth callback
+const callbackLog = (message: string, data?: any) => {
+  const timestamp = new Date().toISOString();
+  if (data) {
+    console.log(`[AUTH CALLBACK ${timestamp}] ${message}`, data);
+  } else {
+    console.log(`[AUTH CALLBACK ${timestamp}] ${message}`);
+  }
+};
+
+const callbackError = (message: string, error?: any) => {
+  const timestamp = new Date().toISOString();
+  if (error) {
+    console.error(`[AUTH CALLBACK ERROR ${timestamp}] ${message}`, error);
+  } else {
+    console.error(`[AUTH CALLBACK ERROR ${timestamp}] ${message}`);
+  }
+};
 
 /**
  * Auth callback handler for OAuth and email verification redirects
  * Processes Supabase authentication code to establish a session
+ * 
+ * UPDATED (Phase 3): Uses simplified profile status logic to prevent loops
  */
 export async function GET(request: NextRequest) {
   // Get the authorization code from the URL
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   
+  callbackLog("Auth callback initiated", { 
+    hasCode: !!code, 
+    origin: requestUrl.origin 
+  });
+  
   // If no code provided, redirect to home page
   if (!code) {
+    callbackLog("No auth code provided, redirecting to home");
     return NextResponse.redirect(new URL('/', requestUrl.origin))
   }
 
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     
+    callbackLog("Exchanging code for session");
     // Exchange the code for a session 
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
     
     if (exchangeError) {
-      console.error('Auth callback error:', exchangeError)
+      callbackError("Code exchange failed", exchangeError);
       return NextResponse.redirect(
         new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, requestUrl.origin)
       )
     }
 
+    callbackLog("Code exchange successful, retrieving user session");
     // Retrieve the new session
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
-      console.error('Auth callback error:', userError)
+      callbackError("Failed to retrieve user after code exchange", userError);
       return NextResponse.redirect(`${requestUrl.origin}/?auth_error=callback_failed`)
     }
     
-    // After OAuth login, we need to check if the user has a complete profile
-    // and perform any necessary data operations
+    callbackLog("User session established", {
+      userId: user.id,
+      email: user.email,
+      isEmailConfirmed: !!user.email_confirmed_at
+    });
+    
+    // After OAuth login, check/create user profile and determine redirect
     try {
       // Check if the user exists in the users table
       const { data: existingUser, error: userError } = await supabase
         .from('users')
-        .select('id, bio, skills, profile_setup_skipped, profile_setup_completed')
+        .select('*')
         .eq('id', user.id)
         .single()
         
       if (userError && userError.code !== 'PGRST116') {
         // Log the error but continue - we'll create a user if needed
-        console.error('Error checking existing user:', userError)
+        callbackError("Error checking existing user", userError);
       }
         
       // Update the last login timestamp ALWAYS when a user logs in
-      // This is critical for the "just logged in" detection
+      callbackLog("Updating last login timestamp");
       const { error: updateError } = await supabase
         .from('users')
         .update({ 
@@ -61,54 +96,57 @@ export async function GET(request: NextRequest) {
         .eq('id', user.id);
         
       if (updateError) {
-        console.error('Error updating last login time:', updateError);
+        callbackError("Failed to update last login time", updateError);
+      } else {
+        callbackLog("Last login timestamp updated successfully");
       }
 
-      // If the user exists, check if the profile is complete
+      // If the user exists, use simplified profile status logic
       if (existingUser) {
-        // If the user has explicitly completed their profile, go to home page
-        if (existingUser.profile_setup_completed) {
-          return NextResponse.redirect(new URL('/', requestUrl.origin))
-        }
+        callbackLog("Existing user found, checking profile status");
         
-        // If the user previously skipped setup, but it's a new login session,
-        // give them another chance to complete their profile
-        if (existingUser.profile_setup_skipped) {
-          // But only if they haven't completed the minimum profile requirements
-          if (!existingUser.bio || !existingUser.skills || existingUser.skills.length === 0) {
-            return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
-          }
-          return NextResponse.redirect(new URL('/', requestUrl.origin))
-        }
+        const status = profileSetupStatus(existingUser);
         
-        // If bio or skills are missing and user hasn't explicitly skipped,
-        // redirect to profile setup
-        if (!existingUser.bio || !existingUser.skills || existingUser.skills.length === 0) {
-          return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
-        }
+        callbackLog("Profile status determined", {
+          shouldSetupProfile: status.shouldSetupProfile,
+          hasSkippedSetup: status.hasSkippedSetup,
+          hasCompletedSetup: status.hasCompletedSetup
+        });
         
-        // If profile has all required fields but isn't explicitly marked as completed,
-        // mark it as completed now
-        if (!existingUser.profile_setup_completed) {
+        // If profile is complete but not marked as such, mark it now
+        if (status.hasCompletedSetup && !existingUser.profile_setup_completed) {
+          callbackLog("Marking profile as completed");
           const { error: completeError } = await supabase
             .from('users')
             .update({ profile_setup_completed: true })
             .eq('id', user.id);
             
           if (completeError) {
-            console.error('Error marking profile as completed:', completeError);
+            callbackError("Failed to mark profile as completed", completeError);
+          } else {
+            callbackLog("Profile marked as completed successfully");
           }
         }
         
-        // If profile is complete, redirect to home page
-        return NextResponse.redirect(new URL('/', requestUrl.origin))
+        // Redirect based on profile status
+        if (status.shouldSetupProfile) {
+          callbackLog("Profile setup needed, redirecting to setup");
+          return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
+        } else {
+          callbackLog("Profile complete, redirecting to home");
+          return NextResponse.redirect(new URL('/', requestUrl.origin))
+        }
       } else {
-        // The user doesn't exist in the users table yet, we'll need to create them
-        // Get user data from the session
+        // The user doesn't exist in the users table yet, create them
         const { full_name, email } = user.user_metadata || {}
         const userEmail = email || user.email || ''
         
-        // Create a new user entry
+        callbackLog("Creating new user record", {
+          fullName: full_name,
+          email: userEmail
+        });
+        
+        // Create a new user entry with clear setup flags
         const { error: insertError } = await supabase
           .from('users')
           .insert({
@@ -127,19 +165,22 @@ export async function GET(request: NextRequest) {
           })
           
         if (insertError) {
-          console.error('Error creating user record:', insertError)
+          callbackError("Failed to create user record", insertError);
+        } else {
+          callbackLog("New user record created successfully");
         }
         
-        // Redirect to profile setup to complete the profile
+        // New users always need to complete profile setup
+        callbackLog("New user created, redirecting to profile setup");
         return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
       }
     } catch (err) {
-      console.error('Error in user profile check:', err)
+      callbackError("Error in user profile check", err);
       // On error, default to redirecting to the home page
       return NextResponse.redirect(new URL('/', requestUrl.origin))
     }
   } catch (err) {
-    console.error('Auth callback exception:', err)
+    callbackError("Auth callback exception", err);
     return NextResponse.redirect(
       new URL('/auth/login?error=Authentication+failed', requestUrl.origin)
     )

@@ -7,7 +7,7 @@
 // 2. `Profile`   - extended user profile stored in your own `users` table
 // 3. `AuthProvider` & `useAuth` hook for accessing both
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "./supabase/client";
 import {
@@ -16,6 +16,26 @@ import {
   AuthError,
   User,
 } from "@supabase/supabase-js";
+import { getClientAuthState, clearAuthState, type AuthState } from "./auth-state-client";
+
+// Enhanced logging utility
+const authLog = (message: string, data?: any) => {
+  const timestamp = new Date().toISOString();
+  if (data) {
+    console.log(`[AUTH ${timestamp}] ${message}`, data);
+  } else {
+    console.log(`[AUTH ${timestamp}] ${message}`);
+  }
+};
+
+const authError = (message: string, error?: any) => {
+  const timestamp = new Date().toISOString();
+  if (error) {
+    console.error(`[AUTH ERROR ${timestamp}] ${message}`, error);
+  } else {
+    console.error(`[AUTH ERROR ${timestamp}] ${message}`);
+  }
+};
 
 /**
  * Minimal authenticated user info from Supabase Auth
@@ -58,6 +78,7 @@ type AuthContextType = {
   authUser: AuthUser | null;
   profile: Profile | null;
   isLoading: boolean;
+  isAuthReady: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (
@@ -79,6 +100,7 @@ const AuthContext = createContext<AuthContextType>({
   authUser: null,
   profile: null,
   isLoading: true,
+  isAuthReady: false,
   error: null,
   signIn: async () => false,
   signUp: async () => false,
@@ -92,16 +114,17 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 /**
- * Fetch user profile from database
+ * Fetch user profile from database with enhanced logging
  * @param userId User ID to fetch profile for
  * @returns User profile or null if not found
  */
 async function fetchUserProfile(userId: string): Promise<Profile | null> {
-  console.log("AUTH: Fetching profile start");
+  authLog("fetchUserProfile: Starting profile fetch", { userId });
   const supabase = createClient();
 
   try {
     // Fetch from users table
+    authLog("fetchUserProfile: Querying users table");
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -110,8 +133,23 @@ async function fetchUserProfile(userId: string): Promise<Profile | null> {
       .single();
 
     if (error) {
-      console.error("AUTH ERROR: Error fetching user profile:", error);
-      // Don't get stuck - return empty profile as fallback
+      authError("fetchUserProfile: Database error", { error: error.message, code: error.code });
+      
+      // If user not found, create a fallback profile
+      if (error.code === 'PGRST116') {
+        authLog("fetchUserProfile: User not found in database, creating fallback profile");
+        return {
+          id: userId,
+          full_name: "User",
+          email: "",
+          bio: "",
+          skills: [],
+          industry: [],
+        };
+      }
+      
+      // For other errors, return fallback profile to prevent blocking
+      authError("fetchUserProfile: Returning fallback profile due to error");
       return {
         id: userId,
         full_name: "User",
@@ -122,11 +160,17 @@ async function fetchUserProfile(userId: string): Promise<Profile | null> {
       };
     }
 
-    console.log("AUTH: Profile fetch success");
+    authLog("fetchUserProfile: Profile fetch successful", { 
+      hasProfile: !!data,
+      profileId: data?.id,
+      hasName: !!data?.full_name,
+      hasBio: !!data?.bio,
+      skillsCount: data?.skills?.length || 0
+    });
     return data as Profile;
   } catch (err) {
-    console.error("AUTH ERROR: Exception fetching profile:", err);
-    // Return fallback profile
+    authError("fetchUserProfile: Exception during profile fetch", err);
+    // Return fallback profile to prevent complete failure
     return {
       id: userId,
       full_name: "User",
@@ -147,6 +191,7 @@ function mapSupabaseUser(s: SupabaseUser): AuthUser {
 
 /**
  * AuthProvider component that manages authentication state
+ * PHASE 4: Enhanced with unified auth state management
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -154,148 +199,266 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [authState, setAuthState] = useState<AuthState | null>(null);
+  const initializationRef = useRef(false);
   const router = useRouter();
 
+  // Stable auth ready state - only becomes true after initial auth check
+  // and remains true even during background sync operations
+  const isAuthReady = isInitialized;
+
   /**
-   * Initialize auth state and set up auth state change listener
+   * Initialize auth state using unified auth state management
    */
   useEffect(() => {
-    console.log("AUTH: Starting auth initialization");
+    authLog("useEffect: Auth initialization triggered (Phase 4)", { 
+      isInitialized, 
+      initializationRefCurrent: initializationRef.current,
+      isLoading 
+    });
 
-    // Prevent multiple initializations during development with Fast Refresh
-    if (isInitialized) return;
+    // Skip if already initialized or initialization in progress
+    if (isInitialized || initializationRef.current) {
+      authLog("useEffect: Already initialized or initialization in progress, skipping");
+      return;
+    }
 
+    initializationRef.current = true;
     const supabase = createClient();
-    let authListener: { data: { subscription: { unsubscribe: () => void } } };
+    let authListener: { data: { subscription: { unsubscribe: () => void } } } | null = null;
 
     // Timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       if (isLoading) {
-        console.log("AUTH: Timeout reached, forcing loading state to false");
+        authLog("useEffect: Timeout reached, forcing loading state to false");
         setIsLoading(false);
       }
-    }, 5000);
+    }, 8000);
 
-    // Initialize: Get current user (secure)
-    supabase.auth
-      .getUser()
-      .then(
-        async ({ data: { user } }: { data: { user: SupabaseUser | null } }) => {
-          clearTimeout(timeoutId);
-          console.log("AUTH: User check complete", !!user);
+    // Initialize using unified auth state
+    authLog("useEffect: Getting unified client auth state");
+    getClientAuthState()
+      .then(async (clientAuthState) => {
+        clearTimeout(timeoutId);
+        authLog("useEffect: Unified auth state retrieved", { 
+          isAuthenticated: clientAuthState.isAuthenticated,
+          userId: clientAuthState.user?.id,
+          isEmailVerified: clientAuthState.isEmailVerified,
+          hasProfile: !!clientAuthState.profile
+        });
 
-          if (user) {
-            setAuthUser(mapSupabaseUser(user));
-            try {
-              console.log("AUTH: Fetching user profile for", user.id);
-              const userProfile = await fetchUserProfile(user.id);
-              console.log("AUTH: Profile fetch result", !!userProfile);
-              setProfile(userProfile);
-            } catch (err) {
-              console.error("AUTH: Error during initial profile fetch", err);
+        // Update local state from unified auth state
+        setAuthState(clientAuthState);
+        
+        if (clientAuthState.isAuthenticated && clientAuthState.user) {
+          setAuthUser(mapSupabaseUser(clientAuthState.user));
+          setProfile(clientAuthState.profile);
+        } else {
+          setAuthUser(null);
+          setProfile(null);
+        }
+
+        // Setup auth state change listener
+        authLog("useEffect: Setting up auth state change listener");
+        authListener = supabase.auth.onAuthStateChange(
+          async (event: string, session: Session | null) => {
+            authLog("Auth state change event received", { 
+              event, 
+              hasSession: !!session,
+              userId: session?.user?.id 
+            });
+            
+            setError(null);
+
+            if (event === "SIGNED_OUT") {
+              authLog("Auth state change: User signed out");
+              setAuthUser(null);
+              setProfile(null);
+              setAuthState(null);
+              return;
+            }
+
+            if (session) {
+              authLog("Auth state change: Session exists, updating auth user");
+              
+              // Get fresh unified auth state for consistency
+              try {
+                const freshAuthState = await getClientAuthState();
+                setAuthState(freshAuthState);
+                
+                if (freshAuthState.isAuthenticated && freshAuthState.user) {
+                  setAuthUser(mapSupabaseUser(freshAuthState.user));
+                  
+                  // Only fetch profile for certain events to prevent loops
+                  if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+                    authLog("Auth state change: Updating profile for event", event);
+                    setProfile(freshAuthState.profile);
+                  }
+                } else {
+                  authLog("Auth state change: Fresh auth state shows not authenticated");
+                  setAuthUser(null);
+                  setProfile(null);
+                }
+              } catch (err) {
+                authError("Auth state change: Error getting fresh auth state", err);
+                // Fallback to basic session handling
+                setAuthUser(mapSupabaseUser(session.user));
+              }
+            } else {
+              authLog("Auth state change: No session, clearing auth state");
+              setAuthUser(null);
+              setProfile(null);
+              setAuthState(null);
             }
           }
+        );
 
-          // Setup listener after initial session check
-          authListener = supabase.auth.onAuthStateChange(
-            async (event: string, session: Session | null) => {
-              setError(null);
-
-              console.log("AUTH: Auth state change event:", event);
-
-              if (event === "SIGNED_OUT") {
-                setAuthUser(null);
-                setProfile(null);
-                return;
-              }
-
-              if (session) {
-                setAuthUser(mapSupabaseUser(session.user));
-
-                // Only fetch profile for certain events
-                if (
-                  ["SIGNED_IN", "USER_UPDATED", "TOKEN_REFRESHED"].includes(
-                    event
-                  )
-                ) {
-                  try {
-                    const userProfile = await fetchUserProfile(session.user.id);
-                    setProfile(userProfile);
-                  } catch (err) {
-                    console.error(
-                      "AUTH: Error fetching profile on auth change",
-                      err
-                    );
-                  }
-                }
-              }
-            }
-          );
-
-          setIsInitialized(true);
-          setIsLoading(false);
-        }
-      )
+        authLog("useEffect: Auth initialization completed");
+        setIsInitialized(true);
+        setIsLoading(false);
+      })
       .catch((err: Error) => {
-        console.error("AUTH: Error during initialization", err);
+        clearTimeout(timeoutId);
+        authError("useEffect: Error during unified auth state initialization", err);
+        setError("Authentication initialization failed");
         setIsLoading(false);
         setIsInitialized(true);
       });
 
     // Clean up
     return () => {
+      authLog("useEffect: Cleaning up auth initialization");
       clearTimeout(timeoutId);
       if (authListener) {
         authListener.data.subscription.unsubscribe();
       }
+      initializationRef.current = false;
     };
-  }, []);
+  }, [isInitialized]); // Depend on isInitialized so it can re-run when reset
+
+  /**
+   * Tab visibility handler to reset auth state when tab becomes active
+   * This ensures auth re-initializes after tab switching
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isInitialized) {
+        authLog("Tab became active, checking auth state health");
+        
+        // If we're in a loading state or have no auth user but should be authenticated,
+        // reset initialization to allow re-initialization
+        if (isLoading || (!authUser && initializationRef.current)) {
+          authLog("Resetting auth initialization due to tab visibility change");
+          initializationRef.current = false;
+          setIsLoading(true);
+          setIsInitialized(false);
+          
+          // Trigger re-initialization by updating a dependency
+          setError(null);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isInitialized, isLoading, authUser]); // Dependencies to track auth state
 
   /**
    * Sign in with email and password
    */
   const signIn = async (email: string, password: string) => {
+    authLog("signIn: Starting sign in process", { email });
     try {
       setIsLoading(true);
       setError(null);
 
       const supabase = createClient();
+      authLog("signIn: Calling signInWithPassword");
       const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        authError("signIn: Authentication failed", error);
         setError(error.message);
         return false;
       }
 
-      // Fetch user profile after successful sign-in
-      if (data.user) {
-        setAuthUser(mapSupabaseUser(data.user));
-        const userProfile = await fetchUserProfile(data.user.id);
-        setProfile(userProfile);
-
-        // Redirect based on the fetched profile's completeness
-        if (
-          !userProfile ||
-          !userProfile.bio ||
-          !userProfile.skills ||
-          userProfile.skills.length === 0
-        ) {
-          router.push("/profile/setup");
-        } else {
-          router.push("/");
-        }
+      if (!data.user) {
+        authError("signIn: No user returned from authentication");
+        setError("Login failed - no user data received");
+        return false;
       }
 
-      // No user returned is unexpected but handle gracefully
-      if (!data.user) {
+      authLog("signIn: Authentication successful", { 
+        userId: data.user.id,
+        isEmailConfirmed: !!data.user.email_confirmed_at 
+      });
+
+      // Check if user's email is verified
+      if (!data.user.email_confirmed_at) {
+        authLog("signIn: Email not verified, handling unverified user flow");
+        
+        // Store the email for the waiting page
+        localStorage.setItem("lastSignupEmail", email);
+        
+        // Send verification email
+        try {
+          authLog("signIn: Sending verification email");
+          const { error: resendError } = await supabase.auth.resend({
+            type: 'signup',
+            email: email,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+          });
+          
+          if (resendError) {
+            authError("signIn: Error sending verification email", resendError);
+          } else {
+            authLog("signIn: Verification email sent successfully");
+          }
+        } catch (resendErr) {
+          authError("signIn: Failed to send verification email", resendErr);
+        }
+        
+        // Set the auth user so they can access the waiting page
+        setAuthUser(mapSupabaseUser(data.user));
+        
+        // Redirect to waiting page
+        authLog("signIn: Redirecting to waiting page");
+        router.push("/auth/waiting");
+        return true;
+      }
+
+      // Fetch user profile after successful sign-in (for verified users)
+      authLog("signIn: Email verified, fetching user profile");
+      setAuthUser(mapSupabaseUser(data.user));
+      
+      const userProfile = await fetchUserProfile(data.user.id);
+      setProfile(userProfile);
+
+      // Redirect based on the fetched profile's completeness
+      if (
+        !userProfile ||
+        !userProfile.bio ||
+        !userProfile.skills ||
+        userProfile.skills.length === 0
+      ) {
+        authLog("signIn: Profile incomplete, redirecting to setup");
+        router.push("/profile/setup");
+      } else {
+        authLog("signIn: Profile complete, redirecting to home");
         router.push("/");
       }
 
       return true;
     } catch (err: any) {
+      authError("signIn: Exception during sign in", err);
       setError(err.message || "Failed to sign in");
       return false;
     } finally {
@@ -307,11 +470,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Sign up with email and password
    */
   const signUp = async (email: string, password: string, fullName: string) => {
+    authLog("signUp: Starting sign up process", { email, fullName });
     try {
       setIsLoading(true);
       setError(null);
 
       const supabase = createClient();
+      authLog("signUp: Calling signUp");
       const { error, data } = await supabase.auth.signUp({
         email,
         password,
@@ -319,29 +484,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         },
       });
 
       if (error) {
+        authError("signUp: Sign up failed", error);
         setError(error.message);
         return false;
       }
 
-      // Don't try to insert into users table directly after signup
-      // Supabase auth handles the user creation in auth.users
-      // Any profile data will be set when the user completes their profile
-      // or we can use a database webhook to automatically create profiles
+      authLog("signUp: Sign up successful", { 
+        hasUser: !!data.user,
+        userId: data.user?.id 
+      });
 
-      // If we need the user information immediately after signup,
-      // we should simply set the state with the data we have
+      // If we have user data, set it
       if (data.user) {
         setAuthUser(mapSupabaseUser(data.user));
       }
 
-      // Return true to indicate successful signup
-      // The user will need to verify their email before they can use full functionality
       return true;
     } catch (err: any) {
+      authError("signUp: Exception during sign up", err);
       setError(err.message || "Failed to sign up");
       return false;
     } finally {
@@ -351,29 +516,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /**
    * Sign out the current user
+   * PHASE 4: Enhanced with unified auth state clearing
    */
   const signOut = async () => {
+    authLog("signOut: Starting sign out process (Phase 4)", { 
+      hasAuthUser: !!authUser,
+      userId: authUser?.id 
+    });
     try {
       setIsLoading(true);
+      setError(null);
 
-      const supabase = createClient();
-      // Sign out and clear any session data from browser
-      const { error } = await supabase.auth.signOut();
+      // Use unified auth state clearing
+      authLog("signOut: Calling unified clearAuthState()");
+      await clearAuthState(); // Client-side only, no parameters
 
-      if (error) {
-        setError(error.message || "Failed to sign out");
-        return;
-      }
-
-      // Clear auth state immediately to prevent flash of protected content
+      authLog("signOut: Sign out successful, clearing local auth state");
+      // Clear local auth state immediately to prevent flash of protected content
       setAuthUser(null);
       setProfile(null);
+      setAuthState(null);
 
-      // Redirect to landing page instead of login
+      // Redirect to landing page
+      authLog("signOut: Redirecting to home page");
       router.push("/");
     } catch (err: any) {
-      console.error("Logout error:", err);
+      authError("signOut: Exception during sign out", err);
+      
+      // Even if signOut fails, clear local state to prevent inconsistency
+      authLog("signOut: Clearing local state despite error");
+      setAuthUser(null);
+      setProfile(null);
+      setAuthState(null);
+      
       setError(err.message || "Failed to sign out");
+      
+      // Still redirect to prevent user from being stuck
+      router.push("/");
     } finally {
       setIsLoading(false);
     }
@@ -383,6 +562,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Sign in with Google OAuth
    */
   const signInWithGoogle = async () => {
+    authLog("signInWithGoogle: Starting Google OAuth flow");
     try {
       setIsLoading(true);
       setError(null);
@@ -396,13 +576,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        authError("signInWithGoogle: OAuth failed", error);
         setError(error.message);
         return false;
       }
 
+      authLog("signInWithGoogle: OAuth initiated successfully");
       return true;
     } catch (err: any) {
-      console.error("AUTH: Error during Google OAuth sign-in", err);
+      authError("signInWithGoogle: Exception during Google OAuth", err);
       setError(err.message || "Failed to sign in with Google");
       return false;
     } finally {
@@ -414,6 +596,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Sign in with GitHub OAuth
    */
   const signInWithGitHub = async () => {
+    authLog("signInWithGitHub: Starting GitHub OAuth flow");
     try {
       setIsLoading(true);
       setError(null);
@@ -427,13 +610,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        authError("signInWithGitHub: OAuth failed", error);
         setError(error.message);
         return false;
       }
 
+      authLog("signInWithGitHub: OAuth initiated successfully");
       return true;
     } catch (err: any) {
-      console.error("AUTH: Error during GitHub OAuth sign-in", err);
+      authError("signInWithGitHub: Exception during GitHub OAuth", err);
       setError(err.message || "Failed to sign in with GitHub");
       return false;
     } finally {
@@ -445,6 +630,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Request a password reset email
    */
   const requestPasswordReset = async (email: string) => {
+    authLog("requestPasswordReset: Starting password reset", { email });
     try {
       setIsLoading(true);
       setError(null);
@@ -455,9 +641,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        authError("requestPasswordReset: Password reset failed", error);
         setError(error.message);
+      } else {
+        authLog("requestPasswordReset: Password reset email sent successfully");
       }
     } catch (err: any) {
+      authError("requestPasswordReset: Exception during password reset", err);
       setError(err.message || "Failed to request password reset");
     } finally {
       setIsLoading(false);
@@ -468,6 +658,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Reset password with new password
    */
   const resetPassword = async (newPassword: string) => {
+    authLog("resetPassword: Starting password reset");
     try {
       setIsLoading(true);
       setError(null);
@@ -478,11 +669,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        authError("resetPassword: Password update failed", error);
         setError(error.message);
       } else {
+        authLog("resetPassword: Password updated successfully");
         router.push("/auth/login?reset=success");
       }
     } catch (err: any) {
+      authError("resetPassword: Exception during password reset", err);
       setError(err.message || "Failed to reset password");
     } finally {
       setIsLoading(false);
@@ -490,19 +684,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /**
-   * Manually refresh user profile data from the database,
-   * in case something changed — like after the user updates their
-   * profile (name, bio, avatar, etc.), or after an external update.
+   * Manually refresh user profile data from the database
    */
   const refreshProfile = async () => {
-    if (!authUser) return;
+    authLog("refreshProfile: Starting profile refresh", { 
+      hasAuthUser: !!authUser,
+      userId: authUser?.id 
+    });
+    
+    if (!authUser) {
+      authLog("refreshProfile: No auth user, skipping refresh");
+      return;
+    }
 
     try {
       setIsLoading(true);
       const userProfile = await fetchUserProfile(authUser.id);
+      authLog("refreshProfile: Profile refresh completed", { 
+        hasProfile: !!userProfile 
+      });
       setProfile(userProfile);
     } catch (err) {
-      console.error("Error refreshing profile:", err);
+      authError("refreshProfile: Error refreshing profile", err);
+      setError("Failed to refresh profile");
     } finally {
       setIsLoading(false);
     }
@@ -513,6 +717,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     authUser,
     profile,
     isLoading,
+    isAuthReady,
     error,
     signIn,
     signUp,
@@ -524,6 +729,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshProfile,
     isManager: profile?.is_manager === true,
   };
+
+  authLog("AuthProvider: Rendering with state", {
+    hasAuthUser: !!authUser,
+    hasProfile: !!profile,
+    isLoading,
+    hasError: !!error,
+    isInitialized
+  });
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

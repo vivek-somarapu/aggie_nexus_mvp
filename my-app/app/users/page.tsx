@@ -313,8 +313,8 @@ export default function UsersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Industries</SelectItem>
-              {industries.map((industry: string) => (
-                <SelectItem key={industry} value={industry}>
+              {industries.map((industry: string, index: number) => (
+                <SelectItem key={`industry-filter-${index}`} value={industry}>
                   {industry}
                 </SelectItem>
               ))}
@@ -326,8 +326,8 @@ export default function UsersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Skills</SelectItem>
-              {skills.map((skill: string) => (
-                <SelectItem key={skill} value={skill}>
+              {skills.map((skill: string, index: number) => (
+                <SelectItem key={`skill-filter-${index}`} value={skill}>
                   {skill}
                 </SelectItem>
               ))}
@@ -424,8 +424,8 @@ export default function UsersPage() {
                             <CardContent className="py-2 px-4">
                               <p className="text-muted-foreground text-sm line-clamp-3 mb-2">{user.bio}</p>
                               <div className="flex flex-wrap gap-1 mb-1">
-                                {user.industry?.slice(0, 2).map((ind) => (
-                                  <Badge key={ind} variant="secondary" className="text-xs px-1.5 py-0">
+                                {user.industry?.slice(0, 2).map((ind, indIndex) => (
+                                  <Badge key={`${user.id}-industry-${indIndex}`} variant="secondary" className="text-xs px-1.5 py-0">
                                     {ind}
                                   </Badge>
                                 ))}
@@ -437,8 +437,8 @@ export default function UsersPage() {
                               </div>
                             </CardContent>
                             <CardFooter className="border-t pt-2 pb-2 px-4 flex flex-wrap gap-1">
-                              {user.skills?.slice(0, 3).map((skill) => (
-                                <Badge key={skill} variant="outline" className="text-xs px-1.5 py-0">
+                              {user.skills?.slice(0, 3).map((skill, skillIndex) => (
+                                <Badge key={`${user.id}-skill-${skillIndex}`} variant="outline" className="text-xs px-1.5 py-0">
                                   {skill}
                                 </Badge>
                               ))}

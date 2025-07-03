@@ -3,22 +3,21 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient();
-  
-  // Check if user is authenticated
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
   try {
-    const { id: userId } = params;
+    const { id } = await params;
+    const supabase = await createClient();
+    
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     
     // Only allow users to access their own bookmarks
-    if (userId !== user.id) {
+    if (id !== user.id) {
       return NextResponse.json(
         { error: 'You can only access your own bookmarks' },
         { status: 403 }
@@ -29,7 +28,7 @@ export async function GET(
     const { data: userBookmarks, error: userBookmarksError } = await supabase
       .from('user_bookmarks')
       .select('id, bookmarked_user_id, saved_at')
-      .eq('user_id', userId);
+      .eq('user_id', id);
       
     if (userBookmarksError) {
       console.error('Error fetching user bookmarks:', userBookmarksError);
@@ -43,7 +42,7 @@ export async function GET(
     const { data: projectBookmarks, error: projectBookmarksError } = await supabase
       .from('project_bookmarks')
       .select('id, project_id, saved_at')
-      .eq('user_id', userId);
+      .eq('user_id', id);
       
     if (projectBookmarksError) {
       console.error('Error fetching project bookmarks:', projectBookmarksError);
@@ -59,7 +58,7 @@ export async function GET(
     
     if (bookmarkedUserIds.length > 0) {
       const { data: users, error: usersError } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
         .in('id', bookmarkedUserIds);
         

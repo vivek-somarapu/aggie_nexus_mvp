@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
  * GET: Fetch user bookmarks
  */
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   
   // Check if user is authenticated
   const { data: { user } } = await supabase.auth.getUser();
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
  * POST: Toggle a user bookmark
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   
   // Check if user is authenticated
   const { data: { user } } = await supabase.auth.getUser();

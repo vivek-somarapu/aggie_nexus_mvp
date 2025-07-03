@@ -5,10 +5,10 @@ import { withAuth } from "@/lib/auth-middleware";
 // GET /api/projects/[id] - Get a single project
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const project = await getProjectById(id);
     
     if (!project) {
@@ -34,11 +34,11 @@ export async function GET(
 // PATCH /api/projects/[id] - Update a project
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(req, async (userId, req) => {
     try {
-      const id = params.id;
+      const { id } = await params;
       const body = await req.json();
       
       // Check if the user is the owner of the project
@@ -73,11 +73,11 @@ export async function PUT(
 // DELETE /api/projects/[id] - Delete a project
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(req, async (userId, req) => {
     try {
-      const id = params.id;
+      const { id } = await params;
       
       // Check if the user is the owner of the project
       const project = await getProjectById(id);
