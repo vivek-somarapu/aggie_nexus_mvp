@@ -268,7 +268,7 @@ export default function CalendarPage() {
     <>
       <style dangerouslySetInnerHTML={{ __html: customScrollStyles }} />
       <motion.div
-        className="flex flex-col max-w-6xl bg-gradient-to-br from-background via-background to-muted/20"
+        className="flex flex-col max-w-6xl bg-gradient-to-br from-background via-background mx-auto to-muted/20"
         variants={pageVariants}
         initial="hidden"
         animate="visible"
