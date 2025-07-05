@@ -218,12 +218,26 @@ export default function Navbar() {
 
           {/* Right side */}
           {!authUser ? (
-            <div className="flex-1 flex justify-end space-x-4">
-              <Button variant="ghost" size="sm" asChild>
+            <div className="flex-1 uppercase flex justify-end space-x-4">
+              <Button variant="ghost" size="sm" className="px-5" asChild>
                 <Link href="/auth/login">Log in</Link>
               </Button>
-              <Button variant="default" size="sm" asChild>
-                <Link href="/auth/signup">Sign up</Link>
+              <Button
+                asChild
+                size="sm"
+                className="
+                  bg-gradient-to-r 
+                  from-[#c80404] to-[#100404]
+                  dark:from-[#440404] dark:to-[#940404] 
+                  hover:from-[#d91515] hover:to-[#1a0a0a]
+                  dark:hover:from-[#550505] dark:hover:to-[#a50505]
+                  text-white
+                  font-semibold
+                  transition-colors
+                  px-5
+                "
+              >
+                <Link href="/auth/signup">Sign Up</Link>
               </Button>
             </div>
           ) : (
