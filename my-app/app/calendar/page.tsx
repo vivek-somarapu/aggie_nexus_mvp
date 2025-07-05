@@ -562,9 +562,15 @@ export default function CalendarPage() {
                                       initial={{ opacity: 0, x: -20 }}
                                       animate={{ opacity: 1, x: 0 }}
                                       transition={{ delay: index * 0.1 }}
-                                      onClick={() =>
-                                        handleEventClick({ id: e.id } as any)
-                                      }
+                                      onClick={() => {
+                                        if (isDesktop) {
+                                          // desktop: open the Dialog
+                                          handleEventClick({ id: e.id } as any);
+                                        } else {
+                                          // mobile: go straight to /calendar/[id]
+                                          router.push(`/calendar/${e.id}`);
+                                        }
+                                      }}
                                       className="relative group cursor-pointer"
                                     >
                                       {/* Event card */}

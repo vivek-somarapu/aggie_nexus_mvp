@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { format, parseISO } from "date-fns";
-
+import { motion } from "framer-motion";
 // UI Components
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -94,7 +94,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
       <div className="mx-auto max-w-2xl space-y-8">
         {/* heading row */}
         <header className="space-y-1">
-          <div className="mb-0 md:mb-4 flex items-center gap-3">
+          <div className="mb-2 md:mb-4 flex items-center gap-3">
             {/* BACK → Calendar */}
             <Button
               type="button"
@@ -105,7 +105,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
               <span className="hidden xs:inline">Back</span>
             </Button>
 
-            <h1 className="text-3xl font-bold tracking-tight dark:text-slate-100">
+            <h1 className="text-3xl mb-2 font-bold tracking-tight dark:text-slate-100">
               {event.title}
             </h1>
           </div>
@@ -115,19 +115,35 @@ export default function EventPage({ params }: { params: { id: string } }) {
               href={`/users/${event.created_by}`}
               className="flex items-center gap-2 group"
             >
-              {event.creator.avatar ? (
-                <Image
-                  src={event.creator.avatar}
-                  alt={event.creator.full_name}
-                  width={32}
-                  height={32}
-                  className="rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium text-[#500000]">
-                  {event.creator.full_name.charAt(0).toUpperCase()}
-                </div>
-              )}
+              {/* Avatar */}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 400,
+                  damping: 10,
+                }}
+                className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
+              >
+                {!event.creator ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                ) : event.creator.avatar ? (
+                  <Image
+                    src={event.creator.avatar}
+                    alt={event.creator.full_name}
+                    fill
+                    className="object-cover"
+                    sizes="64px"
+                    priority
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full w-full bg-muted">
+                    <span className="text-xs font-medium text-[#500000]">
+                      {event.creator.full_name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </motion.div>
               <span className="text-sm font-semibold text-muted-foreground group-hover:underline group-hover:text-foreground">
                 Hosted by {event.creator.full_name}
               </span>
