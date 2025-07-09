@@ -1,13 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import "keen-slider/keen-slider.min.css";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,13 +15,7 @@ import {
 } from "@/components/ui/carousel";
 
 import Autoplay from "embla-carousel-autoplay";
-import {
-  ArrowRight,
-  Users,
-  CheckCircle2,
-  MapPin,
-  Calendar,
-} from "lucide-react";
+import { Users, MapPin, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
@@ -44,6 +32,26 @@ const fadeIn = {
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.8 } },
+};
+
+const slideLeft = {
+  hidden: { opacity: 0, x: -100 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8 } },
+};
+
+const slideRight = {
+  hidden: { opacity: 0, x: 100 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8 } },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.8 } },
+};
+
+const fadeUpSlow = {
+  hidden: { opacity: 0, y: 50 },
+  visible: { opacity: 1, y: 0, transition: { duration: 1.2 } },
 };
 
 const projects = [
@@ -193,32 +201,37 @@ export default function Home() {
             className="flex-1 space-y-6 md:max-w-4xl text-left"
           >
             {/* headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[0.9]">
+            <motion.h1
+              variants={fadeIn}
+              initial="hidden"
+              animate="visible"
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[0.9]"
+            >
               THE CENTRAL HUB
               <br />
               OF AGGIE
               <br />
               INNOVATION.
-            </h1>
+            </motion.h1>
 
-            <div className="px-4 pt-[11rem]">
+            <div className="px-4 pt-[8rem]">
               {/* sub-heading */}
-              <h2
-                className="
-                  text-xl sm:text-3xl md:text-3xl lg:text-4xl
-                  font-semibold tracking-tight mb-1
-                "
+              <motion.h2
+                variants={slideLeft}
+                initial="hidden"
+                animate="visible"
+                className="text-xl sm:text-3xl md:text-3xl lg:text-4xl font-semibold tracking-tight mb-1"
               >
                 The Future Starts Here.
-              </h2>
+              </motion.h2>
 
               {/* body copy */}
               <p
                 className="
-                  max-w-[60ch]
+                  max-w-[55ch]
                   leading-[1.35]
                   font-light text-muted-foreground
-                  text-sm      sm:text-sm   md:text-lg   lg:text-xl
+                  text-sm     sm:text-md   md:text-lg  
                 "
               >
                 Aggie Nexus was created to connect the needs of the industry
@@ -231,7 +244,7 @@ export default function Home() {
             </div>
 
             {/* CTA */}
-            <div className="flex flex-wrap gap-4 pt-4">
+            <div className="flex flex-wrap gap-4">
               <Button
                 asChild
                 size="lg"
@@ -250,26 +263,22 @@ export default function Home() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          variants={fadeUp}
+          variants={slideRight}
           className="relative py-16 md:py-20 overflow-hidden"
         >
           {/* ── Hard container (centres & limits width) ── */}
           <div className="container">
             {/* ── Headline ── */}
-            <h2
-              className="
-                ml-auto
-                max-w-4xl
-                text-right
-                pr-0 2xl:pr-[7.5rem] 
-                text-3xl md:text-4xl lg:text-5xl
-                font-semibold tracking-tight mb-12
-              "
+            <motion.h2
+              variants={fadeUpSlow}
+              initial="hidden"
+              whileInView="visible"
+              className="ml-auto max-w-4xl text-right pr-0 2xl:pr-[7.5rem] text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
             >
               Join a project in progress.
               <br className="hidden sm:block" />
               Post your idea for a new one.
-            </h2>
+            </motion.h2>
 
             {/* ── Copy + carousel wrapper ── */}
             <div
@@ -300,7 +309,7 @@ export default function Home() {
                     {projects.map((p) => (
                       <CarouselItem
                         key={p.id}
-                        className="pl-2 md:pl-4  min-w-[350px] basis-full sm:basis-1/2 lg:basis-1/3"
+                        className="pl-2 md:pl-4  max-w-[350px] basis-full sm:basis-1/2 "
                       >
                         <Card className="h-full transition-shadow hover:shadow-md flex flex-col">
                           <CardContent className="pt-6 flex flex-col h-full">
@@ -370,6 +379,118 @@ export default function Home() {
         {/* Spacing between sections */}
         <div className="h-6 md:h-8"></div>
 
+        {/* Project Highlights section */}
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={scaleIn}
+          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
+        >
+          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
+            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
+            <div
+              className="
+                flex-1
+                grid grid-rows-[auto_1fr_auto]  
+                text-center lg:text-left
+              "
+            >
+              {/* row-1 : title (stays top-left) */}
+              <motion.h2
+                variants={fadeIn}
+                initial="hidden"
+                whileInView="visible"
+                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
+              >
+                Project Highlight
+              </motion.h2>
+
+              {/* row-3 : subtitle + copy (sticks bottom-right) */}
+              <div
+                className="
+                  row-start-3
+                  place-self-center
+                  lg:place-self-end  
+                  text-center lg:text-right
+                  max-w-2xl mx-auto lg:mx-0 
+                  space-y-4
+                "
+              >
+                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
+                  Event Name, Host, Location, Speaker
+                </h3>
+
+                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
+                  Lorem Ipsum is simply dummy text of the printing and
+                  typesetting industry. Lorem Ipsum has been the industry
+                  standard dummy text ever since the 1500s, when an unknown
+                  printer took a galley of type and scrambled it to make a type
+                  specimen book. It has survived not only five centuries, but
+                  also the leap into electronic typesetting, remaining
+                  essentially unchanged. It was popularised in the 1960s with
+                  the release of Letraset sheets containing Lorem Ipsum
+                  passages, and more recently with desktop publishing software
+                  like Aldus PageMaker including versions of Lorem Ipsum
+                </p>
+              </div>
+            </div>
+            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
+            <div
+              className="
+              flex-shrink-0
+              flex flex-col
+              md:flex-row md:justify-center
+              lg:flex-col lg:justify-start
+              gap-4
+              w-full lg:w-80
+            "
+            >
+              {/* square #1 */}
+              <div
+                className="
+                  aspect-square
+                  h-48 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+
+              {/* square #2 */}
+              <div
+                className="
+                  aspect-square
+                  h-64 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+            </div>
+
+            {/* <Image
+              src=""
+              alt="Project highlight preview 1"
+              width={640}
+              height={640}
+              priority
+              className="
+                aspect-square h-48 md:h-64 w-full
+                object-cover       
+                rounded-lg shadow-sm
+              "
+            />
+            <Image
+              src=""
+              alt="Project highlight preview 2"
+              width={640}
+              height={640}
+              className="
+                aspect-square h-64 md:h-64 w-full
+                object-cover
+                rounded-lg shadow-sm
+              "
+            /> */}
+          </div>
+        </motion.section>
+
         {/* calendar section */}
         <motion.section
           initial="hidden"
@@ -380,17 +501,16 @@ export default function Home() {
         >
           <div className="container mx-auto">
             {/* ── Headline ── */}
-            <h2
-              className="
-                max-w-4xl
-                text-3xl sm:text-4xl lg:text-5xl
-                font-semibold tracking-tight mb-12
-              "
+            <motion.h2
+              variants={slideLeft}
+              initial="hidden"
+              whileInView="visible"
+              className="max-w-4xl text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
             >
               Expand your network. Find new opportunities.
               <br className="hidden lg:block" />
               Stay in the know.
-            </h2>
+            </motion.h2>
 
             {/* ── Calendar + copy grid ── */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
@@ -412,104 +532,139 @@ export default function Home() {
               </p>
 
               {/* ✦ calendar preview — second on ≤md, first on ≥lg */}
-              <Card className="order-2 lg:order-1 lg:col-span-3 border rounded-2xl">
-                <CardContent className="p-0">
-                  <Image
-                    src="/images/calendar-view.png"
-                    alt="Aggie Nexus calendar month-view"
-                    width={1200}
-                    height={800}
-                    className="w-full h-auto"
-                    priority
-                  />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Connecting with Investors Section with Garage Image */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeUp}
-          className="relative py-16 md:py-20 w-full overflow-hidden mx-auto my-6 rounded-xl"
-        >
-          <div className="absolute inset-0 z-0">
-            <Image
-              src="/images/garage.jpg"
-              alt="Innovation garage"
-              fill
-              className="object-cover opacity-40 rounded-xl"
-            />
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-xl" />
-          </div>
-
-          <div className="container relative z-10 px-6 md:px-8">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              <motion.div variants={fadeUp} className="space-y-6 md:order-2">
-                <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-                  CONNECTING WITH
-                </h2>
-                <p className="text-xl text-muted-foreground">
-                  Innovators across the world
-                </p>
-                <p className="text-muted-foreground">
-                  Access a vibrant network of angel investors, venture
-                  capitalists, and industry partners looking to fund and
-                  accelerate the next big ideas coming out of Texas A&M.
-                </p>
-                <Button asChild>
-                  <Link href="/users">
-                    Find Partners
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </motion.div>
-
-              <motion.div variants={fadeUp} className="md:order-1">
-                <Card className="bg-background/90 backdrop-blur-sm shadow-lg">
-                  <CardHeader className="pb-4">
-                    <CardTitle>Investment Opportunities</CardTitle>
-                    <CardDescription>
-                      Connect with funders ready to invest
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-6">
-                      <li className="flex items-start gap-4">
-                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Angel Investors</p>
-                          <p className="text-sm text-muted-foreground">
-                            Early-stage funding for promising startups
-                          </p>
-                        </div>
-                      </li>
-                      <li className="flex items-start gap-4">
-                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Venture Capital</p>
-                          <p className="text-sm text-muted-foreground">
-                            Series funding for growth-stage companies
-                          </p>
-                        </div>
-                      </li>
-                      <li className="flex items-start gap-4">
-                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Grant Opportunities</p>
-                          <p className="text-sm text-muted-foreground">
-                            Non-dilutive funding for research projects
-                          </p>
-                        </div>
-                      </li>
-                    </ul>
+              <motion.div
+                className="order-2 lg:order-1 lg:col-span-3 border rounded-2xl"
+                initial={{ scale: 0.95, opacity: 0 }}
+                whileInView={{ scale: 1.08, opacity: 1 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                viewport={{ once: true, amount: 0.5 }}
+              >
+                <Card className="border-none shadow-none">
+                  <CardContent className="p-0">
+                    <Image
+                      src="/images/calendar-view.png"
+                      alt="Aggie Nexus calendar month-view"
+                      width={1200}
+                      height={800}
+                      className="w-full h-auto"
+                      priority
+                    />
                   </CardContent>
                 </Card>
               </motion.div>
             </div>
+          </div>
+        </motion.section>
+
+        {/* Event Highlights section */}
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={slideRight}
+          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
+        >
+          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
+            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
+            <div
+              className="
+                flex-1
+                grid grid-rows-[auto_1fr_auto]  
+                text-center lg:text-left
+              "
+            >
+              {/* row-1 : title (stays top-left) */}
+              <motion.h2
+                variants={scaleIn}
+                initial="hidden"
+                whileInView="visible"
+                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
+              >
+                Event Highlight
+              </motion.h2>
+
+              {/* row-3 : subtitle + copy (sticks bottom-right) */}
+              <div
+                className="
+                  row-start-3
+                  place-self-center
+                  lg:place-self-end  
+                  text-center lg:text-right
+                  max-w-2xl mx-auto lg:mx-0 
+                  space-y-4
+                "
+              >
+                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
+                  Event Name, Host, Location, Speaker
+                </h3>
+
+                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
+                  Lorem Ipsum is simply dummy text of the printing and
+                  typesetting industry. Lorem Ipsum has been the industry
+                  standard dummy text ever since the 1500s, when an unknown
+                  printer took a galley of type and scrambled it to make a type
+                  specimen book. It has survived not only five centuries, but
+                  also the leap into electronic typesetting, remaining
+                  essentially unchanged. It was popularised in the 1960s with
+                  the release of Letraset sheets containing Lorem Ipsum
+                  passages, and more recently with desktop publishing software
+                  like Aldus PageMaker including versions of Lorem Ipsum
+                </p>
+              </div>
+            </div>
+            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
+            <div
+              className="
+              flex-shrink-0
+              flex flex-col
+              md:flex-row md:justify-center
+              lg:flex-col lg:justify-start
+              gap-4
+              w-full lg:w-80
+            "
+            >
+              {/* square #1 */}
+              <div
+                className="
+                  aspect-square
+                  h-48 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+
+              {/* square #2 */}
+              <div
+                className="
+                  aspect-square
+                  h-64 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+            </div>
+
+            {/* <Image
+              src=""
+              alt="Project highlight preview 1"
+              width={640}
+              height={640}
+              priority
+              className="
+                aspect-square h-48 md:h-64 w-full
+                object-cover       
+                rounded-lg shadow-sm
+              "
+            />
+            <Image
+              src=""
+              alt="Project highlight preview 2"
+              width={640}
+              height={640}
+              className="
+                aspect-square h-64 md:h-64 w-full
+                object-cover
+                rounded-lg shadow-sm
+              "
+            /> */}
           </div>
         </motion.section>
 
@@ -518,10 +673,8 @@ export default function Home() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          variants={fadeUp}
-          className="
-    relative w-screen -mx-2 h-[60vh] overflow-hidden
-  "
+          variants={fadeUpSlow}
+          className="relative w-screen -mx-2 h-[60vh] overflow-hidden"
         >
           {/* background image (sits behind, covers whole section) */}
           <Image
@@ -536,15 +689,20 @@ export default function Home() {
           <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] z-0" />
 
           {/* ────────────────────────────────
-      WRAPPER: takes full height, full width
-      flex column on mobile, row on ≥md
-  ──────────────────────────────── */}
+            WRAPPER: takes full height, full width
+            flex column on mobile, row on ≥md
+        ──────────────────────────────── */}
           <div className="relative z-10 flex h-full flex-col md:flex-row">
             {/* text block */}
             <div className="flex-[2] max-w-lg p-8 md:p-12 text-white">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-light mb-6">
+              <motion.h2
+                variants={fadeIn}
+                initial="hidden"
+                whileInView="visible"
+                className="text-3xl md:text-4xl lg:text-5xl font-light mb-6"
+              >
                 Our Mission
-              </h2>
+              </motion.h2>
               <p className="leading-relaxed font-light text-base md:text-lg">
                 Aggie&nbsp;Nexus exists to create a central hub of innovation by
                 connecting entrepreneurs, builders, and investors into a unified
