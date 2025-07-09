@@ -575,7 +575,7 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <div className="w-full mx-auto space-y-6">
+      <div className="w-full mx-auto">
         {/* Profile Card */}
         <ProfileCard
           user={profile}
@@ -1274,7 +1274,7 @@ export default function ProfilePage() {
             </AnimatePresence>
           </TabsContent>
 
-          {/* Events Tab */}
+          {/* Events Tab */} {/* right now am using bookmarks card for backend placeholders, that way i can see the ui */}
           <TabsContent value="events" className="space-y-6">
             <motion.div
               className="flex justify-between items-center mb-4"
@@ -1297,8 +1297,8 @@ export default function ProfilePage() {
                   <Loader2 className="h-8 w-8 text-primary animate-spin" />
                   <span className="ml-2">Loading your events...</span>
                 </motion.div>
-              ) : bookmarkedProjects.length === 0 &&
-                bookmarkedUsers.length === 0 ? (
+              ) : bookmarkedProjects.length === 0 && // replace with events backend
+                bookmarkedUsers.length === 0 ? ( // replace with events backend
                 <motion.div
                   key="no-events"
                   initial={{ opacity: 0 }}
@@ -1318,7 +1318,7 @@ export default function ProfilePage() {
                 </motion.div>
               ) : (
                 <>
-                  {bookmarkedProjects.length > 0 && (
+                  {bookmarkedProjects.length > 0 && ( // replace with events backend
                     <motion.div
                       className="space-y-4"
                       initial={{ opacity: 0, y: 20 }}
@@ -1331,9 +1331,9 @@ export default function ProfilePage() {
                         initial="hidden"
                         animate="visible"
                       >
-                        {bookmarkedProjects.map((project) => (
+                        {bookmarkedProjects.map((project) => ( // replace with events backend
                           <motion.div
-                            key={project.id}
+                            key={project.id} // replace with events backend ?
                             variants={cardVariants}
                             whileHover={{
                               y: -5,
@@ -1341,24 +1341,15 @@ export default function ProfilePage() {
                             }}
                           >
                             <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
-                              <CardHeader className="pb-3">
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                  {project.is_idea ? (
-                                    <Badge variant="outline">Idea</Badge>
-                                  ) : (
-                                    <Badge variant="outline">Project</Badge>
-                                  )}
-                                  <Badge variant="outline">
-                                    {project.recruitment_status}
-                                  </Badge>
-                                </div>
+                              <CardHeader>
                                 <CardTitle className="text-lg">
-                                  {project.title}
+                                  Event Title {/* replace with events backend */}
                                 </CardTitle>
+                                <div className="">Event Date</div>
                               </CardHeader>
                               <CardContent>
                                 <p className="text-sm text-muted-foreground line-clamp-3">
-                                  {project.description}
+                                  Event Details  {/* replace with events backend */}
                                 </p>
                               </CardContent>
                               <CardFooter className="border-t pt-3">
@@ -1372,8 +1363,8 @@ export default function ProfilePage() {
                                     variant="outline"
                                     asChild
                                   >
-                                    <Link href={`/projects/${project.id}`}>
-                                      View Project
+                                    <Link href={`/projects/${project.id}`}>  {/* replace with events backend */}
+                                      View Event {/* maybe the event card details can popup ? or link to calendar */}
                                     </Link>
                                   </Button>
                                 </motion.div>
@@ -1385,7 +1376,7 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
 
-                  {bookmarkedUsers.length > 0 && (
+                  {bookmarkedUsers.length > 0 && ( // replace with events backend
                     <motion.div
                       className="space-y-4 mt-6"
                       initial={{ opacity: 0, y: 20 }}
@@ -1393,7 +1384,7 @@ export default function ProfilePage() {
                       transition={{ delay: 0.3 }}
                     >
                       <h3 className="text-lg font-semibold">
-                        Bookmarked Users
+                        Events I'm Hosting
                       </h3>
                       <motion.div
                         className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
@@ -1401,7 +1392,7 @@ export default function ProfilePage() {
                         initial="hidden"
                         animate="visible"
                       >
-                        {bookmarkedUsers.map((user) => (
+                        {bookmarkedUsers.map((user) => ( // replace with events backend
                           <motion.div
                             key={user.id}
                             variants={cardVariants}
@@ -1422,12 +1413,12 @@ export default function ProfilePage() {
                                   >
                                     <Avatar className="h-16 w-16">
                                       <AvatarImage
-                                        src={user.avatar || ""}
-                                        alt={user.full_name}
+                                        src={user.avatar || ""} // replace with events backend
+                                        alt={user.full_name} // replace with events backend
                                       />
                                       <AvatarFallback>
-                                        {user.full_name?.charAt(0)}
-                                      </AvatarFallback>
+                                        {user.full_name?.charAt(0)} {/* replace with events backend */}
+                                      </AvatarFallback> 
                                     </Avatar>
                                   </motion.div>
                                   <div>
@@ -1447,8 +1438,8 @@ export default function ProfilePage() {
                                         className="mt-4"
                                         asChild
                                       >
-                                        <Link href={`/users/${user.id}`}>
-                                          View Profile
+                                        <Link href={`/users/${user.id}`}> {/* replace with events backend */}
+                                          View Event {/* maybe the event card details can popup ? or link to calendar */}
                                         </Link>
                                       </Button>
                                     </motion.div>

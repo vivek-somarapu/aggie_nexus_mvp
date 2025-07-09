@@ -120,7 +120,7 @@ export function ProfileTab<T extends BaseFormFields>({
               animate="visible"
               className="flex justify-center"
             >
-              <div className="w-full">
+              <div className="w-full border rounded-xl p-6">
                 <motion.div
                   className="grid md:grid-cols-3 gap-8"
                   variants={containerVariants}
@@ -132,7 +132,7 @@ export function ProfileTab<T extends BaseFormFields>({
                     variants={itemVariants}
                   >
                     {/* About */}
-                    <div className="border rounded-xl p-6">
+                    <div>
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-lg">About</h3>
                         <DialogTrigger asChild>
@@ -151,9 +151,25 @@ export function ProfileTab<T extends BaseFormFields>({
                       </p>
                     </div>
 
+                    {/* Industry */}
+                    {user?.industry && user.industry.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-2 text-lg">Industry</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {user.industry.map((tag) => (
+                          <motion.div key={tag} variants={itemVariants}>
+                            <Badge variant="secondary" className="px-2 py-1">
+                              {tag}
+                            </Badge>
+                          </motion.div>
+                        ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Skills */}
                     {user?.skills && user.skills.length > 0 && (
-                      <div className="border rounded-xl p-6">
+                      <div>
                         <h3 className="font-semibold mb-2 text-lg">Skills</h3>
                         <div className="flex flex-wrap gap-2">
                           {user.skills.slice(0, 6).map((skill, skillIndex) => (
@@ -173,7 +189,7 @@ export function ProfileTab<T extends BaseFormFields>({
 
                   <motion.div className="space-y-5" variants={itemVariants}>
                     {/* Contact */}
-                    <div className="border rounded-xl p-6">
+                    <div>
                       <h3 className="font-semibold mb-2 text-lg">Contact</h3>
                       <div className="space-y-3">
                         {user?.contact?.email && (
@@ -194,7 +210,7 @@ export function ProfileTab<T extends BaseFormFields>({
                     {(user?.linkedin_url ||
                       user?.website_url ||
                       (user?.additional_links?.length ?? 0) > 0) && (
-                      <div className="border rounded-xl p-6">
+                      <div>
                         <h3 className="font-semibold mb-2 text-lg">Links</h3>
                         <div className="space-y-3">
                           {user?.linkedin_url && (

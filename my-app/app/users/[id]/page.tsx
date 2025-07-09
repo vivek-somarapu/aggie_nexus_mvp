@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, notFound, useRouter } from "next/navigation"
+import { useParams, notFound, redirect, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,7 @@ import {
   Share2,
   Loader2,
   Home,
+  Pencil,
 } from "lucide-react"
 import { userService } from "@/lib/services/user-service"
 import { projectService } from "@/lib/services/project-service"
@@ -30,6 +31,12 @@ import { Project } from "@/lib/services/project-service"
 import { createClient } from "@/lib/supabase/client"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { ProfileAvatarEdit } from "@/components/profile/profile-avatar"
+import { TexasAMAffiliation, TexasAMAffiliationData } from "@/components/profile/tamu-affiliate"
+import { TagSelector } from "@/components/profile/tag-selector"
+import { industryOptions } from "@/lib/constants"
 
 // Simple Alert component
 function Alert({ variant, className, children }: { 
@@ -61,13 +68,24 @@ export default function UserPage() {
   const [isLoadingBookmark, setIsLoadingBookmark] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [bookmarkError, setBookmarkError] = useState<string | null>(null)
-  
+
   // Message dialog state
   const [messageNote, setMessageNote] = useState("")
   const [isMessageOpen, setIsMessageOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [messageError, setMessageError] = useState<string | null>(null)
   const [messageSuccess, setMessageSuccess] = useState(false)
+
+  // editing profile
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    avatar: user?.avatar || '',
+    full_name: user?.full_name || '',
+    is_texas_am_affiliate: user?.is_texas_am_affiliate || false,
+    graduation_year: user?.graduation_year
+  });
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>(user?.industry || []);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Fetch user data
   useEffect(() => {
@@ -122,7 +140,83 @@ export default function UserPage() {
     
     fetchUserProjects();
   }, [user]);
-  
+
+  // Check if user can edit
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        avatar: user.avatar || '',
+        full_name: user.full_name || '',
+        is_texas_am_affiliate: user.is_texas_am_affiliate || false,
+        graduation_year: user.graduation_year
+      });
+      setSelectedIndustries(user.industry || []);
+    }
+  }, [user]);
+
+  // Form change handlers
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAffiliationChange = (data: TexasAMAffiliationData) => {
+    setFormData(prev => ({
+      ...prev,
+      is_texas_am_affiliate: data.is_texas_am_affiliate,
+      graduation_year: data.graduation_year
+    }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setFormData(prev => ({
+            ...prev,
+            avatar: event.target!.result as string
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDeleteAvatar = () => {
+    setFormData(prev => ({
+      ...prev,
+      avatar: ''
+    }));
+  };
+
+  const handleSaveProfile = async () => {
+    if (!currentUser) return;
+    
+    setIsSaving(true);
+    try {
+      // Update the user data
+      await userService.updateUser(currentUser.id, {
+        ...formData,
+        industry: selectedIndustries
+      });
+      
+      // Refresh user data
+      const updatedUser = await userService.getUser(id);
+      setUser(updatedUser);
+      
+      setIsEditOpen(false);
+    } catch (error) {
+      console.error("Error saving profile:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Check if user is bookmarked
   useEffect(() => {
     const checkBookmarkStatus = async () => {
@@ -276,7 +370,84 @@ export default function UserPage() {
                   {bookmarkError && (
                     <span className="text-destructive text-sm mr-2">{bookmarkError}</span>
                   )}
-                  
+                  {currentUser?.id == user?.id && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={() => setIsEditOpen(true)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Edit profile</span>
+                    </Button>
+                    
+                    <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                      <DialogContent className="flex flex-col max-h-[90vh]">
+                        <DialogHeader>
+                          <DialogTitle>Edit Profile</DialogTitle>
+                        </DialogHeader>
+
+                        <div className="space-y-4 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-muted flex-1">
+                          {/* Avatar + Name + Affiliation */}
+                          <div className="flex flex-col sm:flex-row gap-6">
+                            <div className="w-full flex justify-center sm:w-auto sm:shrink-0">
+                              <ProfileAvatarEdit
+                                avatar={formData.avatar}
+                                fullName={formData.full_name}
+                                onAvatarChange={handleAvatarChange}
+                                onAvatarDelete={handleDeleteAvatar}
+                              />
+                            </div>
+                            <div className="w-full sm:flex-1 space-y-4 pt-2">
+                              <div className="space-y-2">
+                                <Label htmlFor="full_name">Full Name</Label>
+                                <Input
+                                  id="full_name"
+                                  name="full_name"
+                                  value={formData.full_name}
+                                  onChange={handleChange}
+                                />
+                              </div>
+                              <TexasAMAffiliation
+                                value={{
+                                  is_texas_am_affiliate: formData.is_texas_am_affiliate,
+                                  graduation_year: Number(formData.graduation_year)
+                                }}
+                                onChange={handleAffiliationChange}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Industry edit */}
+                          <div className="space-y-2">
+                            <Label>Industries (select up to 10)</Label>
+                            <TagSelector
+                              label="Industries"
+                              options={industryOptions}
+                              selected={selectedIndustries}
+                              onChange={setSelectedIndustries}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            disabled={isSaving}
+                            onClick={handleSaveProfile}
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving
+                              </>
+                            ) : (
+                              "Save Changes"
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </>
+                )}
                   <Button 
                     variant="outline" 
                     size="icon" 
