@@ -1,3 +1,5 @@
+
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -8,6 +10,8 @@ const nextConfig = {
     // Disable TypeScript type checking during production builds
     ignoreBuildErrors: true,
   },
+
+  // Upgraded images configuration using remotePatterns
   images: {
     /*
      * Allow <Image> to download and optimise files from our Supabase
@@ -15,7 +19,21 @@ const nextConfig = {
      * explicitly listed here.
      */
     domains: ["gkzwxaiflfimhfikwfol.supabase.co"],
+    remotePatterns: [
+      {
+        //  Google user profiles
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        //  Supabase storage bucket
+        protocol: 'https',
+        hostname: 'gkzwxaiflfimhfikwfol.supabase.co',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
 };
-
-export default nextConfig;
