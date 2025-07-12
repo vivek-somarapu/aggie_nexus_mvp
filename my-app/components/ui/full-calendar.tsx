@@ -372,7 +372,7 @@ const CalendarMonthView = () => {
   return (
     <div
       ref={gridRef}
-      className="relative h-full grid grid-rows-6 grid-cols-7 overflow-hidden p-px gap-px"
+      className="relative h-full grid grid-rows-6 grid-cols-7 min-h-[550px] overflow-hidden p-px gap-px"
     >
       {monthDates.map((_date, idx) => {
         const currentEvents = events.filter((e) => isSameDay(e.start, _date));
