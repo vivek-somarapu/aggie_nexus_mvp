@@ -276,17 +276,6 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
 
   return (
     <Card className="shadow-none overflow-hidden border-0">
-      {/* Gradient heading */}
-      {/* <div className="relative -mt-7 h-50 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5">
-        <div className="absolute top-6 right-4">
-          {!showCompletionBanner && (
-            <Button variant="secondary" size="sm" className="shadow-sm" asChild>
-              <Link href={`/users/${user?.id}`}>View Profile</Link>
-            </Button>
-          )}
-        </div>
-      </div> */}
-
       {/* {!showCompletionBanner && (
             <Button variant="secondary" size="sm" className="shadow-sm" asChild>
               <Link href={`/users/${user?.id}`}>View Profile</Link>

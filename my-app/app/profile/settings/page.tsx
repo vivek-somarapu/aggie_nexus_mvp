@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -60,6 +60,9 @@ export default function SettingsPage() {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from");
 
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -390,10 +393,21 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/profile">
+          <button
+            onClick={() => {
+              if (from) {
+                router.push(from);
+              } else if (window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/profile");
+              }
+            }}
+            className="inline-flex items-center"
+          >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Profile
-          </Link>
+            Back
+          </button>
         </Button>
       </div>
 
@@ -435,7 +449,7 @@ export default function SettingsPage() {
             </Alert>
           )}
 
-          <Card className="w-full max-w-5xl border-0 md:border shadow-none md:shadow">
+          <Card className="border-0 md:border shadow-none md:shadow">
             <CardHeader>
               <CardTitle>Personal & Professional Information</CardTitle>
               <CardDescription>

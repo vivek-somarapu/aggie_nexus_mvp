@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, notFound, redirect, useRouter } from "next/navigation"
+import { useState, useEffect, use } from "react"
+import { useParams, notFound, redirect, useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +21,7 @@ import {
   Loader2,
   Home,
   Pencil,
+  Phone,
 } from "lucide-react"
 import { userService } from "@/lib/services/user-service"
 import { projectService } from "@/lib/services/project-service"
@@ -77,6 +78,8 @@ export default function UserPage() {
   const [messageSuccess, setMessageSuccess] = useState(false)
 
   // editing profile
+  const pathname = usePathname();
+
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [formData, setFormData] = useState({
     avatar: user?.avatar || '',
@@ -153,6 +156,10 @@ export default function UserPage() {
       setSelectedIndustries(user.industry || []);
     }
   }, [user]);
+
+  const handleEdit = () => {
+    router.push(`/profile/settings?from=${encodeURIComponent(pathname)}`);
+  };
 
   // Form change handlers
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -375,7 +382,8 @@ export default function UserPage() {
                     <Button 
                       variant="outline" 
                       size="icon"
-                      onClick={() => setIsEditOpen(true)}
+                      onClick={handleEdit}
+                      // onClick={() => setIsEditOpen(true)}
                     >
                       <Pencil className="h-4 w-4" />
                       <span className="sr-only">Edit profile</span>
@@ -504,12 +512,12 @@ export default function UserPage() {
                     <h3 className="font-semibold mb-2">Contact</h3>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span>{user.email}</span>
+                        <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="min-w-0 break-all">{user.email}</span>
                       </div>
                       {user.contact?.phone && (
                         <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <Phone className="h-4 w-4 text-muted-foreground" />
                           <span>{user.contact.phone}</span>
                         </div>
                       )}
