@@ -24,6 +24,8 @@ import {
   subMonths,
   subWeeks,
   subYears,
+  eachDayOfInterval,
+  endOfMonth,
 } from "date-fns";
 import { enUS } from "date-fns/locale/en-US";
 import {
@@ -34,8 +36,10 @@ import {
   useContext,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const monthEventVariants = cva("size-2 rounded-full", {
   variants: {
@@ -351,72 +355,174 @@ const CalendarWeekView = () => {
 };
 
 const CalendarMonthView = () => {
-  const { date, view, events, locale, onEventClick } = useCalendar();
+  const { view, events, locale, date, onEventClick } = useCalendar();
+  const MAX_EVENTS_VISIBLE = 2;
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const monthDates = useMemo(() => getDaysInMonth(date), [date]);
   const weekDays = useMemo(() => generateWeekdays(locale), [locale]);
+  const [expandedDate, setExpandedDate] = useState<Date | null>(null);
+  const [popoverPosition, setPopoverPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   if (view !== "month") return null;
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="grid grid-cols-7 gap-px sticky top-0 bg-background border-b">
-        {weekDays.map((day, i) => (
+    <div
+      ref={gridRef}
+      className="relative h-full grid grid-rows-6 grid-cols-7 min-h-[550px] overflow-hidden p-px gap-px"
+    >
+      {monthDates.map((_date, idx) => {
+        const currentEvents = events.filter((e) => isSameDay(e.start, _date));
+
+        return (
           <div
-            key={day}
+            key={_date.toString()}
+            data-cell
             className={cn(
-              "mb-2 text-right text-sm text-muted-foreground pr-2",
-              [0, 6].includes(i) && "text-muted-foreground/50"
+              "ring-1 ring-border overflow-hidden p-1 text-sm text-muted-foreground",
+              !isSameMonth(date, _date) && "text-muted-foreground/50"
             )}
           >
-            {day}
-          </div>
-        ))}
-      </div>
-      <div className="grid overflow-hidden -mt-px flex-1 auto-rows-fr p-px grid-cols-7 gap-px">
-        {monthDates.map((_date) => {
-          const currentEvents = events.filter((event) =>
-            isSameDay(event.start, _date)
-          );
-
-          return (
-            <div
-              className={cn(
-                "ring-1 p-2 text-sm text-muted-foreground ring-border overflow-auto",
-                !isSameMonth(date, _date) && "text-muted-foreground/50"
-              )}
-              key={_date.toString()}
-            >
-              <span
+            {/* weekday label for the first row -------------------------------- */}
+            {idx < 7 && (
+              <div
                 className={cn(
-                  "size-6 grid place-items-center rounded-full mb-1 sticky top-0",
-                  isToday(_date) && "bg-primary text-primary-foreground"
+                  "text-xs font-medium text-center",
+                  [0, 6].includes(idx) && "text-muted-foreground/50"
                 )}
               >
-                {format(_date, "d")}
-              </span>
+                {weekDays[idx]}
+              </div>
+            )}
 
-              {currentEvents.map((event) => {
-                return (
+            {/* day number ---------------------------------------------------- */}
+            <span
+              className={cn(
+                "size-6 grid place-items-center rounded-full sticky top-0",
+                isToday(_date) && "bg-primary text-primary-foreground"
+              )}
+            >
+              {format(_date, "d")}
+            </span>
+
+            {/* events -------------------------------------------------------- */}
+            {currentEvents.slice(0, MAX_EVENTS_VISIBLE).map((event) => (
+              <div
+                key={`${event.id}-${_date.toISOString()}`}
+                className="px-1 rounded text-sm flex items-center gap-1 cursor-pointer
+                         hover:bg-muted/50 transition-colors"
+                onClick={() => onEventClick?.(event)}
+              >
+                <div
+                  className={cn(
+                    "shrink-0",
+                    monthEventVariants({ variant: event.color })
+                  )}
+                />
+                <span className="flex-1 truncate">{event.title}</span>
+              </div>
+            ))}
+
+            {/* “+ n more” ---------------------------------------------------- */}
+            {currentEvents.length > MAX_EVENTS_VISIBLE && (
+              <button
+                className="text-xs text-primary hover:underline"
+                onClick={(e) => {
+                  const cell = (e.currentTarget as HTMLElement).closest(
+                    "[data-cell]"
+                  )!;
+                  const cellRect = cell.getBoundingClientRect();
+                  const gridRect = gridRef.current!.getBoundingClientRect();
+
+                  setPopoverPosition({
+                    top: cellRect.top - gridRect.top - 25,
+                    left: cellRect.left - gridRect.left,
+                  });
+                  setExpandedDate(_date);
+                }}
+              >
+                +{currentEvents.length - MAX_EVENTS_VISIBLE} more…
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {expandedDate && popoverPosition && (
+        <>
+          {/* Backdrop to close popover */}
+          <div
+            className="absolute inset-0 z-40"
+            onClick={() => {
+              setExpandedDate(null);
+              setPopoverPosition(null);
+            }}
+          />
+
+          {/* Popover */}
+          <div
+            className="absolute z-50 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg min-w-[50px] max-w-[200px]"
+            style={{
+              top: popoverPosition.top,
+              left: popoverPosition.left,
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-1">
+              <div className="text-xs font-medium text-muted-foreground">
+                {format(expandedDate, "EEE").toUpperCase()},{" "}
+                {format(expandedDate, "d")}
+              </div>
+              <button
+                className="text-muted-foreground hover:text-foreground px-1 rounded-sm hover:bg-muted/50"
+                onClick={() => {
+                  setExpandedDate(null);
+                  setPopoverPosition(null);
+                }}
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Events list */}
+            <div className="max-h-[300px] pb-1 overflow-y-auto">
+              {events
+                .filter((e) => isSameDay(e.start, expandedDate))
+                .map((event) => (
                   <div
                     key={event.id}
-                    className="px-1 rounded text-sm flex items-center gap-1 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => onEventClick?.(event)}
+                    className="pl-1 flex gap-1 items-center hover:bg-muted/40 cursor-pointer border-l-4 border-l-transparent hover:border-l-primary/20"
+                    onClick={() => {
+                      onEventClick?.(event);
+                    }}
                   >
                     <div
                       className={cn(
                         "shrink-0",
                         monthEventVariants({ variant: event.color })
                       )}
-                    ></div>
-                    <span className="flex-1 truncate">{event.title}</span>
+                    />
+                    <span className="flex-1 text-[12px]">{event.title}</span>
                   </div>
-                );
-              })}
+                ))}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

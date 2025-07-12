@@ -6,11 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserIcon, Upload, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import {
-  containerVariants,
-  itemVariants,
-  industryOptions,
-} from "@/lib/constants";
+import { itemVariants } from "@/lib/constants";
 
 interface ProfileAvatarEditProps {
   avatar: string | null;

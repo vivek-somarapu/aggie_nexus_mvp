@@ -1,36 +1,25 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import "keen-slider/keen-slider.min.css";
 import Link from "next/link";
 import Image from "next/image";
+import { format } from "date-fns";
 import {
-  ArrowRight,
-  Users,
-  Lightbulb,
-  Building,
-  ArrowUpRight,
-  ChevronRight,
-  CheckCircle2,
-  Star,
-  BarChart,
-  Award,
-  MessageCircle,
-  CalendarIcon,
-} from "lucide-react";
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from "@/components/ui/carousel";
+
+import Autoplay from "embla-carousel-autoplay";
+import { Users, MapPin, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 
@@ -45,15 +34,88 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.8 } },
 };
 
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
+const slideLeft = {
+  hidden: { opacity: 0, x: -100 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8 } },
 };
+
+const slideRight = {
+  hidden: { opacity: 0, x: 100 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8 } },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.8 } },
+};
+
+const fadeUpSlow = {
+  hidden: { opacity: 0, y: 50 },
+  visible: { opacity: 1, y: 0, transition: { duration: 1.2 } },
+};
+
+const projects = [
+  {
+    id: 1,
+    title: "Mobile App for Local Farmers Markets",
+    stage: "Project",
+    status: "In Progress",
+    recruiting: "Actively Recruiting",
+    summary:
+      "Developing an augmented-reality application that provides interactive information about local vendors and their goods.",
+    location: "Hybrid",
+    createdAt: new Date("2025-05-25"),
+    tags: ["Technology", "Agriculture"],
+  },
+  {
+    id: 2,
+    title: "Aerial Drone Launcher Development",
+    stage: "Idea",
+    status: "Planning",
+    recruiting: "Full team, seeking investment",
+    summary:
+      "Building a full-scale prototype of a military-grade drone launcher for water craft. Looking for students interested in mechanical engineering.",
+    location: "In-person",
+    createdAt: new Date("2025-06-28"),
+    tags: ["Manufacturing", "Technology", "Other"],
+  },
+  {
+    id: 3,
+    title: "FinTech App",
+    stage: "Project",
+    status: "Ongoing",
+    recruiting: "Looking for co-founders",
+    summary:
+      "We’re looking for teammates with Customer Service and Design expertise to join us on this FinTech application.",
+    location: "Hybrid",
+    createdAt: new Date("2025-04-18"),
+    tags: ["Nonprofit", "Customer Service", "Design"],
+  },
+  {
+    id: 4,
+    title: "AI App",
+    stage: "Project",
+    status: "Not Started",
+    recruiting: "Looking for co-founders",
+    summary:
+      "Seeking Marketing and Sales talent to help launch an AI-driven application in the food & beverage space.",
+    location: "Remote",
+    createdAt: new Date("2025-04-18"),
+    tags: ["Food & Beverage", "Marketing", "Sales"],
+  },
+  {
+    id: 5,
+    title: "ML App",
+    stage: "Idea",
+    status: "Not Started",
+    recruiting: "Recruiting team members",
+    summary:
+      "Looking for teammates with strong Problem-Solving and Research skills to build an energy-sector ML solution.",
+    location: "Remote",
+    createdAt: new Date("2025-04-18"),
+    tags: ["Energy", "Problem Solving", "Research"],
+  },
+];
 
 export default function Home() {
   const { authUser, isLoading } = useAuth();
@@ -81,38 +143,32 @@ export default function Home() {
       <motion.div
         className="
           absolute
-          -right-35
-          top-35
-          transform
-          rotate-[220deg]
-          z-0
-          pointer-events-none
-          opacity-60
+          right-[-90px]  top-[0px] scale-60
+          md:right-[-80px]  md:top-[40px] 
+          lg:right-0       lg:top-[120px] 
+          xl:right-0       xl:top-[120px] 
+          md:scale-75
+          lg:scale-100  
+          rotate-[10deg]
+          pointer-events-none opacity-60
         "
-        initial={{ opacity: 0, scale: 0.8, rotate: 205 }}
+        initial={{ opacity: 0, rotate: 205 }}
         animate={{
           opacity: 0.6,
           scale: 1,
           rotate: 220,
-          transition: {
-            duration: 0.8,
-            ease: "easeOut",
-          },
+          transition: { duration: 0.8, ease: "easeOut" },
         }}
         whileInView={{
           x: [0, 10, 0],
-          transition: {
-            repeat: Infinity,
-            repeatType: "reverse",
-            duration: 8,
-          },
+          transition: { repeat: Infinity, repeatType: "reverse", duration: 8 },
         }}
       >
         <Image
           src="/images/circles-logo.png"
           alt="Decorative circles"
-          width={800}
-          height={600}
+          width={650}
+          height={450}
           className="object-contain"
           priority
         />
@@ -136,158 +192,186 @@ export default function Home() {
           initial="hidden"
           animate="visible"
           variants={fadeUp}
-          className="container flex-1 flex flex-col items-center justify-center py-12 md:py-16 text-center relative"
+          className="container mx-auto flex-1 flex flex-col md:flex-row items-center md:items-start
+          justify-center gap-10 py-12 md:py-20 relative"
         >
-          <div className="space-y-6 max-w-3xl mt-16">
-            <Badge className="bg-[#500000] text-white hover:bg-[#500000]/90 border-none px-4 py-2 text-sm mb-4">
-              Connecting Innovators at Texas A&M and Beyond
-            </Badge>
+          {/* ────── LEFT  (text) ────── */}
+          <motion.div
+            variants={fadeIn}
+            className="flex-1 space-y-6 md:max-w-4xl text-left"
+          >
+            {/* headline */}
             <motion.h1
               variants={fadeIn}
-              className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl"
+              initial="hidden"
+              animate="visible"
+              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[0.9]"
             >
               THE CENTRAL HUB
               <br />
-              FOR
+              OF AGGIE
               <br />
-              AGGIE INNOVATION
+              INNOVATION.
             </motion.h1>
-            <motion.p
-              variants={fadeIn}
-              className="mx-auto max-w-[800px] text-muted-foreground md:text-xl"
-            >
-              Aggie Nexus is the premier platform connecting entrepreneurs,
-              builders, and investors to transform innovative ideas into
-              successful ventures.
-            </motion.p>
-          </div>
 
-          <motion.div
-            variants={stagger}
-            className="flex flex-wrap justify-center gap-4 mt-8"
-          >
-            <motion.div variants={fadeUp}>
-              <Button size="lg" asChild>
-                <Link href="/projects">
-                  Explore Projects
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </motion.div>
-            <motion.div variants={fadeUp}>
-              <Button variant="outline" size="lg" asChild>
+            <div className="px-4 pt-[8rem]">
+              {/* sub-heading */}
+              <motion.h2
+                variants={slideLeft}
+                initial="hidden"
+                animate="visible"
+                className="text-xl sm:text-3xl md:text-3xl lg:text-4xl font-semibold tracking-tight mb-1"
+              >
+                The Future Starts Here.
+              </motion.h2>
+
+              {/* body copy */}
+              <p
+                className="
+                  max-w-[55ch]
+                  leading-[1.35]
+                  font-light text-muted-foreground
+                  text-sm     sm:text-md   md:text-lg  
+                "
+              >
+                Aggie Nexus was created to connect the needs of the industry
+                with builders excited to meet those needs. Here you can do more
+                than stay up-to-date with industry progress—you now have the
+                opportunity to be a part of the growth forward. Post your ideas,
+                join a startup, network your product. It all happens right here,
+                in the central hub for A&M innovation.
+              </p>
+            </div>
+
+            {/* CTA */}
+            <div className="flex flex-wrap gap-4">
+              <Button
+                asChild
+                size="lg"
+                className="rounded-full text-lg uppercase bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 px-7 py-3 font-semibold tracking-wide transition-colors"
+              >
                 <Link href={authUser ? "/projects/new" : "/auth/signup"}>
-                  {authUser ? "Start a Project" : "Sign Up"}
-                  <ArrowUpRight className="ml-2 h-4 w-4" />
+                  {authUser ? "Explore Projects" : "Sign Up"}
                 </Link>
               </Button>
-            </motion.div>
-          </motion.div>
-
-          {/* Stats Section */}
-          <motion.div
-            variants={fadeUp}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 mt-16 w-full max-w-5xl mx-auto py-6 md:py-8 relative"
-          >
-            <div className="flex flex-col items-center text-center relative z-10">
-              <div className="text-3xl md:text-4xl font-bold">500+</div>
-              <div className="text-sm text-muted-foreground">
-                Active Projects
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center relative z-10">
-              <div className="text-3xl md:text-4xl font-bold">2.5K</div>
-              <div className="text-sm text-muted-foreground">
-                Community Members
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center relative z-10">
-              <div className="text-3xl md:text-4xl font-bold">150+</div>
-              <div className="text-sm text-muted-foreground">
-                Successful Ventures
-              </div>
-            </div>
-            <div className="flex flex-col items-center text-center relative z-10">
-              <div className="text-3xl md:text-4xl font-bold">$2.4M</div>
-              <div className="text-sm text-muted-foreground">
-                Investment Secured
-              </div>
             </div>
           </motion.div>
         </motion.section>
 
-        {/* Fostering Growth Section with Lab Image */}
+        {/* Projects in Progress section */}
         <motion.section
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          variants={fadeUp}
-          className="relative py-16 md:py-20 w-full overflow-hidden mx-auto my-6 rounded-xl"
+          variants={slideRight}
+          className="relative py-16 md:py-20 overflow-hidden"
         >
-          <div className="absolute inset-0 z-0">
-            <Image
-              src="/images/lab1.jpg"
-              alt="Laboratory environment"
-              fill
-              className="object-cover opacity-40 rounded-xl"
-            />
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-xl" />
-          </div>
+          {/* ── Hard container (centres & limits width) ── */}
+          <div className="container">
+            {/* ── Headline ── */}
+            <motion.h2
+              variants={fadeUpSlow}
+              initial="hidden"
+              whileInView="visible"
+              className="ml-auto max-w-4xl text-right pr-0 2xl:pr-[7.5rem] text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
+            >
+              Join a project in progress.
+              <br className="hidden sm:block" />
+              Post your idea for a new one.
+            </motion.h2>
 
-          <div className="container relative z-10 px-6 md:px-8">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              <motion.div variants={fadeUp} className="space-y-6">
-                <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-                  FOSTERING GROWTH
-                </h2>
-                <p className="text-xl text-muted-foreground">
-                  In every industry
+            {/* ── Copy + carousel wrapper ── */}
+            <div
+              className="
+              mx-auto max-w-7xl
+              grid grid-cols-1 lg:grid-cols-4 gap-8 lg:gap-12
+              items-start
+            "
+            >
+              <div className="lg:col-span-1">
+                <p className="text-muted-foreground text-center px-10 lg:px-5 lg:text-left leading-relaxed text-lg">
+                  Our Projects Page is where ideas become a reality. Whether
+                  you're starting a company or just looking for experience,
+                  Aggie Nexus is the place to start.
                 </p>
-                <p className="text-muted-foreground">
-                  Our platform provides the tools, connections, and resources
-                  needed for innovative ideas to flourish across all
-                  sectors—from technology and engineering to arts and
-                  agriculture.
-                </p>
-                <Button variant="outline" asChild>
-                  <Link href="/projects">
-                    Browse Industries
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </motion.div>
+              </div>
 
-              <motion.div
-                variants={fadeUp}
-                className="bg-muted/50 p-6 md:p-8 rounded-lg shadow-lg"
-              >
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h3 className="font-medium">Technology</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Software, hardware, and digital innovation
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="font-medium">Engineering</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Civil, mechanical, aerospace projects
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="font-medium">Agriculture</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Sustainable farming and food tech
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="font-medium">Health</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Medical devices and healthcare solutions
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
+              {/* ────── Carousel starts here ────── */}
+              <div className="lg:col-span-3">
+                <Carousel
+                  opts={{ loop: true }}
+                  plugins={[
+                    Autoplay({ delay: 5000, stopOnInteraction: false }),
+                  ]}
+                  className="w-full relative"
+                >
+                  <CarouselContent className="-ml-2 md:-ml-4">
+                    {projects.map((p) => (
+                      <CarouselItem
+                        key={p.id}
+                        className="pl-2 md:pl-4  max-w-[350px] basis-full sm:basis-1/2 "
+                      >
+                        <Card className="h-full transition-shadow hover:shadow-md flex flex-col">
+                          <CardContent className="pt-6 flex flex-col h-full">
+                            <div className="flex-1 space-y-4">
+                              <h3 className="text-xl font-semibold leading-snug">
+                                {p.title}
+                              </h3>
+                              <div className="flex gap-2">
+                                <Badge
+                                  className={
+                                    p.stage === "Idea"
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-green-600 text-white"
+                                  }
+                                >
+                                  {p.stage}
+                                </Badge>
+                                <Badge variant="secondary">{p.status}</Badge>
+                              </div>
+                              <p className="text-muted-foreground">
+                                {p.summary}
+                              </p>
+                            </div>
+
+                            {/* Fixed metadata at bottom */}
+                            <div className="mt-auto pt-4 space-y-3 border-t border-border/50">
+                              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-4 h-4" />
+                                  {p.location}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-4 h-4" />
+                                  {format(p.createdAt, "MMM d, yyyy")}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Users className="w-4 h-4" />
+                                  {p.recruiting}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {p.tags.map((tag) => (
+                                  <Badge
+                                    key={tag}
+                                    variant="secondary"
+                                    className="capitalize"
+                                  >
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  {/* Chevron arrows */}
+                  <CarouselPrevious className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+                  <CarouselNext className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+                </Carousel>
+              </div>
             </div>
           </div>
         </motion.section>
@@ -295,84 +379,176 @@ export default function Home() {
         {/* Spacing between sections */}
         <div className="h-6 md:h-8"></div>
 
-        {/* Connecting with Investors Section with Garage Image */}
+        {/* Project Highlights section */}
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={scaleIn}
+          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
+        >
+          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
+            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
+            <div
+              className="
+                flex-1
+                grid grid-rows-[auto_1fr_auto]  
+                text-center lg:text-left
+              "
+            >
+              {/* row-1 : title (stays top-left) */}
+              <motion.h2
+                variants={fadeIn}
+                initial="hidden"
+                whileInView="visible"
+                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
+              >
+                Project Highlight
+              </motion.h2>
+
+              {/* row-3 : subtitle + copy (sticks bottom-right) */}
+              <div
+                className="
+                  row-start-3
+                  place-self-center
+                  lg:place-self-end  
+                  text-center lg:text-right
+                  max-w-2xl mx-auto lg:mx-0 
+                  space-y-4
+                "
+              >
+                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
+                  Event Name, Host, Location, Speaker
+                </h3>
+
+                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
+                  Lorem Ipsum is simply dummy text of the printing and
+                  typesetting industry. Lorem Ipsum has been the industry
+                  standard dummy text ever since the 1500s, when an unknown
+                  printer took a galley of type and scrambled it to make a type
+                  specimen book. It has survived not only five centuries, but
+                  also the leap into electronic typesetting, remaining
+                  essentially unchanged. It was popularised in the 1960s with
+                  the release of Letraset sheets containing Lorem Ipsum
+                  passages, and more recently with desktop publishing software
+                  like Aldus PageMaker including versions of Lorem Ipsum
+                </p>
+              </div>
+            </div>
+            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
+            <div
+              className="
+              flex-shrink-0
+              flex flex-col
+              md:flex-row md:justify-center
+              lg:flex-col lg:justify-start
+              gap-4
+              w-full lg:w-80
+            "
+            >
+              {/* square #1 */}
+              <div
+                className="
+                  aspect-square
+                  h-48 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+
+              {/* square #2 */}
+              <div
+                className="
+                  aspect-square
+                  h-64 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+            </div>
+
+            {/* <Image
+              src=""
+              alt="Project highlight preview 1"
+              width={640}
+              height={640}
+              priority
+              className="
+                aspect-square h-48 md:h-64 w-full
+                object-cover       
+                rounded-lg shadow-sm
+              "
+            />
+            <Image
+              src=""
+              alt="Project highlight preview 2"
+              width={640}
+              height={640}
+              className="
+                aspect-square h-64 md:h-64 w-full
+                object-cover
+                rounded-lg shadow-sm
+              "
+            /> */}
+          </div>
+        </motion.section>
+
+        {/* calendar section */}
         <motion.section
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUp}
-          className="relative py-16 md:py-20 w-full overflow-hidden mx-auto my-6 rounded-xl"
+          className="relative py-20 px-5 md:py-28 overflow-hidden"
         >
-          <div className="absolute inset-0 z-0">
-            <Image
-              src="/images/garage.jpg"
-              alt="Innovation garage"
-              fill
-              className="object-cover opacity-40 rounded-xl"
-            />
-            <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] rounded-xl" />
-          </div>
+          <div className="container mx-auto">
+            {/* ── Headline ── */}
+            <motion.h2
+              variants={slideLeft}
+              initial="hidden"
+              whileInView="visible"
+              className="max-w-4xl text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
+            >
+              Expand your network. Find new opportunities.
+              <br className="hidden lg:block" />
+              Stay in the know.
+            </motion.h2>
 
-          <div className="container relative z-10 px-6 md:px-8">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              <motion.div variants={fadeUp} className="space-y-6 md:order-2">
-                <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-                  CONNECTING WITH
-                </h2>
-                <p className="text-xl text-muted-foreground">
-                  Innovators across the world
-                </p>
-                <p className="text-muted-foreground">
-                  Access a vibrant network of angel investors, venture
-                  capitalists, and industry partners looking to fund and
-                  accelerate the next big ideas coming out of Texas A&M.
-                </p>
-                <Button asChild>
-                  <Link href="/users">
-                    Find Partners
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </motion.div>
+            {/* ── Calendar + copy grid ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
+              {/* ✦ descriptive copy — first on ≤md, second on ≥lg */}
+              <p
+                className="
+                  order-1 lg:order-2
+                  lg:col-span-2
+                  text-center lg:text-left
+                  text-muted-foreground leading-relaxed
+                  text-sm sm:text-base md:text-lg
+                "
+              >
+                Our Nexus calendar lets you stay up to date with all of the
+                A&amp;M events that you wouldn’t want to miss. Looking to grow
+                your network? Find an upcoming networking event in your
+                industry. Trying to hone your technical skills? Look for a
+                workshop. We have it all right here, convenient and accessible.
+              </p>
 
-              <motion.div variants={fadeUp} className="md:order-1">
-                <Card className="bg-background/90 backdrop-blur-sm shadow-lg">
-                  <CardHeader className="pb-4">
-                    <CardTitle>Investment Opportunities</CardTitle>
-                    <CardDescription>
-                      Connect with funders ready to invest
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-6">
-                      <li className="flex items-start gap-4">
-                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Angel Investors</p>
-                          <p className="text-sm text-muted-foreground">
-                            Early-stage funding for promising startups
-                          </p>
-                        </div>
-                      </li>
-                      <li className="flex items-start gap-4">
-                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Venture Capital</p>
-                          <p className="text-sm text-muted-foreground">
-                            Series funding for growth-stage companies
-                          </p>
-                        </div>
-                      </li>
-                      <li className="flex items-start gap-4">
-                        <CheckCircle2 className="h-5 w-5 mt-0.5 text-primary flex-shrink-0" />
-                        <div>
-                          <p className="font-medium">Grant Opportunities</p>
-                          <p className="text-sm text-muted-foreground">
-                            Non-dilutive funding for research projects
-                          </p>
-                        </div>
-                      </li>
-                    </ul>
+              {/* ✦ calendar preview — second on ≤md, first on ≥lg */}
+              <motion.div
+                className="order-2 lg:order-1 lg:col-span-3 border rounded-2xl"
+                initial={{ scale: 0.95, opacity: 0 }}
+                whileInView={{ scale: 1.08, opacity: 1 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                viewport={{ once: true, amount: 0.5 }}
+              >
+                <Card className="border-none shadow-none">
+                  <CardContent className="p-0">
+                    <Image
+                      src="/images/calendar-view.png"
+                      alt="Aggie Nexus calendar month-view"
+                      width={1200}
+                      height={800}
+                      className="w-full h-auto"
+                      priority
+                    />
                   </CardContent>
                 </Card>
               </motion.div>
@@ -380,439 +556,163 @@ export default function Home() {
           </div>
         </motion.section>
 
-        {/* How It Works Section */}
-        <div className="h-6 md:h-8"></div>
-
-        <section className="bg-muted/50 py-16 md:py-20 my-6 rounded-xl container mx-auto overflow-hidden">
-          <div className="max-w-3xl mx-auto mb-8 px-6 md:px-8">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">
-              How Aggie Nexus Works
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground text-center">
-              Our platform streamlines the journey from concept to creation,
-              connecting the right people at the right time.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 px-6 md:px-8">
-            <div className="flex flex-col items-center text-center p-6 bg-background/80 rounded-lg shadow-md">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Lightbulb className="h-6 w-6" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Post Your Project</h3>
-              <p className="text-muted-foreground">
-                Share your vision, specify what resources you need, and set
-                clear goals to attract the right collaborators.
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center text-center p-6 bg-background/80 rounded-lg shadow-md">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Users className="h-6 w-6" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Build Your Team</h3>
-              <p className="text-muted-foreground">
-                Connect with developers, designers, marketers, and investors who
-                align with your project's needs and vision.
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center text-center p-6 bg-background/80 rounded-lg shadow-md">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                <BarChart className="h-6 w-6" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Grow Together</h3>
-              <p className="text-muted-foreground">
-                Track progress, share updates, and celebrate milestones as your
-                project develops from concept to reality.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Testimonials Section */}
-        <div className="h-6 md:h-8"></div>
-
-        <section className="bg-muted/50 py-16 md:py-20 my-6 rounded-xl container mx-auto overflow-hidden">
-          <div className="max-w-3xl mx-auto mb-8 px-6 md:px-8">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl text-center">
-              Success Stories
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground text-center">
-              Hear from entrepreneurs who've achieved their goals through Aggie
-              Nexus
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 px-6 md:px-8">
-            <Card className="bg-background shadow-lg">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback>JD</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">James Donovan</p>
-                    <p className="text-sm text-muted-foreground">
-                      CEO, TechFlow
-                    </p>
-                  </div>
-                </div>
-                <div className="flex mb-4">
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                </div>
-                <p className="text-muted-foreground">
-                  "Aggie Nexus connected me with the technical co-founder I
-                  needed to turn my idea into reality. Six months later, we
-                  closed our first funding round and are now serving clients
-                  across three states."
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-background shadow-lg">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback>ML</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">Maria Liang</p>
-                    <p className="text-sm text-muted-foreground">
-                      Founder, EcoSolutions
-                    </p>
-                  </div>
-                </div>
-                <div className="flex mb-4">
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                </div>
-                <p className="text-muted-foreground">
-                  "As a student entrepreneur, I found it challenging to build a
-                  team outside my immediate circle. Aggie Nexus helped me find
-                  talented partners who shared my vision for sustainable
-                  business practices."
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-background shadow-lg">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback>KJ</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">Kevin Johnson</p>
-                    <p className="text-sm text-muted-foreground">
-                      Angel Investor
-                    </p>
-                  </div>
-                </div>
-                <div className="flex mb-4">
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="h-4 w-4 text-primary" />
-                  <Star className="opacity-30 h-4 w-4" />
-                </div>
-                <p className="text-muted-foreground">
-                  "I've invested in three startups I discovered through Aggie
-                  Nexus. The platform's quality filtering saves me time by
-                  connecting me with serious founders who have well-thought-out
-                  business plans."
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        {/* Feature Preview Section */}
-        <div className="h-2 md:h-4"></div>
-
-        <section className="py-8 md:py-12 my-2 container mx-auto overflow-hidden">
-          <div className="text-center max-w-3xl mx-auto mb-6 px-6 md:px-8">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Platform Features
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Designed to facilitate every stage of your entrepreneurial journey
-            </p>
-          </div>
-
-          <Tabs
-            defaultValue="projects"
-            className="w-full max-w-4xl mx-auto px-6 md:px-8"
-          >
-            <TabsList className="grid grid-cols-3 mb-8">
-              <TabsTrigger value="projects">Projects</TabsTrigger>
-              <TabsTrigger value="networking">Networking</TabsTrigger>
-              <TabsTrigger value="resources">Resources</TabsTrigger>
-            </TabsList>
-
-            <TabsContent
-              value="projects"
-              className="border rounded-lg p-6 bg-background/90 shadow-md"
+        {/* Event Highlights section */}
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={slideRight}
+          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
+        >
+          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
+            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
+            <div
+              className="
+                flex-1
+                grid grid-rows-[auto_1fr_auto]  
+                text-center lg:text-left
+              "
             >
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                  <h3 className="text-2xl font-semibold mb-4">
-                    Project Management
-                  </h3>
-                  <ul className="space-y-3">
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>
-                        Create detailed project listings with specific
-                        requirements
-                      </span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Manage team recruitment and role assignments</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Track project milestones and progress</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>
-                        Filter projects by industry, skills needed, and stage
-                      </span>
-                    </li>
-                  </ul>
-                  <Button className="mt-6" asChild>
-                    <Link href={authUser ? "/projects/new" : "/auth/signup"}>
-                      {authUser ? "Start a Project" : "Sign Up to Start"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-                <div className="bg-muted rounded-lg p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">FinTech Network</h4>
-                      <Badge className="bg-muted text-foreground">
-                        Idea Phase
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Creating a platform for financial technology professionals
-                      to connect, share resources, and collaborate on innovative
-                      solutions.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">Finance</Badge>
-                      <Badge variant="outline">Technology</Badge>
-                      <Badge variant="outline">Networking</Badge>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between items-center">
-                      <div className="flex -space-x-2">
-                        <Avatar className="h-8 w-8 border-2 border-background">
-                          <AvatarFallback>JD</AvatarFallback>
-                        </Avatar>
-                        <Avatar className="h-8 w-8 border-2 border-background">
-                          <AvatarFallback>AL</AvatarFallback>
-                        </Avatar>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        Recruiting team members
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
+              {/* row-1 : title (stays top-left) */}
+              <motion.h2
+                variants={scaleIn}
+                initial="hidden"
+                whileInView="visible"
+                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
+              >
+                Event Highlight
+              </motion.h2>
 
-            <TabsContent
-              value="networking"
-              className="border rounded-lg p-6 bg-background/90 shadow-md"
-            >
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                  <h3 className="text-2xl font-semibold mb-4">
-                    Connection & Collaboration
-                  </h3>
-                  <ul className="space-y-3">
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>
-                        Find partners and team members with complementary skills
-                      </span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Direct messaging with potential collaborators</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Specialized Texas A&M community connections</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Industry-specific networking opportunities</span>
-                    </li>
-                  </ul>
-                  <Button className="mt-6" asChild>
-                    <Link href={authUser ? "/users" : "/auth/signup"}>
-                      {authUser ? "Connect Now" : "Sign Up to Connect"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-                <div className="bg-muted rounded-lg p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>SR</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h4 className="font-medium">Sarah Rodriguez</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Full-Stack Developer
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      "I connected with my co-founder through Aggie Nexus. Our
-                      complementary skills in technology and business have been
-                      key to our startup's growth."
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">React</Badge>
-                      <Badge variant="secondary">Node.js</Badge>
-                      <Badge variant="secondary">UX Design</Badge>
-                    </div>
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4" />
-                      <Star className="h-4 w-4" />
-                      <Star className="h-4 w-4" />
-                      <Star className="h-4 w-4" />
-                      <Star className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
+              {/* row-3 : subtitle + copy (sticks bottom-right) */}
+              <div
+                className="
+                  row-start-3
+                  place-self-center
+                  lg:place-self-end  
+                  text-center lg:text-right
+                  max-w-2xl mx-auto lg:mx-0 
+                  space-y-4
+                "
+              >
+                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
+                  Event Name, Host, Location, Speaker
+                </h3>
 
-            <TabsContent
-              value="resources"
-              className="border rounded-lg p-6 bg-background/90 shadow-md"
-            >
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                  <h3 className="text-2xl font-semibold mb-4">
-                    Startup Resources
-                  </h3>
-                  <ul className="space-y-3">
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>
-                        Access to funding opportunities and investor connections
-                      </span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Mentorship from experienced entrepreneurs</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Legal and business development resources</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>
-                        Texas A&M entrepreneurship program integration
-                      </span>
-                    </li>
-                  </ul>
-                  <Button className="mt-6" asChild>
-                    <Link href={authUser ? "/projects" : "/auth/signup"}>
-                      {authUser ? "Explore Resources" : "Sign Up to Access"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
-                <div className="bg-muted rounded-lg p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Award className="h-6 w-6" />
-                      <h4 className="font-medium">Funding Success Story</h4>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      AgTech Solutions secured $500K in seed funding after
-                      connecting with investors through our platform. Their
-                      agricultural technology is now being implemented across
-                      Texas.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="flex flex-col">
-                        <span className="text-muted-foreground">
-                          Time to funding
-                        </span>
-                        <span className="font-medium">6 months</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-muted-foreground">Team size</span>
-                        <span className="font-medium">5 members</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-muted-foreground">Industry</span>
-                        <span className="font-medium">Agriculture</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-muted-foreground">
-                          Current status
-                        </span>
-                        <span className="font-medium">Series A</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </section>
-
-        {/* CTA Section */}
-        <div className="h-6 md:h-8"></div>
-
-        <section className="container py-16 md:py-20 my-6">
-          <div className="relative rounded-xl bg-card text-foreground border px-6 py-12 shadow-lg">
-            <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-3xl font-bold tracking-tight md:text-4xl">
-                Ready to bring your idea to life?
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                Connect with the talent, resources, and funding you need to
-                succeed.
-              </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-4">
-                <Button size="lg" asChild>
-                  <Link href={authUser ? "/projects/new" : "/auth/signup"}>
-                    {authUser ? "Start a Project" : "Sign Up Now"}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button variant="outline" size="lg" asChild>
-                  <Link href="/projects">
-                    Browse Projects
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
+                  Lorem Ipsum is simply dummy text of the printing and
+                  typesetting industry. Lorem Ipsum has been the industry
+                  standard dummy text ever since the 1500s, when an unknown
+                  printer took a galley of type and scrambled it to make a type
+                  specimen book. It has survived not only five centuries, but
+                  also the leap into electronic typesetting, remaining
+                  essentially unchanged. It was popularised in the 1960s with
+                  the release of Letraset sheets containing Lorem Ipsum
+                  passages, and more recently with desktop publishing software
+                  like Aldus PageMaker including versions of Lorem Ipsum
+                </p>
               </div>
             </div>
+            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
+            <div
+              className="
+              flex-shrink-0
+              flex flex-col
+              md:flex-row md:justify-center
+              lg:flex-col lg:justify-start
+              gap-4
+              w-full lg:w-80
+            "
+            >
+              {/* square #1 */}
+              <div
+                className="
+                  aspect-square
+                  h-48 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+
+              {/* square #2 */}
+              <div
+                className="
+                  aspect-square
+                  h-64 md:h-60
+                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
+                "
+              />
+            </div>
+
+            {/* <Image
+              src=""
+              alt="Project highlight preview 1"
+              width={640}
+              height={640}
+              priority
+              className="
+                aspect-square h-48 md:h-64 w-full
+                object-cover       
+                rounded-lg shadow-sm
+              "
+            />
+            <Image
+              src=""
+              alt="Project highlight preview 2"
+              width={640}
+              height={640}
+              className="
+                aspect-square h-64 md:h-64 w-full
+                object-cover
+                rounded-lg shadow-sm
+              "
+            /> */}
           </div>
-        </section>
+        </motion.section>
+
+        {/* Our mission section */}
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={fadeUpSlow}
+          className="relative w-screen -mx-2 h-[60vh] overflow-hidden"
+        >
+          {/* background image (sits behind, covers whole section) */}
+          <Image
+            src="/images/design-center.jpg"
+            alt="Campus innovation workshop"
+            fill
+            className="object-cover z-[-1]"
+            priority
+          />
+
+          {/* dark overlay */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] z-0" />
+
+          {/* ────────────────────────────────
+            WRAPPER: takes full height, full width
+            flex column on mobile, row on ≥md
+        ──────────────────────────────── */}
+          <div className="relative z-10 flex h-full flex-col md:flex-row">
+            {/* text block */}
+            <div className="flex-[2] max-w-lg p-8 md:p-12 text-white">
+              <motion.h2
+                variants={fadeIn}
+                initial="hidden"
+                whileInView="visible"
+                className="text-3xl md:text-4xl lg:text-5xl font-light mb-6"
+              >
+                Our Mission
+              </motion.h2>
+              <p className="leading-relaxed font-light text-base md:text-lg">
+                Aggie&nbsp;Nexus exists to create a central hub of innovation by
+                connecting entrepreneurs, builders, and investors into a unified
+                ecosystem. Our mission is to accelerate technology
+                commercialization and foster transformative collaboration—rooted
+                in Texas&nbsp;A&amp;M University and its affiliated network.
+              </p>
+            </div>
+          </div>
+        </motion.section>
 
         {/* Footer */}
         <div className="container py-8 text-center dark:text-white/60 text-muted-foreground border-t">

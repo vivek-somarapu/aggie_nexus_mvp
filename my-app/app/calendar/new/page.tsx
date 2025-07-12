@@ -1,14 +1,31 @@
 "use client";
 
-import React, { useState } from "react";
+import type React from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/lib";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { SquarePoster } from "@/components/ui/SquarePoster";
 import { formatISO, set } from "date-fns";
-import { useCallback } from "react";
-import { Upload, X } from "lucide-react";
+import { FileUpload } from "@/components/file-upload";
+import DateTimePicker from "@/components/DateTimePicker";
+import Image from "next/image";
+import { motion } from "framer-motion";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -23,13 +40,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import { CalendarIcon, LinkIcon, MapPin } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
+import { LinkIcon, MapPin, ChevronLeft, Loader2 } from "lucide-react";
+import { pageVariants, calendarVariants, categories } from "@/lib/constants";
 import {
   Select,
   SelectTrigger,
@@ -39,491 +51,638 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { eventService } from "@/lib/services/event-service";
-import { categories } from "@/lib/constants";
 
-const newEventSchema = z
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { format } from "date-fns";
+
+/* ------------------------------------------------------------------
+  Validation Schema
+-------------------------------------------------------------------*/
+/* ------------------------------------------------------------------
+  Validation Schema  ➜  drop-in replacement
+-------------------------------------------------------------------*/
+const schema = z
   .object({
     title: z.string().min(1, "Title is required"),
     event_type: z.string().min(1, "Event type is required"),
+
+    /* all three of these fields are needed to build the full Date-time */
     date: z.date({ required_error: "Date is required" }),
     start_time: z.string().min(1, "Start time is required"),
     end_time: z.string().min(1, "End time is required"),
+
     is_online: z.boolean(),
-
-    // for in-person:
     location: z.string().optional(),
+    event_link: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.string().url().optional()
+    ),
 
-    // for online: trim, drop empty, then validate URL
-    event_link: z.preprocess((val) => {
-      if (typeof val === "string") {
-        const t = val.trim();
-        return t === "" ? undefined : t;
-      }
-      return val;
-    }, z.string().url("Must be a valid URL").optional()),
-
-    description: z.string().max(500).optional(),
+    description: z.string().max(10_000).optional(),
   })
-  // (re-add your refine here if you need to enforce one vs the other)
+  /* -------------------------------------------------------------- */
+  /*  ❶ address / link requirement (your old rule)                  */
+  /* -------------------------------------------------------------- */
   .refine(
-    (data) =>
-      data.is_online ? Boolean(data.event_link) : Boolean(data.location),
+    (d) => (d.is_online ? !!d.event_link : !!d.location),
+    (d) => ({
+      message: d.is_online
+        ? "Link required for online events"
+        : "Address required",
+      path: d.is_online ? ["event_link"] : ["location"],
+    })
+  )
+
+  /* -------------------------------------------------------------- */
+  /*  ❷ NO events in the past ↴                                     */
+  /* -------------------------------------------------------------- */
+  .refine(
+    (d) => {
+      /* turn date + start_time into one JS Date                     */
+      const [sh, sm] = d.start_time.split(":").map(Number);
+      const start = new Date(
+        d.date.getFullYear(),
+        d.date.getMonth(),
+        d.date.getDate(),
+        sh,
+        sm,
+        0,
+        0
+      );
+      return start >= new Date();
+    },
     {
-      message: (data) =>
-        data.is_online
-          ? "A valid event link is required for online events"
-          : "A location is required for in-person events",
-      path: [(data) => (data.is_online ? "event_link" : "location")],
+      message: "Cannot schedule an event in the past",
+      path: ["date"], // error shows under the Date field (red text)
+    }
+  )
+  /* -------------------------------------------------------------- */
+  /*  ❸ End time must be after start time ↴                         */
+  /* -------------------------------------------------------------- */
+  .refine(
+    (d) => {
+      const [sh, sm] = d.start_time.split(":").map(Number);
+      const [eh, em] = d.end_time.split(":").map(Number);
+      const start = sh * 60 + sm;
+      const end = eh * 60 + em;
+      return end > start;
+    },
+    {
+      message: "End time must be after start time",
+      path: ["end_time"],
     }
   );
 
-type NewEventFormValues = z.infer<typeof newEventSchema>;
+type FormValues = z.infer<typeof schema>;
 
+/* ------------------------------------------------------------------
+  Constants
+-------------------------------------------------------------------*/
 export const eventTypes = Object.entries(categories).map(([value, label]) => ({
   value,
   label,
 }));
-// Time options (30 min intervals)
+
 const timeOptions: string[] = [];
-for (let hour = 0; hour < 24; hour++) {
-  for (let minute = 0; minute < 60; minute += 30) {
-    const formattedHour = hour.toString().padStart(2, "0");
-    const formattedMinute = minute.toString().padStart(2, "0");
-    timeOptions.push(`${formattedHour}:${formattedMinute}`);
+for (let h = 8; h <= 20; h++) {
+  for (let m = 0; m < 60; m += 30) {
+    timeOptions.push(
+      `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+    );
   }
 }
 
-// Drag and drop photo component
-function PhotoUpload({
-  onPhotoChange,
-}: {
-  onPhotoChange: (file: File | null) => void;
-}) {
-  const [dragActive, setDragActive] = useState(false);
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDragActive(false);
-
-      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        const file = e.dataTransfer.files[0];
-        if (file.type.startsWith("image/")) {
-          setPhoto(file);
-          onPhotoChange(file);
-
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            setPreview(e.target?.result as string);
-          };
-          reader.readAsDataURL(file);
-        }
-      }
-    },
-    [onPhotoChange]
-  );
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.type.startsWith("image/")) {
-        setPhoto(file);
-        onPhotoChange(file);
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setPreview(e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  };
-
-  const removePhoto = () => {
-    setPhoto(null);
-    setPreview(null);
-    onPhotoChange(null);
-  };
-
-  return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Event Photo</label>
-      {preview ? (
-        <div className="relative">
-          <img
-            src={preview || "/placeholder.svg"}
-            alt="Event preview"
-            className="w-full h-48 object-cover rounded-lg border"
-          />
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            className="absolute top-2 right-2"
-            onClick={removePhoto}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : (
-        <div
-          className={cn(
-            "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
-            dragActive
-              ? "border-primary bg-primary/5"
-              : "border-muted-foreground/25 hover:border-primary/50"
-          )}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => document.getElementById("photo-input")?.click()}
-        >
-          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground mb-1">
-            Drag and drop an image here, or click to select
-          </p>
-          <p className="text-xs text-muted-foreground">
-            PNG, JPG, GIF up to 10MB
-          </p>
-          <input
-            id="photo-input"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileInput}
-          />
-        </div>
-      )}
-    </div>
-  );
+/* ------------------------------------------------------------------
+  Helper to POST to the /api/upload/event-posters route
+-------------------------------------------------------------------*/
+async function uploadPoster(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/upload/event-posters", {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    throw new Error("Upload failed");
+  }
+  const { publicUrl } = (await res.json()) as { publicUrl: string };
+  return publicUrl;
 }
 
+/* ------------------------------------------------------------------
+  Main Page Component
+-------------------------------------------------------------------*/
 export default function NewEventPage() {
   const router = useRouter();
   const { profile } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [eventPhoto, setEventPhoto] = useState<File | null>(null);
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
-  const form = useForm<NewEventFormValues>({
-    resolver: zodResolver(newEventSchema),
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
       date: new Date(),
-      title: "",
-      event_type: "",
-      start_time: "",
-      end_time: "",
-      location: "",
-      event_link: "",
-      description: "",
       is_online: false,
-    },
+    } as any,
   });
 
-  const watchIsOnline = form.watch("is_online");
-  const descriptionWords = form
+  const isOnline = form.watch("is_online");
+  const descWords = form
     .watch("description", "")
     .trim()
     .split(/\s+/)
     .filter(Boolean).length;
 
-  const onSubmit = async (data: NewEventFormValues) => {
-    setIsSubmitting(true);
+  async function onSubmit(data: FormValues) {
+    setSubmitting(true);
     try {
-      // build ISO timestamps
-      const { date, start_time, end_time, is_online, ...rest } = data;
-      const [startHour, startMin] = start_time.split(":").map(Number);
-      const [endHour, endMin] = end_time.split(":").map(Number);
-      const startDateObj = set(date, {
-        hours: startHour,
-        minutes: startMin,
-        seconds: 0,
-      });
-      const endDateObj = set(date, {
-        hours: endHour,
-        minutes: endMin,
-        seconds: 0,
-      });
-      const startISO = formatISO(startDateObj);
-      const endISO = formatISO(endDateObj);
+      // build start/end ISO strings
+      const [sh, sm] = data.start_time.split(":").map(Number);
+      const [eh, em] = data.end_time.split(":").map(Number);
+      const startISO = formatISO(
+        set(data.date, { hours: sh, minutes: sm, seconds: 0 })
+      );
+      const endISO = formatISO(
+        set(data.date, { hours: eh, minutes: em, seconds: 0 })
+      );
 
+      // optional poster upload
       let poster_url: string | null = null;
-      if (eventPhoto) {
-        poster_url = await eventService.uploadPhoto(eventPhoto);
+      if (posterFile) {
+        poster_url = await uploadPoster(posterFile);
       }
 
-      // assemble payload
-      const payload = {
-        title: rest.title,
-        description: rest.description || null,
+      await eventService.createEvent({
+        title: data.title,
+        description: data.description || null,
         start_time: startISO,
         end_time: endISO,
-        event_type: rest.event_type,
-        location: !is_online && rest.location !== "" ? rest.location : null,
-        event_link:
-          is_online && rest.event_link !== "" ? rest.event_link : null,
+        event_type: data.event_type as any,
+        location: data.is_online
+          ? (data.event_link as string)
+          : (data.location as string),
         poster_url,
-        created_by: profile!.id,
-      };
-
-      // call the REST API to create event
-      await eventService.createEvent(payload);
+      } as any);
 
       router.push("/calendar");
-    } catch (error: any) {
-      console.error("Error creating event:", error);
-      form.setError("title", {
-        message: error.message || "Failed to create event",
-      });
+    } catch (err) {
+      console.error(err);
+      form.setError("title", { message: "Failed to create event" });
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
-  };
+  }
+  // 🔗 preview URL for the selected poster (or null)
+  const posterPreview = useMemo(
+    () => (posterFile ? URL.createObjectURL(posterFile) : null),
+    [posterFile]
+  );
 
+  // 🧹 revoke the object URL when it’s no longer needed
+  useEffect(() => {
+    return () => {
+      if (posterPreview) URL.revokeObjectURL(posterPreview);
+    };
+  }, [posterPreview]);
+
+  /* -------------------------------- UI -------------------------------- */
   return (
-    <Card>
-      <CardContent>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit, (errors) => {
-              console.log("🚨 validation errors:", errors);
-              alert(
-                "Form has validation errors – check the console for details."
-              );
-            })}
-            className="space-y-6"
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="p-2"
+    >
+      <div className="max-w-5xl mx-auto">
+        {/* heading row */}
+        <div className="mb-0 md:mb-4 flex items-center gap-3">
+          {/* BACK → Calendar */}
+          <Button
+            type="button"
+            onClick={() => router.push("/calendar")}
+            className="h-9 px-3 rounded-md bg-muted/90 hover:bg-muted text-foreground font-medium shadow-sm"
           >
-            {/* Title & Type */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Event Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter event title" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="md:col-span-1">
-                <FormField
-                  control={form.control}
-                  name="event_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Event Type</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select event type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {eventTypes.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            <span className="hidden xs:inline">Back</span>
+          </Button>
 
-            {/* Date & Times */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
+          {/* page title */}
+          <h1 className="text-2xl font-bold text-foreground">
+            New Event Request
+          </h1>
+        </div>
+        <Alert className="mb-4 bg-blue-50" variant="info">
+          <AlertDescription className="text-sm">
+            Please submit your event at least{" "}
+            <strong>1 week before the event date</strong> to allow{" "}
+            <strong>1–2 days</strong> for Nexus Support to review.
+          </AlertDescription>
+        </Alert>
+
+        <Card
+          className="border-0 shadow-none md:border md:shadow-lg
+            bg-card/80  sm:dark:bg-slate-900/80
+            md:border-slate-200 dark:md:border-slate-700
+            backdrop-blur-sm"
+        >
+          <CardContent className="p-0 md:px-6 md:py-3 space-y-4">
+            <Form {...form}>
+              <motion.form
+                variants={calendarVariants}
+                initial="hidden"
+                animate="visible"
+                className="space-y-4"
+                onSubmit={form.handleSubmit(onSubmit)}
+              >
+                {/* ── Title + Date/Time (responsive row) ────────────────────────── */}
+                <div className="grid gap-4 lg:grid-cols-4">
+                  {/* Event Title & Category */}
+                  <div className="lg:col-span-2">
+                    <FormField
+                      name="title"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Event Title
+                          </FormLabel>
+                          <div className="relative">
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter your event title..."
+                                className="h-10 pr-36 dark:bg-slate-900/80 dark:text-slate-200"
+                              />
+                            </FormControl>
+
+                            {/* Category dropdown in the input’s right corner */}
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-1">
+                              <FormField
+                                name="event_type"
+                                control={form.control}
+                                render={({ field: categoryField }) => (
+                                  <Select
+                                    value={categoryField.value}
+                                    onValueChange={categoryField.onChange}
+                                  >
+                                    <SelectTrigger className="h-8 w-36 bg-muted/50 border-0 text-xs">
+                                      <SelectValue placeholder="Category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {eventTypes.map((t) => (
+                                        <SelectItem
+                                          key={t.value}
+                                          value={t.value}
+                                        >
+                                          {t.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Date + Time range picker */}
+                  <div className="lg:col-span-2">
+                    <DateTimePicker />
+                  </div>
+                </div>
+
+                {/* Location Section - Switch and Input on Same Line */}
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Event Location
+                  </FormLabel>
+                  <div className="flex items-center gap-4">
+                    <FormField
+                      name="is_online"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center gap-2">
+                            {field.value ? (
+                              <LinkIcon className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <MapPin className="h-4 w-4 text-green-600" />
+                            )}
+                            <span className="font-medium text-sm whitespace-nowrap text-slate-700 dark:text-slate-200">
+                              {field.value ? "Online" : "In-Person"}
+                            </span>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex-1">
+                      {isOnline ? (
+                        <FormField
+                          name="event_link"
+                          control={form.control}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  placeholder="https://zoom.us/j/..."
+                                  {...field}
+                                  className="h-10 dark:bg-slate-900/80 dark:text-slate-200"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <FormField
+                          name="location"
+                          control={form.control}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  placeholder="123 Main St, City, State"
+                                  {...field}
+                                  className="h-10 dark:bg-slate-900/80 dark:text-slate-200"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description and Poster - Stacked Vertically */}
+                <div className="space-y-4">
+                  <FormField
+                    name="description"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Description
+                        </FormLabel>
                         <FormControl>
-                          <Button
-                            variant="outline"
+                          <Textarea
+                            className="min-h-[80px] resize-none"
+                            {...field}
+                            placeholder="Tell people about your event..."
+                          />
+                        </FormControl>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground">
+                            Optional
+                          </span>
+                          <span
                             className={cn(
-                              "w-full text-left font-normal",
-                              !field.value && "text-muted-foreground"
+                              "font-medium",
+                              descWords > 350
+                                ? "text-destructive"
+                                : "text-muted-foreground dark:text-slate-400"
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value
-                              ? field.value.toLocaleDateString()
-                              : "Pick a date"}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                {["start_time", "end_time"].map((name) => (
-                  <FormField
-                    key={name}
-                    control={form.control}
-                    name={name as "start_time" | "end_time"}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {name === "start_time" ? "Start Time" : "End Time"}
-                        </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
+                            {descWords}/350 words
+                          </span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FileUpload onChange={setPosterFile} />
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 h-10 dark:bg-slate-800 dark:border-slate-600"
+                    onClick={() => setShowPreview(true)}
+                  >
+                    Preview Event Page
+                  </Button>
+                  <AlertDialog>
+                    {/* primary button just OPENS the dialog */}
+                    <AlertDialogTrigger asChild onClick={() => form.trigger()}>
+                      <Button
+                        type="button" // no immediate submit
+                        className="flex-1 h-10 font-medium bg-gradient-to-r
+                          from-primary to-primary/90
+                          hover:from-primary/90 hover:to-primary"
+                        disabled={submitting}
+                      >
+                        {submitting ? (
+                          <>
+                            <div className="animate-spin h-3 w-3 mr-2 border-b-2 border-white rounded-full" />
+                            Creating…
+                          </>
+                        ) : (
+                          "Create Event"
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+
+                    {/* confirmation dialog */}
+                    <AlertDialogContent className="dark:bg-slate-800 dark:border-slate-700">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Heads-up!</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Once you create the event you{" "}
+                          <strong>won’t be able to edit it.</strong>
+                          <br />
+                          Double-check all details!
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="w-full sm:w-auto">
+                          Go back &amp; review
+                        </AlertDialogCancel>
+
+                        {/* final “Send anyway” — calls the SAME RHF submit */}
+                        <AlertDialogAction
+                          className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                          onClick={() =>
+                            form.handleSubmit(async (data) => {
+                              await onSubmit(data); // your existing submit fn
+                              toast.success(
+                                "Event submitted successfully 🎉 Wait for updates on email!"
+                              );
+                            })()
+                          }
                         >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={
-                                  name === "start_time" ? "Start" : "End"
-                                }
-                              />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {timeOptions.map((time) => (
-                              <SelectItem key={time} value={time}>
-                                {new Date(
-                                  `2000-01-01T${time}`
-                                ).toLocaleTimeString([], {
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                })}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Online vs In-Person */}
-            <div className="grid grid-cols-12 gap-4 items-center">
-              <div className="col-span-12 md:col-span-4">
-                <FormField
-                  control={form.control}
-                  name="is_online"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        {field.value ? <LinkIcon /> : <MapPin />}
-                        {field.value ? "Online Event" : "In-Person Event"}
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="col-span-12 md:col-span-8">
-                {watchIsOnline ? (
-                  <FormField
-                    control={form.control}
-                    name="event_link"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input placeholder="https://zoom.us/..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input placeholder="Enter event address" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Optional description"
-                      {...field}
-                      className="min-h-[100px]"
-                    />
-                  </FormControl>
-                  <div className="flex justify-end text-xs text-muted-foreground">
-                    {descriptionWords}/350 words
-                  </div>
-                  <FormMessage />
-                </FormItem>
+                          Double-check&nbsp;and&nbsp;Send&nbsp;anyway
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </motion.form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+      {/* Event Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="w-full max-h-[100dvh] p-0 overflow-hidden scrollbar-hidden overflow-y-auto sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:text-slate-1500 dark:bg-slate-800/70">
+          <div className="py-5 px-4">
+            <div className="space-y-6">
+              {/* Poster preview (only if a file was chosen) */}
+              {posterPreview && (
+                <SquarePoster src={posterPreview} alt={`Preview poster`} />
               )}
-            />
 
-            {/* Photo Upload */}
-            <PhotoUpload onPhotoChange={setEventPhoto} />
+              {/* Event Information */}
+              <div className="space-y-2">
+                <div className="pb-2">
+                  <DialogTitle className="text-2xl font-bold">
+                    {form.watch("title") || "Event Title"}
+                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    {/* Avatar */}
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden border bg-muted border-border flex items-center justify-center transition-transform duration-200">
+                      {!profile ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      ) : profile.avatar ? (
+                        <Image
+                          src={profile.avatar}
+                          alt={profile.full_name ?? "Avatar"}
+                          fill
+                          className="object-cover"
+                          sizes="64px"
+                          priority
+                        />
+                      ) : (
+                        <span className="text-xs font-medium text-[#500000]">
+                          {profile.full_name?.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
 
-            <button
-              type="submit"
-              className="w-full bg-blue-500 text-white py-2"
-            >
-              {isSubmitting ? "Submitting…" : "Submit Event Request"}
-            </button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+                    {/* Host text */}
+                    <p className="text-sm font-semibold text-muted-foreground group-hover:underline group-hover:text-foreground transition-colors duration-200">
+                      Hosted by {profile?.full_name ?? "Unknown"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Date, Time & Location */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {/* Calendar Icon */}
+                    {form.watch("date") && (
+                      <>
+                        <div className="w-10 h-10 rounded-sm border bg-white text-center overflow-hidden shadow-sm shrink-0">
+                          <div className="bg-gray-100 text-[10px] font-medium text-gray-700 py-[3px] leading-none">
+                            {format(form.watch("date"), "MMM").toUpperCase()}
+                          </div>
+                          <div className="text-[15px] font-extrabold text-gray-900 leading-none pt-[3px]">
+                            {format(form.watch("date"), "d")}
+                          </div>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="text-sm">
+                          <p className="font-semibold text-[14px]">
+                            {format(form.watch("date"), "EEEE, MMMM d")}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {form.watch("start_time") &&
+                              form.watch("end_time") && (
+                                <>
+                                  {new Date(
+                                    `2000-01-01T${form.watch("start_time")}`
+                                  ).toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}{" "}
+                                  –{" "}
+                                  {new Date(
+                                    `2000-01-01T${form.watch("end_time")}`
+                                  ).toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
+                                </>
+                              )}
+                          </p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="w-px h-6 bg-border" />
+                      </>
+                    )}
+
+                    {/* Location Info */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-10 h-10 border rounded-md bg-gray-100 flex items-center justify-center">
+                        {isOnline ? (
+                          <LinkIcon className="h-5 w-5 text-blue-600" />
+                        ) : (
+                          <MapPin className="h-5 w-5 text-gray-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-[14px]">
+                          {isOnline
+                            ? "Online Event"
+                            : form.watch("location") || "Venue Address"}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {isOnline ? "Virtual Meeting" : "In-person Event"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview Notice */}
+              <Card className="border border-blue-200 bg-blue-50 p-4">
+                <div className="text-center text-sm text-blue-800">
+                  <h3 className="font-semibold text-base">Event Preview</h3>
+                  <p className="mt-1">
+                    This is how your event will appear to attendees
+                  </p>
+                </div>
+              </Card>
+
+              {/* About Event */}
+              {form.watch("description")?.trim() && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    About Event
+                  </h3>
+                  <Separator />
+                  <div className="rounded-md px-4 py-2">
+                    <p className="text-sm leading-relaxed whitespace-pre-line">
+                      {form.watch("description")}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
   );
 }

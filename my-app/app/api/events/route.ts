@@ -1,24 +1,8 @@
 // app/api/events/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getApprovedEvents,
-  getEventsByStatus,
-  createEvent,
-} from "@/lib/models/events";
+import { getEventsByStatus } from "@/lib/models/events";
 import { createClient } from "@/lib/supabase/server";
-
 import type { EventType } from "@/lib/services/event-service";
-
-const allowedTypes: readonly EventType[] = [
-  "workshop",
-  "info_session",
-  "networking",
-  "hackathon",
-  "deadline",
-  "meeting",
-  "other",
-  "personal",
-];
 
 export async function GET(request: NextRequest) {
   // 1) clean & validate the incoming query string

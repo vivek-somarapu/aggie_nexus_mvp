@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
   // Get the authorization code from the URL
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const type = requestUrl.searchParams.get('type')
   
   callbackLog("Auth callback initiated", { 
     hasCode: !!code, 
@@ -55,6 +56,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(
         new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, requestUrl.origin)
       )
+    }
+
+    if (type === 'signup' || type === 'invite') {
+      callbackLog('Email verification callback detected.');
+      const { data: { user }, error: userErr } = await supabase.auth.getUser()
+      
+      if (userErr) callbackError('Could not fetch user after verification', userErr)
+
+      if (user) {
+
+        const { data: existing, error: selErr } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', user.id)
+          .single()
+
+          if (selErr?.code === 'PGRST116' || !existing) {
+
+            callbackLog('No user row yet — inserting placeholder profile')
+            await supabase.from('users').insert({
+              id: user.id,
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'New User',
+              email: user.email,
+              industry: [],
+              skills: [],
+              contact: { email: user.email },
+              views: 0,
+              is_texas_am_affiliate: false,
+              deleted: false,
+              last_login_at: new Date().toISOString(),
+              profile_setup_completed: false,
+              profile_setup_skipped: false
+
+            })
+          }
+        }
+      return NextResponse.redirect(new URL('/auth/verified', requestUrl.origin))
     }
 
     callbackLog("Code exchange successful, retrieving user session");
