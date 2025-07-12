@@ -33,7 +33,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 export default function ProfileSetupPage() {
-  const { profile, refreshProfile, isLoading: authLoading } = useAuth();
+  const { authUser, profile, refreshProfile, isLoading: authLoading } = useAuth();
+  const stillLoadingProfile = authLoading || (authUser && !profile);
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -309,7 +310,7 @@ export default function ProfileSetupPage() {
     }
   };
 
-  if (authLoading) {
+  if (stillLoadingProfile) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -318,7 +319,7 @@ export default function ProfileSetupPage() {
     );
   }
 
-  if (!profile) {
+  if (!authUser) {
     return (
       <div className="container py-8">
         <Alert className="mb-6">
@@ -379,7 +380,7 @@ export default function ProfileSetupPage() {
             <TagSelector
               label="Industries"
               options={industryOptions}
-              selected={profile.industry || []}
+              selected={profile?.industry || []}
               onChange={setSelectedIndustries}
             />
           </div>
@@ -388,7 +389,7 @@ export default function ProfileSetupPage() {
             <TagSelector
               label="Skills"
               options={skillOptions}
-              selected={profile.skills || []}
+              selected={profile?.skills || []}
               onChange={setSelectedSkills}
               maxTags={15}
             />
