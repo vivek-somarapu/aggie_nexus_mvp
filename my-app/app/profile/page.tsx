@@ -1363,7 +1363,7 @@ export default function ProfilePage() {
                                     variant="outline"
                                     asChild
                                   >
-                                    <Link href={`/projects/${project.id}`}>  {/* replace with events backend */}
+                                    <Link href={'/calendar'}>  {/* replace with events backend */}
                                       View Event {/* maybe the event card details can popup ? or link to calendar */}
                                     </Link>
                                   </Button>
@@ -1423,10 +1423,10 @@ export default function ProfilePage() {
                                   </motion.div>
                                   <div>
                                     <h3 className="font-semibold text-lg">
-                                      {user.full_name}
+                                      Event Title {/* replace with events backend */}
                                     </h3>
                                     <p className="text-sm text-muted-foreground line-clamp-2">
-                                      {user.bio}
+                                      Event Description {/* replace with events backend */}
                                     </p>
                                     <motion.div
                                       whileHover={{ scale: 1.05 }}
@@ -1438,7 +1438,7 @@ export default function ProfilePage() {
                                         className="mt-4"
                                         asChild
                                       >
-                                        <Link href={`/users/${user.id}`}> {/* replace with events backend */}
+                                        <Link href={'/calendar'}> {/* replace with events backend */}
                                           View Event {/* maybe the event card details can popup ? or link to calendar */}
                                         </Link>
                                       </Button>
