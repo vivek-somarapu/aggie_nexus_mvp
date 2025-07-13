@@ -25,6 +25,7 @@ import {
   Users,
   FileText,
   MessageSquare,
+  Bookmark,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
@@ -292,18 +293,12 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/profile/settings" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Settings
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
                     <Link
                       href="/profile?tab=inquiries"
                       className="cursor-pointer flex items-center justify-between"
                     >
                       <div className="flex items-center">
-                        <MessageSquare className="mr-2 h-4 w-4" />
+                        <MessageSquare className="mr-4 h-4 w-4" />
                         Project Inquiries
                       </div>
                       {pendingInquiries > 0 && (
@@ -316,6 +311,25 @@ export default function Navbar() {
                       )}
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile?tab=bookmarks" className="cursor-pointer">
+                      <Bookmark className="mr-2 h-4 w-4" />
+                      Bookmarks
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile?tab=events" className="cursor-pointer">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Events
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile/settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+
                   {isManager && (
                     <>
                       <DropdownMenuSeparator />

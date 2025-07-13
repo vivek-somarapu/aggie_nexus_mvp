@@ -275,21 +275,16 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
   };
 
   return (
-    <Card className="shadow-none border border-border/50 overflow-hidden md:shadow-md md:border-0">
-      {/* Gradient heading */}
-      <div className="relative -mt-7 h-50 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5">
-        <div className="absolute top-6 right-4">
-          {!showCompletionBanner && (
+    <Card className="shadow-none overflow-hidden border-0">
+      {/* {!showCompletionBanner && (
             <Button variant="secondary" size="sm" className="shadow-sm" asChild>
               <Link href={`/users/${user?.id}`}>View Profile</Link>
             </Button>
-          )}
-        </div>
-      </div>
+          )} */}
 
-      <CardContent className="px-6 -mt-16 relative">
+      <CardContent className="px-6 relative">
         <motion.div
-          className="flex flex-col sm:flex-row gap-6 mb-6"
+          className="flex flex-col gap-6"
           initial="hidden"
           animate="visible"
           variants={containerVariants}
@@ -306,8 +301,8 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
           {/* Info block */}
           <motion.div className="flex-1 space-y-4" variants={itemVariants}>
             {/* Name + edit button */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold tracking-tight">
+            <div className="flex items-center justify-center">
+              <h2 className="pl-13 text-2xl font-bold tracking-tight">
                 {user?.full_name || "Unnamed User"}
               </h2>
 
@@ -316,7 +311,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="hover:shadow-sm rounded-2xl transition-shadow"
+                    className="hover:shadow-sm ml-5 rounded-2xl transition-shadow"
                   >
                     <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </Button>
@@ -407,46 +402,17 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
 
             {/* Meta info */}
             <motion.div
-              className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+              className="flex flex-wrap justify-center gap-2 text-sm text-muted-foreground"
               variants={itemVariants}
             >
-              <div className="flex items-center">
-                <Eye className="h-4 w-4 mr-1" />
-                <span>0 profile views</span>
-              </div>
-
               {user?.is_texas_am_affiliate && (
                 <div className="flex items-center">
-                  <Separator orientation="vertical" className="h-4 mx-2" />
+                  <Separator orientation="vertical" className="h-4 hidden" />
                   <GraduationCap className="h-4 w-4 mr-1" />
                   <span>Texas A&M Affiliate</span>
                 </div>
               )}
-
-              {user?.is_texas_am_affiliate && user.graduation_year && (
-                <div className="flex items-center">
-                  <Separator orientation="vertical" className="h-4 mx-2" />
-                  <CalendarIcon className="h-4 w-4 mr-1" />
-                  <span>Class of {user.graduation_year}</span>
-                </div>
-              )}
             </motion.div>
-
-            {/* Industry tags */}
-            {user?.industry && user.industry.length > 0 && (
-              <motion.div
-                className="flex flex-wrap gap-2 mt-2"
-                variants={containerVariants}
-              >
-                {user.industry.map((tag) => (
-                  <motion.div key={tag} variants={itemVariants}>
-                    <Badge variant="secondary" className="px-2 py-1">
-                      {tag}
-                    </Badge>
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
           </motion.div>
         </motion.div>
       </CardContent>

@@ -2,7 +2,7 @@
 
 /* ────── React & Next ────── */
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -60,6 +60,7 @@ import {
   CalendarIcon,
   Filter,
   Loader2,
+  Mail,
   MessageSquare,
   PenLine,
   Plus,
@@ -72,6 +73,7 @@ import { toast } from "sonner";
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
+  
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
 
@@ -80,7 +82,10 @@ export default function ProfilePage() {
   const [bookmarksLoading, setBookmarksLoading] = useState(true);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [inquiriesLoading, setInquiriesLoading] = useState(true);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const router = useRouter();
 
   const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([]);
   const [bookmarkedUsers, setBookmarkedUsers] = useState<ProfileType[]>([]);
@@ -132,11 +137,19 @@ export default function ProfilePage() {
     additional_links: [] as { url: string; title: string }[],
   });
 
+  // update profile tab url
+  const onTabChange = (value: string) => {
+    setActiveTab(value)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', value)
+    router.replace(url.toString(), { scroll: false })
+  }
+
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (tabFromUrl) {
-      const validTabs = ["profile", "projects", "inquiries", "bookmarks"];
+      const validTabs = ["profile", "projects", "inquiries", "events", "bookmarks"];
       if (validTabs.includes(tabFromUrl)) {
         setActiveTab(tabFromUrl);
       }
@@ -195,6 +208,27 @@ export default function ProfilePage() {
     };
 
     fetchBookmarks();
+  }, [profile]);
+
+  // Load user's events
+   useEffect(() => {
+    const fetchEvents = async () => {
+      if (!profile) return;
+
+      try {
+        setEventsLoading(true);
+        // i think it'd go something like this
+        // const events = await rsvpService.get(profile.id); ???
+        // set(UserEvents(events)); 
+      } catch (err) {
+        console.error("Error fetching events:", err);
+        setError("Failed to load events. Please try again later.");
+      } finally {
+        setEventsLoading(false);
+      }
+    };
+
+    fetchEvents();
   }, [profile]);
 
   // Load user's projects
@@ -517,7 +551,7 @@ export default function ProfilePage() {
 
   return (
     <motion.div
-      className="space-y-6"
+      className="space-y-6 w-full"
       variants={pageVariants}
       initial="hidden"
       animate="visible"
@@ -541,7 +575,7 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="w-full mx-auto">
         {/* Profile Card */}
         <ProfileCard
           user={profile}
@@ -555,13 +589,32 @@ export default function ProfilePage() {
           showCompletionBanner={showCompletionBanner}
         />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="projects">My Projects</TabsTrigger>
-            <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
-            <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={onTabChange} className="w-full"> 
+          <div className="hidden sm:flex justify-center mb-4">
+            <TabsList className="flex flex-wrap gap-2">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="projects">My Projects</TabsTrigger>
+              <TabsTrigger value="inquiries">Project Inquiries</TabsTrigger>
+              <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Dropdown for mobile */}
+          <div className="sm:hidden mb-4">
+          <Select value={activeTab} onValueChange={onTabChange}>
+            <SelectTrigger className="w-full h-10 px-3 text-sm border rounded-lg">
+              <SelectValue placeholder="Select a section" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="profile">Profile</SelectItem>
+              <SelectItem value="projects">My Projects</SelectItem>
+              <SelectItem value="inquiries">Project Inquiries</SelectItem>
+              <SelectItem value="bookmarks">Bookmarks</SelectItem>
+              <SelectItem value="events">Events</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
           {/* Profile Tab */}
           <ProfileTab
@@ -1036,7 +1089,7 @@ export default function ProfilePage() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.1 }}
             >
-              <h2 className="text-xl font-semibold">My Bookmarks</h2>
+              <h2 className="text-xl font-semibold">Bookmarked Projects</h2>
             </motion.div>
 
             <AnimatePresence mode="wait">
@@ -1080,9 +1133,6 @@ export default function ProfilePage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
                     >
-                      <h3 className="text-lg font-semibold">
-                        Bookmarked Projects
-                      </h3>
                       <motion.div
                         className="grid gap-4 md:grid-cols-2"
                         variants={containerVariants}
@@ -1207,6 +1257,189 @@ export default function ProfilePage() {
                                       >
                                         <Link href={`/users/${user.id}`}>
                                           View Profile
+                                        </Link>
+                                      </Button>
+                                    </motion.div>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </>
+              )}
+            </AnimatePresence>
+          </TabsContent>
+
+          {/* Events Tab */} {/* right now am using bookmarks card for backend placeholders, that way i can see the ui */}
+          <TabsContent value="events" className="space-y-6">
+            <motion.div
+              className="flex justify-between items-center mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <h2 className="text-xl font-semibold">My Events</h2>
+            </motion.div>
+
+            <AnimatePresence mode="wait">
+              {eventsLoading ? (
+                <motion.div
+                  key="loading"
+                  className="flex justify-center items-center py-12"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <span className="ml-2">Loading your events...</span>
+                </motion.div>
+              ) : bookmarkedProjects.length === 0 && // replace with events backend
+                bookmarkedUsers.length === 0 ? ( // replace with events backend
+                <motion.div
+                  key="no-events"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Card>
+                    <CardContent className="py-10 flex flex-col items-center justify-center text-center">
+                      <h3 className="text-lg font-medium mb-2">
+                        No events yet
+                      </h3>
+                      <p className="text-muted-foreground">
+                        Explore upcoming events and join the ones that interest you!
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ) : (
+                <>
+                  {bookmarkedProjects.length > 0 && ( // replace with events backend
+                    <motion.div
+                      className="space-y-4"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <motion.div
+                        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        {bookmarkedProjects.map((project) => ( // replace with events backend
+                          <motion.div
+                            key={project.id} // replace with events backend ?
+                            variants={cardVariants}
+                            whileHover={{
+                              y: -5,
+                              transition: { duration: 0.2 },
+                            }}
+                          >
+                            <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
+                              <CardHeader>
+                                <CardTitle className="text-lg">
+                                  Event Title {/* replace with events backend */}
+                                </CardTitle>
+                                <div className="">Event Date</div>
+                              </CardHeader>
+                              <CardContent>
+                                <p className="text-sm text-muted-foreground line-clamp-3">
+                                  Event Details  {/* replace with events backend */}
+                                </p>
+                              </CardContent>
+                              <CardFooter className="border-t pt-3">
+                                <motion.div
+                                  whileHover={{ scale: 1.03 }}
+                                  whileTap={{ scale: 0.97 }}
+                                  className="w-full"
+                                >
+                                  <Button
+                                    className="w-full"
+                                    variant="outline"
+                                    asChild
+                                  >
+                                    <Link href={'/calendar'}>  {/* replace with events backend */}
+                                      View Event {/* maybe the event card details can popup ? or link to calendar */}
+                                    </Link>
+                                  </Button>
+                                </motion.div>
+                              </CardFooter>
+                            </Card>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    </motion.div>
+                  )}
+
+                  {bookmarkedUsers.length > 0 && ( // replace with events backend
+                    <motion.div
+                      className="space-y-4 mt-6"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      <h3 className="text-lg font-semibold">
+                        Events I'm Hosting
+                      </h3>
+                      <motion.div
+                        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        {bookmarkedUsers.map((user) => ( // replace with events backend
+                          <motion.div
+                            key={user.id}
+                            variants={cardVariants}
+                            whileHover={{
+                              y: -5,
+                              transition: { duration: 0.2 },
+                            }}
+                          >
+                            <Card className="shadow-sm hover:shadow-md transition-shadow">
+                              <CardContent className="pt-6">
+                                <div className="flex flex-col items-center text-center gap-4">
+                                  <motion.div
+                                    whileHover={{ scale: 1.05 }}
+                                    transition={{
+                                      type: "spring",
+                                      stiffness: 300,
+                                    }}
+                                  >
+                                    <Avatar className="h-16 w-16">
+                                      <AvatarImage
+                                        src={user.avatar || ""} // replace with events backend
+                                        alt={user.full_name} // replace with events backend
+                                      />
+                                      <AvatarFallback>
+                                        {user.full_name?.charAt(0)} {/* replace with events backend */}
+                                      </AvatarFallback> 
+                                    </Avatar>
+                                  </motion.div>
+                                  <div>
+                                    <h3 className="font-semibold text-lg">
+                                      Event Title {/* replace with events backend */}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground line-clamp-2">
+                                      Event Description {/* replace with events backend */}
+                                    </p>
+                                    <motion.div
+                                      whileHover={{ scale: 1.05 }}
+                                      whileTap={{ scale: 0.95 }}
+                                    >
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-4"
+                                        asChild
+                                      >
+                                        <Link href={'/calendar'}> {/* replace with events backend */}
+                                          View Event {/* maybe the event card details can popup ? or link to calendar */}
                                         </Link>
                                       </Button>
                                     </motion.div>

@@ -98,14 +98,14 @@ export function ProfileTab<T extends BaseFormFields>({
   const additionalLinks = formData.additional_links || [];
   /* ---------------------------- UI -------------------------*/
   return (
-    <TabsContent value="profile" className="space-y-6 mx-2">
+    <TabsContent value="profile" className="space-y-6">
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         {/* ---------- MAIN VIEW ---------- */}
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.div
               key="loading"
-              className="flex justify-center items-center py-12"
+              className="flex justify-center items-center py-1"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -120,9 +120,9 @@ export function ProfileTab<T extends BaseFormFields>({
               animate="visible"
               className="flex justify-center"
             >
-              <div className="w-full max-w-4xl">
+              <div className="w-full border rounded-xl p-6">
                 <motion.div
-                  className="grid md:grid-cols-3 gap-8 py-6"
+                  className="grid md:grid-cols-3 gap-8"
                   variants={containerVariants}
                   initial="hidden"
                   animate="visible"
@@ -151,6 +151,22 @@ export function ProfileTab<T extends BaseFormFields>({
                       </p>
                     </div>
 
+                    {/* Industry */}
+                    {user?.industry && user.industry.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-2 text-lg">Industry</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {user.industry.map((tag) => (
+                          <motion.div key={tag} variants={itemVariants}>
+                            <Badge variant="secondary" className="px-2 py-1">
+                              {tag}
+                            </Badge>
+                          </motion.div>
+                        ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Skills */}
                     {user?.skills && user.skills.length > 0 && (
                       <div>
@@ -178,7 +194,7 @@ export function ProfileTab<T extends BaseFormFields>({
                       <div className="space-y-3">
                         {user?.contact?.email && (
                           <div className="flex items-center gap-3">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <a
                               href={`mailto:${user.contact.email}`}
                               className="text-sm hover:underline text-primary"
