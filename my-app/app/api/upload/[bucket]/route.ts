@@ -1,80 +1,91 @@
 // app/api/upload/[bucket]/route.ts
 import { NextResponse } from "next/server";
 import { v4 as uuid } from "uuid";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createStorageClient } from "@supabase/supabase-js";
 import { withAuth } from "@/lib/auth-middleware";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
-/*───────────────────────────────────────────────────────────
-  POST /api/upload/[bucket]
-  Body: multipart/form-data   field "file"
-  Resp: { publicUrl: string }
-───────────────────────────────────────────────────────────*/
+export const runtime = "nodejs";
+
+const ALLOWED = ["avatars", "resumes", "project-images", "event-posters"];
+const storage = createStorageClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ bucket: string }> }
 ) {
-  return withAuth(request, async (userId, req) => {
+  return withAuth(request, async (_userId, req) => {
     try {
       const { bucket } = await params;
-      
-      // Validate bucket name
-      if (!["avatars", "resumes", "project-images"].includes(bucket)) {
+      if (!ALLOWED.includes(bucket)) {
         return NextResponse.json(
           { error: "Invalid bucket name" },
           { status: 400 }
         );
       }
 
-      const supabase = createClient();
-
-      // Parse multipart/form-data
       const form = await req.formData();
       const file = form.get("file") as File | null;
       if (!file) {
-        return NextResponse.json({ error: "No file provided" }, { status: 400 });
+        return NextResponse.json(
+          { error: "No file provided" },
+          { status: 400 }
+        );
       }
 
-      const ext = file.name.split(".").pop();
+      const ext = file.name.split(".").pop() || "";
       const filename = `${uuid()}.${ext}`;
+      const arrayBuffer = await file.arrayBuffer();
 
-      // Upload (acting as the authenticated user from cookies)
-      const { error } = await supabase.storage
+      // Upload to Supabase Storage
+      const { error: uploadError } = await storage.storage
         .from(bucket)
-        .upload(filename, Buffer.from(await file.arrayBuffer()), {
+        .upload(filename, arrayBuffer, {
           upsert: false,
           cacheControl: "3600",
           contentType: file.type,
         });
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      if (uploadError) {
+        console.error("❌ supabase.storage.upload error:", uploadError);
+        return NextResponse.json(
+          { error: uploadError.message },
+          { status: 500 }
+        );
       }
 
-      // Return the public URL
-      const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
-      return NextResponse.json({ publicUrl: data.publicUrl });
-    } catch (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // Get public URL
+      const { data: urlData, error: urlError } = storage.storage
+        .from(bucket)
+        .getPublicUrl(filename);
+
+      if (urlError) {
+        console.error("❌ getPublicUrl error:", urlError);
+        return NextResponse.json({ error: urlError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ publicUrl: urlData.publicUrl });
+    } catch (err) {
+      console.error("❌ upload handler threw:", err);
+      return NextResponse.json(
+        { error: (err as Error).message },
+        { status: 500 }
+      );
     }
   });
 }
 
-/*───────────────────────────────────────────────────────────
-  DELETE /api/upload/[bucket]
-  Body: JSON { url: "<Public URL previously returned>" }
-  Resp: { ok: true }
-───────────────────────────────────────────────────────────*/
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ bucket: string }> }
 ) {
-  return withAuth(request, async (userId, req) => {
+  return withAuth(request, async (_userId, req) => {
     try {
       const { bucket } = await params;
       const { url } = (await req.json()) as { url?: string };
-      const supabase = createClient();
-
       if (!url) {
         return NextResponse.json({ error: "No url supplied" }, { status: 400 });
       }
@@ -86,14 +97,25 @@ export async function DELETE(
       }
       const filePath = parts[1];
 
-      const { error } = await supabase.storage.from(bucket).remove([filePath]);
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      const { error: removeError } = await storage.storage
+        .from(bucket)
+        .remove([filePath]);
+
+      if (removeError) {
+        console.error("❌ supabase.storage.remove error:", removeError);
+        return NextResponse.json(
+          { error: removeError.message },
+          { status: 500 }
+        );
       }
 
       return NextResponse.json({ ok: true });
-    } catch (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (err) {
+      console.error("❌ delete handler threw:", err);
+      return NextResponse.json(
+        { error: (err as Error).message },
+        { status: 500 }
+      );
     }
   });
 }
