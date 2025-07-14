@@ -98,7 +98,8 @@ export default function ProfilePage() {
 
   const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([]);
   const [bookmarkedUsers, setBookmarkedUsers] = useState<ProfileType[]>([]);
-  const [userRSVP, setUserRSVP] = useState<Event[]>([]);
+  const [userRSVP, setUserRSVP] = useState<Event[]>([]); // events user RSVP to
+  const [userEvents, setUserEvents] = useState<Event[]>([]); // events user is hosting
   const [userProjects, setUserProjects] = useState<Project[]>([]);
   const [receivedInquiries, setReceivedInquiries] = useState<ProjectInquiry[]>(
     []
@@ -1299,7 +1300,7 @@ export default function ProfilePage() {
             </AnimatePresence>
           </TabsContent>
 
-          {/* Events Tab */} {/* right now am using bookmarks card for backend placeholders, that way i can see the ui */}
+          {/* Events Tab for */}
           <TabsContent value="events" className="space-y-6">
             <motion.div
               className="flex justify-between items-center mb-4"
@@ -1307,9 +1308,21 @@ export default function ProfilePage() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.1 }}
             >
-              <h2 className="text-xl font-semibold">My Events</h2>
+              <h2 className="text-xl font-semibold">Upcoming Events</h2>
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <Button asChild>
+                  <Link href="/calendar/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Event
+                  </Link>
+                </Button>
+              </motion.div>
             </motion.div>
 
+            {/* Events you've RSVP to */}
             <AnimatePresence mode="wait">
               {RSVPLoading ? (
                 <motion.div
@@ -1322,8 +1335,8 @@ export default function ProfilePage() {
                   <Loader2 className="h-8 w-8 text-primary animate-spin" />
                   <span className="ml-2">Loading your events...</span>
                 </motion.div>
-              ) : bookmarkedProjects.length === 0 && // replace with events backend
-                bookmarkedUsers.length === 0 ? ( // replace with events backend
+              ) : userRSVP.length === 0 && 
+                userRSVP.length === 0 ? ( 
                 <motion.div
                   key="no-events"
                   initial={{ opacity: 0 }}
@@ -1343,7 +1356,7 @@ export default function ProfilePage() {
                 </motion.div>
               ) : (
                 <>
-                  {userRSVP.length > 0 && ( // replace with events backend
+                  {userRSVP.length > 0 && ( 
                     <motion.div
                       className="space-y-4"
                       initial={{ opacity: 0, y: 20 }}
@@ -1359,7 +1372,7 @@ export default function ProfilePage() {
                         {userRSVP.map((rsvp) => {
                           return (
                             <motion.div
-                              key={rsvp.id} // replace with events backend ?
+                              key={rsvp.id} 
                               variants={cardVariants}
                               whileHover={{
                                 y: -5,
@@ -1369,7 +1382,7 @@ export default function ProfilePage() {
                               <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
                                 <CardHeader>
                                   <CardTitle className="text-lg">
-                                    {rsvp.title} {/* replace with events backend */}
+                                    {rsvp.title} 
                                   </CardTitle>
                                   <div className="">
                                     {format(rsvp.start_time, "h:mm a")} -{" "}
@@ -1379,7 +1392,7 @@ export default function ProfilePage() {
                                 </CardHeader>
                                 <CardContent>
                                   <p className="text-sm text-muted-foreground line-clamp-3">
-                                    {rsvp.description}  {/* replace with events backend */}
+                                    {rsvp.description}  
                                   </p>
                                 </CardContent>
                                 <CardFooter className="border-t pt-3">
@@ -1393,7 +1406,7 @@ export default function ProfilePage() {
                                       variant="outline"
                                       onClick={() => handleEventClick(rsvp)}
                                     >
-                                        View event {/* maybe the event card details can popup ? or link to calendar */}
+                                        View Event 
 
                                     </Button>
                                   </motion.div>
@@ -1406,6 +1419,7 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
 
+                  {/* Events your hosting */}
                   {bookmarkedUsers.length > 0 && ( // replace with events backend
                     <motion.div
                       className="space-y-4 mt-6"
@@ -1414,7 +1428,7 @@ export default function ProfilePage() {
                       transition={{ delay: 0.3 }}
                     >
                       <h3 className="text-lg font-semibold">
-                        Events I'm Hosting
+                        My Events
                       </h3>
                       <motion.div
                         className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
@@ -1618,7 +1632,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Past Event / Message Only */}
-                <Card
+                {/* <Card
                   className="border border-primary/20 dark:border-primary/40 dark:text-slate-100
                     bg-primary/5 dark:bg-primary/10 p-4 space-y-4"
                 >
@@ -1636,9 +1650,9 @@ export default function ProfilePage() {
                       </p>
                     </div>
                   ) : (
-                    <></>
+                    <>hi</>
                   )}
-                </Card>
+                </Card> */}
 
                 {/* About Event */}
                 {selectedEvent.description?.trim() && (
