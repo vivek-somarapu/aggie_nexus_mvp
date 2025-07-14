@@ -34,26 +34,4 @@ export const rsvpService = {
 
     return res.json();
   },
-
-  async getEventRSVPs(eventId: string): Promise<RSVPResponse[]> {
-    const res = await fetch(`/api/rsvps?eventId=${eventId}`);
-
-    if (!res.ok) {
-      const { error } = await res.json();
-      throw new Error(error ?? "Failed to fetch RSVPs for event");
-    }
-
-    return res.json();
-  }, 
-
-  async getUserRSVPs(userId: string) : Promise<RSVPResponse[]> {
-    const res = await fetch(`/api/rsvps?userId=${userId}`);
-
-    if (!res.ok) {
-      const { error } = await res.json();
-      throw new Error(error ?? "Failed to fetch RSVPs");
-    }
-
-    return res.json();
-  }
 };
