@@ -2,6 +2,7 @@
 
 /* ────── React & Next ────── */
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -92,6 +93,7 @@ export default function ProfilePage() {
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [inquiriesLoading, setInquiriesLoading] = useState(true);
   const [RSVPLoading, setRSVPLoading] = useState(true);
+  const [userEventLoading, setUserEventLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const router = useRouter();
@@ -107,6 +109,9 @@ export default function ProfilePage() {
   const [sentInquiries, setSentInquiries] = useState<ProjectInquiry[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  // for event dialogs
+  const startTime = selectedEvent?.start_time ?? selectedEvent?.start;
+  const endTime = selectedEvent?.end_time ?? selectedEvent?.end;
 
   const [error, setError] = useState<string | null>(null);
   const [showCompletionBanner, setShowCompletionBanner] = useState(false);
@@ -213,50 +218,6 @@ export default function ProfilePage() {
     setIsLoading(false);
   }, [profile]);
 
-  // Load bookmarks
-  useEffect(() => {
-    const fetchBookmarks = async () => {
-      if (!profile) return;
-
-      try {
-        setBookmarksLoading(true);
-        const bookmarks = await bookmarkService.getAllBookmarks(profile.id);
-        setBookmarkedProjects(bookmarks.projects);
-        setBookmarkedUsers(bookmarks.users as unknown as Profile[]);
-      } catch (err) {
-        console.error("Error fetching bookmarks:", err);
-        setError("Failed to load bookmarks. Please try again later.");
-      } finally {
-        setBookmarksLoading(false);
-      }
-    };
-
-    fetchBookmarks();
-  }, [profile]);
-
-  // Load user's rsvps
-   useEffect(() => {
-    const fetchRSVP = async () => {
-      if (!profile) return;
-
-      try {
-        setRSVPLoading(true);
-        const rsvps = await rsvpService.getUserRSVPs(profile.id);
-        const events = await Promise.all(
-          rsvps.map((rsvp) => eventService.getEvent(rsvp.eventId))
-        );
-        setUserRSVP(events);
-      } catch (err) {
-        console.error("Error fetching RSVPs:", err);
-        setError("Failed to load RSVPs. Please try again later.");
-      } finally {
-        setRSVPLoading(false);
-      }
-    };
-
-    fetchRSVP();
-  }, [profile]);
-
   // Load user's projects
   useEffect(() => {
     const fetchUserProjects = async () => {
@@ -333,6 +294,79 @@ export default function ProfilePage() {
     receivedInquiries,
     sentInquiries,
   ]);
+
+    // Load bookmarks
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      if (!profile) return;
+
+      try {
+        setBookmarksLoading(true);
+        const bookmarks = await bookmarkService.getAllBookmarks(profile.id);
+        setBookmarkedProjects(bookmarks.projects);
+        setBookmarkedUsers(bookmarks.users as unknown as Profile[]);
+      } catch (err) {
+        console.error("Error fetching bookmarks:", err);
+        setError("Failed to load bookmarks. Please try again later.");
+      } finally {
+        setBookmarksLoading(false);
+      }
+    };
+
+    fetchBookmarks();
+  }, [profile]);
+
+  // Load user's rsvps
+  useEffect(() => {
+    const fetchRSVP = async () => {
+      if (!profile) return;
+
+      try {
+        setRSVPLoading(true);
+        const rsvps = await rsvpService.getUserRSVPs(profile.id);
+        const events = await Promise.all(
+          rsvps.map((rsvp) => eventService.getEvent(rsvp.eventId))
+        );
+        const validEvents = events
+          .filter(Boolean)
+          .filter(event => new Date(event.end_time) > new Date());
+        validEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+        setUserRSVP(validEvents);
+      } catch (err) {
+        console.error("Error fetching RSVPs:", err);
+        setError("Failed to load RSVPs. Please try again later.");
+      } finally {
+        setRSVPLoading(false);
+      }
+    };
+
+    fetchRSVP();
+  }, [profile]);
+
+  // Load user's events
+  useEffect(() => {
+    const fetchUserEvents = async () => {
+      if (!profile) return;
+
+      try {
+        setUserEventLoading(true);
+        const events = await eventService.getEventsByCreator(profile.id);
+        const validEvents = events
+          .filter(Boolean)
+          .filter(event => new Date(event.end) > new Date());
+        validEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        console.log("Fetched user events:", events);
+        setUserEvents(validEvents);
+      } catch (err) {
+        console.error("Error fetching user events:", err);
+        setError("Failed to load user events. Please try again later.");
+      } finally {
+        setUserEventLoading(false);
+      }
+    };
+
+    fetchUserEvents();
+  }, [profile]);
 
   const handleDeleteInquiry = async (inquiryId: string) => {
     if (!profile) return;
@@ -1381,7 +1415,7 @@ export default function ProfilePage() {
                             >
                               <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
                                 <CardHeader>
-                                  <CardTitle className="text-lg">
+                                  <CardTitle className="text-lg line-clamp-1">
                                     {rsvp.title} 
                                   </CardTitle>
                                   <div className="">
@@ -1406,8 +1440,7 @@ export default function ProfilePage() {
                                       variant="outline"
                                       onClick={() => handleEventClick(rsvp)}
                                     >
-                                        View Event 
-
+                                      View Event 
                                     </Button>
                                   </motion.div>
                                 </CardFooter>
@@ -1420,7 +1453,7 @@ export default function ProfilePage() {
                   )}
 
                   {/* Events your hosting */}
-                  {bookmarkedUsers.length > 0 && ( // replace with events backend
+                  {userEvents.length > 0 && ( // replace with events backend
                     <motion.div
                       className="space-y-4 mt-6"
                       initial={{ opacity: 0, y: 20 }}
@@ -1436,9 +1469,9 @@ export default function ProfilePage() {
                         initial="hidden"
                         animate="visible"
                       >
-                        {bookmarkedUsers.map((user) => ( // replace with events backend
+                        {userEvents.map((event) => ( // replace with events backend
                           <motion.div
-                            key={user.id}
+                            key={event.id}
                             variants={cardVariants}
                             whileHover={{
                               y: -5,
@@ -1446,8 +1479,8 @@ export default function ProfilePage() {
                             }}
                           >
                             <Card className="shadow-sm hover:shadow-md transition-shadow">
-                              <CardContent className="pt-6">
-                                <div className="flex flex-col items-center text-center gap-4">
+                              <CardContent>
+                                <div className="flex flex-col items-center text-center">
                                   <motion.div
                                     whileHover={{ scale: 1.05 }}
                                     transition={{
@@ -1455,36 +1488,29 @@ export default function ProfilePage() {
                                       stiffness: 300,
                                     }}
                                   >
-                                    <Avatar className="h-16 w-16">
-                                      <AvatarImage
-                                        src={user.avatar || ""} // replace with events backend
-                                        alt={user.full_name} // replace with events backend
-                                      />
-                                      <AvatarFallback>
-                                        {user.full_name?.charAt(0)} {/* replace with events backend */}
-                                      </AvatarFallback> 
-                                    </Avatar>
                                   </motion.div>
                                   <div>
-                                    <h3 className="font-semibold text-lg">
-                                      Event Title {/* replace with events backend */}
+                                    <h3 className="font-semibold text-lg line-clamp-1">
+                                      {event.title}
                                     </h3>
+                                    <div className="">
+                                      {format(event.start, "h:mm a")} -{" "}
+                                      {format(event.end, "h:mm a")} •{" "}
+                                      {format(event.end, "MMM d")}
+                                    </div>
                                     <p className="text-sm text-muted-foreground line-clamp-2">
-                                      Event Description {/* replace with events backend */}
+                                      {event.description}
                                     </p>
                                     <motion.div
                                       whileHover={{ scale: 1.05 }}
                                       whileTap={{ scale: 0.95 }}
                                     >
                                       <Button
+                                        className="w-full h-10"
                                         variant="outline"
-                                        size="sm"
-                                        className="mt-4"
-                                        asChild
+                                        onClick={() => handleEventClick(event)}
                                       >
-                                        <Link href={'/calendar'}> {/* replace with events backend */}
-                                          View Event {/* maybe the event card details can popup ? or link to calendar */}
-                                        </Link>
+                                        View Event 
                                       </Button>
                                     </motion.div>
                                   </div>
@@ -1503,7 +1529,7 @@ export default function ProfilePage() {
         </Tabs>
       </div>
 
-      {/* Event Information Dialog Without RSVP */}
+      {/* Event Information Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           className="w-full max-h-[100dvh] p-0 overflow-hidden overflow-y-auto scrollbar-hidden 
@@ -1546,9 +1572,16 @@ export default function ProfilePage() {
                           }}
                           className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
                         >
-                          {!selectedEvent.creator ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                          ) : selectedEvent.creator.avatar ? (
+                          {selectedEvent.created_by === profile.id && profile.avatar ? (
+                            <Image
+                              src={profile.avatar}
+                              alt={profile.full_name}
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                              priority
+                            />
+                          ) : selectedEvent.creator && selectedEvent.creator.avatar ? (
                             <Image
                               src={selectedEvent.creator.avatar}
                               alt={selectedEvent.creator.full_name}
@@ -1557,12 +1590,17 @@ export default function ProfilePage() {
                               sizes="64px"
                               priority
                             />
-                          ) : (
+                          ) : selectedEvent.creator ? (
                             <div className="flex items-center justify-center h-full w-full bg-muted">
                               <span className="text-xs font-medium text-[#500000]">
-                                {selectedEvent.creator.full_name
-                                  .charAt(0)
-                                  .toUpperCase()}
+                                {selectedEvent.creator.full_name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          ) : (
+                            // fallback for when creator is missing (should rarely happen)
+                            <div className="flex items-center justify-center h-full w-full bg-muted">
+                              <span className="text-xs font-medium text-[#500000]">
+                                {profile.full_name.charAt(0).toUpperCase()}
                               </span>
                             </div>
                           )}
@@ -1571,7 +1609,9 @@ export default function ProfilePage() {
                         {/* Host text */}
                         <p className="text-sm text-muted-foreground font-semibold group-hover:underline group-hover:text-foreground transition-colors duration-200">
                           Hosted by{" "}
-                          {selectedEvent.creator?.full_name ?? "Unknown"}
+                          {selectedEvent.created_by === profile.id
+                            ? "You"
+                            : selectedEvent.creator?.full_name ?? "Unknown"}
                         </p>
                       </Link>
                     </div>
@@ -1586,21 +1626,21 @@ export default function ProfilePage() {
                           overflow-hidden shadow-sm shrink-0"
                       >
                         <div className="bg-muted text-[10px] dark:text-slate-100 font-medium py-[3px] leading-none">
-                          {format(selectedEvent.start_time, "MMM").toUpperCase()}
+                          {format(startTime, "MMM").toUpperCase()}
                         </div>
                         <div className="text-[15px] dark:text-slate-100 font-extrabold text-foreground leading-none pt-[3px]">
-                          {format(selectedEvent.start_time, "d")}
+                          {format(startTime, "d")}
                         </div>
                       </div>
 
                       {/* Date & Time */}
                       <div className="text-sm dark:text-slate-100">
                         <p className="font-semibold text-[14px]">
-                          {format(selectedEvent.start_time, "EEEE, MMMM d")}
+                          {format(startTime, "EEEE, MMMM d")}
                         </p>
                         <p className="text-muted-foreground">
-                          {format(selectedEvent.start_time, "h:mm a")} –{" "}
-                          {format(selectedEvent.end_time, "h:mm a")}
+                          {format(startTime, "h:mm a")} –{" "}
+                          {format(endTime, "h:mm a")}
                         </p>
                       </div>
 
@@ -1631,29 +1671,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Past Event / Message Only */}
-                {/* <Card
-                  className="border border-primary/20 dark:border-primary/40 dark:text-slate-100
-                    bg-primary/5 dark:bg-primary/10 p-4 space-y-4"
-                >
-                  {new Date(selectedEvent.end) < new Date() ? (
-                    <div className="text-center text-sm text-muted-foreground space-y-1">
-                      <h3 className="font-semibold text-base text-gray-800">
-                        Past Event
-                      </h3>
-                      <p>
-                        This event ended on{" "}
-                        <span className="font-medium">
-                          {format(new Date(selectedEvent.end), "MMMM d, yyyy")}
-                        </span>
-                        .
-                      </p>
-                    </div>
-                  ) : (
-                    <>hi</>
-                  )}
-                </Card> */}
-
                 {/* About Event */}
                 {selectedEvent.description?.trim() && (
                   <div className="space-y-3">
@@ -1673,7 +1690,6 @@ export default function ProfilePage() {
           </motion.div>
         </DialogContent>
       </Dialog>
-
     </motion.div>
   );
 }
