@@ -86,7 +86,7 @@ const rangeClass =
 /* ------------------------------------------------------------------ */
 /*  component                                                         */
 /* ------------------------------------------------------------------ */
-export default function DateTimePicker() {
+export default function DateTimePicker({ error }: { error?: boolean }) {
   const form = useFormContext(); // pulls RHF context from parent <Form>
   const [timeRange, setTimeRange] = useState<{
     start: string | null;
@@ -155,7 +155,8 @@ export default function DateTimePicker() {
                   variant="outline"
                   className={cn(
                     "h-10 w-full text-left font-normal",
-                    !field.value && "text-muted-foreground"
+                    !field.value && "text-muted-foreground",
+                    error && "border-red-300 focus:border-red-500"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />

@@ -438,15 +438,11 @@ export default function NewEventPage() {
                         Event Date (choose start and end time)
                         <span className="text-red-500">*</span>
                       </FormLabel>
-                      <div
-                        className={cn(
-                          (!watchedValues.start_time ||
-                            !watchedValues.end_time) &&
-                            "border border-red-300 rounded-md"
-                        )}
-                      >
-                        <DateTimePicker />
-                      </div>
+                      <DateTimePicker
+                        error={
+                          !watchedValues.start_time || !watchedValues.end_time
+                        }
+                      />
                     </div>
                   </div>
                 </div>
