@@ -1,737 +1,841 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import "keen-slider/keen-slider.min.css";
-import Link from "next/link";
+import type React from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { useAuth } from "@/lib";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { SquarePoster } from "@/components/ui/SquarePoster";
+import { formatISO, set } from "date-fns";
+import { FileUpload } from "@/components/file-upload";
+import DateTimePicker from "@/components/DateTimePicker";
 import Image from "next/image";
-import { format } from "date-fns";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
-} from "@/components/ui/carousel";
-
-import Autoplay from "embla-carousel-autoplay";
-import { Users, MapPin, Calendar } from "lucide-react";
-import { useAuth } from "@/lib/auth";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
-// Animation variants
-const fadeIn = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.6 } },
-};
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  LinkIcon,
+  MapPin,
+  ChevronLeft,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { pageVariants, calendarVariants, categories } from "@/lib/constants";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { eventService } from "@/lib/services/event-service";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.8 } },
-};
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { format } from "date-fns";
 
-const slideLeft = {
-  hidden: { opacity: 0, x: -100 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.8 } },
-};
+/* ------------------------------------------------------------------
+  Validation Schema
+-------------------------------------------------------------------*/
+const schema = z
+  .object({
+    title: z.string().min(1, "Title is required"),
+    event_type: z.string().min(1, "Event type is required"),
 
-const slideRight = {
-  hidden: { opacity: 0, x: 100 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.8 } },
-};
+    /* all three of these fields are needed to build the full Date-time */
+    date: z.date({ required_error: "Date is required" }),
+    start_time: z.string().min(1, "Start time is required"),
+    end_time: z.string().min(1, "End time is required"),
 
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.8 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.8 } },
-};
+    is_online: z.boolean(),
+    location: z.string().optional(),
+    event_link: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.string().url().optional()
+    ),
 
-const fadeUpSlow = {
-  hidden: { opacity: 0, y: 50 },
-  visible: { opacity: 1, y: 0, transition: { duration: 1.2 } },
-};
+    description: z.string().max(10_000).optional(),
+  })
+  /* -------------------------------------------------------------- */
+  /*  ❶ address / link requirement (your old rule)                  */
+  /* -------------------------------------------------------------- */
+  .refine(
+    (d) => (d.is_online ? !!d.event_link : !!d.location),
+    (d) => ({
+      message: d.is_online
+        ? "Link required for online events"
+        : "Address required",
+      path: d.is_online ? ["event_link"] : ["location"],
+    })
+  )
 
-const projects = [
-  {
-    id: 1,
-    title: "Mobile App for Local Farmers Markets",
-    stage: "Project",
-    status: "In Progress",
-    recruiting: "Actively Recruiting",
-    summary:
-      "Developing an augmented-reality application that provides interactive information about local vendors and their goods.",
-    location: "Hybrid",
-    createdAt: new Date("2025-05-25"),
-    tags: ["Technology", "Agriculture"],
-  },
-  {
-    id: 2,
-    title: "Aerial Drone Launcher Development",
-    stage: "Idea",
-    status: "Planning",
-    recruiting: "Full team, seeking investment",
-    summary:
-      "Building a full-scale prototype of a military-grade drone launcher for water craft. Looking for students interested in mechanical engineering.",
-    location: "In-person",
-    createdAt: new Date("2025-06-28"),
-    tags: ["Manufacturing", "Technology", "Other"],
-  },
-  {
-    id: 3,
-    title: "FinTech App",
-    stage: "Project",
-    status: "Ongoing",
-    recruiting: "Looking for co-founders",
-    summary:
-      "We’re looking for teammates with Customer Service and Design expertise to join us on this FinTech application.",
-    location: "Hybrid",
-    createdAt: new Date("2025-04-18"),
-    tags: ["Nonprofit", "Customer Service", "Design"],
-  },
-  {
-    id: 4,
-    title: "AI App",
-    stage: "Project",
-    status: "Not Started",
-    recruiting: "Looking for co-founders",
-    summary:
-      "Seeking Marketing and Sales talent to help launch an AI-driven application in the food & beverage space.",
-    location: "Remote",
-    createdAt: new Date("2025-04-18"),
-    tags: ["Food & Beverage", "Marketing", "Sales"],
-  },
-  {
-    id: 5,
-    title: "ML App",
-    stage: "Idea",
-    status: "Not Started",
-    recruiting: "Recruiting team members",
-    summary:
-      "Looking for teammates with strong Problem-Solving and Research skills to build an energy-sector ML solution.",
-    location: "Remote",
-    createdAt: new Date("2025-04-18"),
-    tags: ["Energy", "Problem Solving", "Research"],
-  },
-];
-
-export default function Home() {
-  const { authUser, isLoading } = useAuth();
-  const searchParams = useSearchParams();
-  const authError = searchParams?.get("auth_error");
-  const [showError, setShowError] = useState(false);
-
-  // Handle auth errors from callback
-  useEffect(() => {
-    if (authError) {
-      setShowError(true);
-      const timeout = setTimeout(() => setShowError(false), 5000);
-      return () => clearTimeout(timeout);
+  /* -------------------------------------------------------------- */
+  /*  ❷ NO events in the past ↴                                     */
+  /* -------------------------------------------------------------- */
+  .refine(
+    (d) => {
+      /* turn date + start_time into one JS Date                     */
+      const [sh, sm] = d.start_time.split(":").map(Number);
+      const start = new Date(
+        d.date.getFullYear(),
+        d.date.getMonth(),
+        d.date.getDate(),
+        sh,
+        sm,
+        0,
+        0
+      );
+      return start >= new Date();
+    },
+    {
+      message: "Cannot schedule an event in the past",
+      path: ["date"], // error shows under the Date field (red text)
     }
-  }, [authError]);
+  )
+  /* -------------------------------------------------------------- */
+  /*  ❸ End time must be after start time ↴                         */
+  /* -------------------------------------------------------------- */
+  .refine(
+    (d) => {
+      const [sh, sm] = d.start_time.split(":").map(Number);
+      const [eh, em] = d.end_time.split(":").map(Number);
+      const start = sh * 60 + sm;
+      const end = eh * 60 + em;
+      return end > start;
+    },
+    {
+      message: "End time must be after start time",
+      path: ["end_time"],
+    }
+  );
 
-  // Simple loading state handled by client layout
-  if (isLoading) {
-    return <Skeleton className="h-[400px] w-full rounded-xl" />;
+type FormValues = z.infer<typeof schema>;
+
+/* ------------------------------------------------------------------
+  Constants
+-------------------------------------------------------------------*/
+export const eventTypes = Object.entries(categories).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+const timeOptions: string[] = [];
+for (let h = 8; h <= 20; h++) {
+  for (let m = 0; m < 60; m += 30) {
+    timeOptions.push(
+      `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+    );
+  }
+}
+
+/* ------------------------------------------------------------------
+  Helper to POST to the /api/upload/event-posters route
+-------------------------------------------------------------------*/
+async function uploadPoster(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/upload/event-posters", {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    throw new Error("Upload failed");
+  }
+  const { publicUrl } = (await res.json()) as { publicUrl: string };
+  return publicUrl;
+}
+
+/* ------------------------------------------------------------------
+  Main Page Component
+-------------------------------------------------------------------*/
+export default function NewEventPage() {
+  const router = useRouter();
+  const { profile } = useAuth();
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      title: "",
+      event_type: "",
+      date: new Date(),
+      start_time: "",
+      end_time: "",
+      is_online: false,
+      location: "",
+      event_link: "",
+      description: "",
+    },
+  });
+
+  const isOnline = form.watch("is_online");
+  const watchedValues = form.watch();
+  const descWords = (watchedValues.description || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+  // --- New: Sync end_time with start_time by default ---
+  const [prevStartTime, setPrevStartTime] = useState("");
+  useEffect(() => {
+    const startTime = form.getValues("start_time");
+    const endTime = form.getValues("end_time");
+    // If end time is empty or matches the previous start time, update it
+    if (startTime && (endTime === "" || endTime === prevStartTime)) {
+      form.setValue("end_time", startTime);
+    }
+    setPrevStartTime(startTime);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch("start_time")]);
+
+  // Check for missing required fields
+  const missingFields = useMemo(() => {
+    const fields: string[] = [];
+
+    if (!watchedValues.title?.trim()) fields.push("Event Title");
+    if (!watchedValues.event_type) fields.push("Event Category");
+    if (!watchedValues.start_time) fields.push("Start Time");
+    if (!watchedValues.end_time) fields.push("End Time");
+    if (isOnline && !watchedValues.event_link?.trim()) {
+      fields.push("Event Link (required for online events)");
+    } else if (!isOnline && !watchedValues.location?.trim()) {
+      fields.push("Event Location (required for in-person events)");
+    }
+
+    return fields;
+  }, [watchedValues, isOnline]);
+
+  const hasMissingFields = missingFields.length > 0;
+
+  // Check for specific missing field types for custom messages
+  const missingTimeFields =
+    !watchedValues.start_time || !watchedValues.end_time;
+  const missingCategory = !watchedValues.event_type;
+  const hasTitleDescriptionLocation =
+    watchedValues.title?.trim() &&
+    (watchedValues.description?.trim() ||
+      watchedValues.location?.trim() ||
+      watchedValues.event_link?.trim());
+
+  // Custom alert message based on what's missing
+  const getAlertMessage = () => {
+    if (missingTimeFields && hasTitleDescriptionLocation) {
+      return "You do not have start/end time of event";
+    }
+    if (missingCategory && hasTitleDescriptionLocation) {
+      return "Type in category";
+    }
+    if (hasMissingFields) {
+      return "Please complete the following required fields:";
+    }
+    return "";
+  };
+
+  const showCustomAlert = missingTimeFields || missingCategory;
+
+  async function onSubmit(data: FormValues) {
+    setSubmitting(true);
+    try {
+      // build start/end ISO strings
+      const [sh, sm] = data.start_time.split(":").map(Number);
+      const [eh, em] = data.end_time.split(":").map(Number);
+      const startISO = formatISO(
+        set(data.date, { hours: sh, minutes: sm, seconds: 0 })
+      );
+      const endISO = formatISO(
+        set(data.date, { hours: eh, minutes: em, seconds: 0 })
+      );
+
+      // optional poster upload
+      let poster_url: string | null = null;
+      if (posterFile) {
+        poster_url = await uploadPoster(posterFile);
+      }
+
+      await eventService.createEvent({
+        title: data.title,
+        description: data.description || null,
+        start_time: startISO,
+        end_time: endISO,
+        event_type: data.event_type as any,
+        location: data.is_online
+          ? (data.event_link as string)
+          : (data.location as string),
+        poster_url,
+      } as any);
+
+      router.push("/calendar");
+    } catch (err) {
+      console.error(err);
+      form.setError("title", { message: "Failed to create event" });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
+  // 🔗 preview URL for the selected poster (or null)
+  const posterPreview = useMemo(
+    () => (posterFile ? URL.createObjectURL(posterFile) : null),
+    [posterFile]
+  );
+
+  // 🧹 revoke the object URL when it's no longer needed
+  useEffect(() => {
+    return () => {
+      if (posterPreview) URL.revokeObjectURL(posterPreview);
+    };
+  }, [posterPreview]);
+
+  /* -------------------------------- UI -------------------------------- */
   return (
-    <div className="relative overflow-hidden">
-      {/* Decorative circles logo background with animation */}
-      <motion.div
-        className="
-          absolute
-          right-[-90px]  top-[0px] scale-60
-          md:right-[-80px]  md:top-[40px] 
-          lg:right-0       lg:top-[120px] 
-          xl:right-0       xl:top-[120px] 
-          md:scale-75
-          lg:scale-100  
-          rotate-[10deg]
-          pointer-events-none opacity-60
-        "
-        initial={{ opacity: 0, rotate: 205 }}
-        animate={{
-          opacity: 0.6,
-          scale: 1,
-          rotate: 220,
-          transition: { duration: 0.8, ease: "easeOut" },
-        }}
-        whileInView={{
-          x: [0, 10, 0],
-          transition: { repeat: Infinity, repeatType: "reverse", duration: 8 },
-        }}
-      >
-        <Image
-          src="/images/circles-logo.png"
-          alt="Decorative circles"
-          width={650}
-          height={450}
-          className="object-contain"
-          priority
-        />
-      </motion.div>
-
-      <section className="relative">
-        {/* Hero Background */}
-        <div className="absolute inset-0 bg-background/5 to-transparent -z-10" />
-
-        {/* Auth Error Message */}
-        {showError && (
-          <div className="container mx-auto mt-24">
-            <div className="bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-md">
-              <p>Authentication error occurred. Please try again.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Hero Section */}
-        <motion.section
-          initial="hidden"
-          animate="visible"
-          variants={fadeUp}
-          className="container mx-auto flex-1 flex flex-col md:flex-row items-center md:items-start
-          justify-center gap-10 py-12 md:py-20 relative"
-        >
-          {/* ────── LEFT  (text) ────── */}
-          <motion.div
-            variants={fadeIn}
-            className="flex-1 space-y-6 md:max-w-4xl text-left"
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="p-2"
+    >
+      <div className="max-w-5xl mx-auto">
+        {/* heading row */}
+        <div className="mb-0 md:mb-4 flex items-center gap-3">
+          {/* BACK → Calendar */}
+          <Button
+            type="button"
+            onClick={() => router.push("/calendar")}
+            className="h-9 px-3 rounded-md bg-muted/90 hover:bg-muted text-foreground font-medium shadow-sm"
           >
-            {/* headline */}
-            <motion.h1
-              variants={fadeIn}
-              initial="hidden"
-              animate="visible"
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[0.9]"
-            >
-              THE CENTRAL HUB
-              <br />
-              OF AGGIE
-              <br />
-              INNOVATION.
-            </motion.h1>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            <span className="hidden xs:inline">Back</span>
+          </Button>
 
-            <div className="px-4 pt-[8rem]">
-              {/* sub-heading */}
-              <motion.h2
-                variants={slideLeft}
+          {/* page title */}
+          <h1 className="text-2xl font-bold text-foreground">
+            New Event Request
+          </h1>
+        </div>
+
+        <Alert className="mb-4 bg-blue-50" variant="info">
+          <AlertDescription className="text-sm">
+            Please submit your event at least{" "}
+            <strong>1 week before the event date</strong> to allow{" "}
+            <strong>1–2 days</strong> for Nexus Support to review.
+          </AlertDescription>
+        </Alert>
+
+        <Card
+          className="border-0 shadow-none md:border md:shadow-lg
+            bg-card/80  sm:dark:bg-slate-900/80
+            md:border-slate-200 dark:md:border-slate-700
+            backdrop-blur-sm"
+        >
+          <CardContent className="p-0 md:px-6 md:py-3 space-y-4">
+            <Form {...form}>
+              <motion.form
+                variants={calendarVariants}
                 initial="hidden"
                 animate="visible"
-                className="text-xl sm:text-3xl md:text-3xl lg:text-4xl font-semibold tracking-tight mb-1"
+                className="space-y-4"
+                onSubmit={form.handleSubmit(onSubmit)}
               >
-                The Future Starts Here.
-              </motion.h2>
+                {/* ── Title + Date/Time (responsive row) ────────────────────────── */}
+                <div className="grid gap-4 lg:grid-cols-4">
+                  {/* Event Title & Category */}
+                  <div className="lg:col-span-2">
+                    <FormField
+                      name="title"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Event Title <span className="text-red-500">*</span>
+                          </FormLabel>
+                          <div className="relative">
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter your event title..."
+                                className={cn(
+                                  "h-10 pr-36 dark:bg-slate-900/80 dark:text-slate-200",
+                                  !field.value?.trim() &&
+                                    "border-red-300 focus:border-red-500"
+                                )}
+                              />
+                            </FormControl>
 
-              {/* body copy */}
-              <p
-                className="
-                  max-w-[55ch]
-                  leading-[1.35]
-                  font-light text-muted-foreground
-                  text-sm     sm:text-md   md:text-lg  
-                "
-              >
-                Aggie Nexus was created to connect the needs of the industry
-                with builders excited to meet those needs. Here you can do more
-                than stay up-to-date with industry progress—you now have the
-                opportunity to be a part of the growth forward. Post your ideas,
-                join a startup, network your product. It all happens right here,
-                in the central hub for A&M innovation.
-              </p>
-            </div>
-
-            {/* CTA */}
-            <div className="flex flex-wrap gap-4">
-              <Button
-                asChild
-                size="lg"
-                className="rounded-full text-lg uppercase bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 px-7 py-3 font-semibold tracking-wide transition-colors"
-              >
-                <Link href={authUser ? "/projects/new" : "/auth/signup"}>
-                  {authUser ? "Explore Projects" : "Sign Up"}
-                </Link>
-              </Button>
-            </div>
-          </motion.div>
-        </motion.section>
-
-        {/* Projects in Progress section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={slideRight}
-          className="relative py-16 md:py-20 overflow-hidden"
-        >
-          {/* ── Hard container (centres & limits width) ── */}
-          <div className="container">
-            {/* ── Headline ── */}
-            <motion.h2
-              variants={fadeUpSlow}
-              initial="hidden"
-              whileInView="visible"
-              className="ml-auto max-w-4xl text-right pr-0 2xl:pr-[7.5rem] text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
-            >
-              Join a project in progress.
-              <br className="hidden sm:block" />
-              Post your idea for a new one.
-            </motion.h2>
-
-            {/* ── Copy + carousel wrapper ── */}
-            <div
-              className="
-              mx-auto max-w-7xl
-              grid grid-cols-1 lg:grid-cols-4 gap-8 lg:gap-12
-              items-start
-            "
-            >
-              <div className="lg:col-span-1">
-                <p className="text-muted-foreground text-center px-10 lg:px-5 lg:text-left leading-relaxed text-lg">
-                  Our Projects Page is where ideas become a reality. Whether
-                  you're starting a company or just looking for experience,
-                  Aggie Nexus is the place to start.
-                </p>
-              </div>
-
-              {/* ────── Carousel starts here ────── */}
-              <div className="lg:col-span-3">
-                <Carousel
-                  opts={{ loop: true }}
-                  plugins={[
-                    Autoplay({ delay: 5000, stopOnInteraction: false }),
-                  ]}
-                  className="w-full relative"
-                >
-                  <CarouselContent className="-ml-2 md:-ml-4">
-                    {projects.map((p) => (
-                      <CarouselItem
-                        key={p.id}
-                        className="pl-2 md:pl-4  max-w-[350px] basis-full sm:basis-1/2 "
-                      >
-                        <Card className="h-full transition-shadow hover:shadow-md flex flex-col">
-                          <CardContent className="pt-6 flex flex-col h-full">
-                            <div className="flex-1 space-y-4">
-                              <h3 className="text-xl font-semibold leading-snug">
-                                {p.title}
-                              </h3>
-                              <div className="flex gap-2">
-                                <Badge
-                                  className={
-                                    p.stage === "Idea"
-                                      ? "bg-blue-600 text-white"
-                                      : "bg-green-600 text-white"
-                                  }
-                                >
-                                  {p.stage}
-                                </Badge>
-                                <Badge variant="secondary">{p.status}</Badge>
-                              </div>
-                              <p className="text-muted-foreground">
-                                {p.summary}
-                              </p>
-                            </div>
-
-                            {/* Fixed metadata at bottom */}
-                            <div className="mt-auto pt-4 space-y-3 border-t border-border/50">
-                              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="w-4 h-4" />
-                                  {p.location}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="w-4 h-4" />
-                                  {format(p.createdAt, "MMM d, yyyy")}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Users className="w-4 h-4" />
-                                  {p.recruiting}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {p.tags.map((tag) => (
-                                  <Badge
-                                    key={tag}
-                                    variant="secondary"
-                                    className="capitalize"
+                            {/* Category dropdown in the input's right corner */}
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-1">
+                              <FormField
+                                name="event_type"
+                                control={form.control}
+                                render={({ field: categoryField }) => (
+                                  <Select
+                                    value={categoryField.value}
+                                    onValueChange={categoryField.onChange}
                                   >
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
+                                    <SelectTrigger
+                                      className={cn(
+                                        "h-8 w-36 bg-muted/50 border-0 text-xs",
+                                        !categoryField.value && "border-red-300"
+                                      )}
+                                    >
+                                      <SelectValue placeholder="Category *" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {eventTypes.map((t) => (
+                                        <SelectItem
+                                          key={t.value}
+                                          value={t.value}
+                                        >
+                                          {t.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
                             </div>
-                          </CardContent>
-                        </Card>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  {/* Chevron arrows */}
-                  <CarouselPrevious className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
-                  <CarouselNext className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
-                </Carousel>
-              </div>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Spacing between sections */}
-        <div className="h-6 md:h-8"></div>
-
-        {/* Project Highlights section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.3 }}
-          variants={scaleIn}
-          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
-        >
-          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
-            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
-            <div
-              className="
-                flex-1
-                grid grid-rows-[auto_1fr_auto]  
-                text-center lg:text-left
-              "
-            >
-              {/* row-1 : title (stays top-left) */}
-              <motion.h2
-                variants={fadeIn}
-                initial="hidden"
-                whileInView="visible"
-                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
-              >
-                Project Highlight
-              </motion.h2>
-
-              {/* row-3 : subtitle + copy (sticks bottom-right) */}
-              <div
-                className="
-                  row-start-3
-                  place-self-center
-                  lg:place-self-end  
-                  text-center lg:text-right
-                  max-w-2xl mx-auto lg:mx-0 
-                  space-y-4
-                "
-              >
-                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
-                  Event Name, Host, Location, Speaker
-                </h3>
-
-                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
-                  Lorem Ipsum is simply dummy text of the printing and
-                  typesetting industry. Lorem Ipsum has been the industry
-                  standard dummy text ever since the 1500s, when an unknown
-                  printer took a galley of type and scrambled it to make a type
-                  specimen book. It has survived not only five centuries, but
-                  also the leap into electronic typesetting, remaining
-                  essentially unchanged. It was popularised in the 1960s with
-                  the release of Letraset sheets containing Lorem Ipsum
-                  passages, and more recently with desktop publishing software
-                  like Aldus PageMaker including versions of Lorem Ipsum
-                </p>
-              </div>
-            </div>
-            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
-            <div
-              className="
-              flex-shrink-0
-              flex flex-col
-              md:flex-row md:justify-center
-              lg:flex-col lg:justify-start
-              gap-4
-              w-full lg:w-80
-            "
-            >
-              {/* square #1 */}
-              <div
-                className="
-                  aspect-square
-                  h-48 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
-
-              {/* square #2 */}
-              <div
-                className="
-                  aspect-square
-                  h-64 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
-            </div>
-
-            {/* <Image
-              src=""
-              alt="Project highlight preview 1"
-              width={640}
-              height={640}
-              priority
-              className="
-                aspect-square h-48 md:h-64 w-full
-                object-cover       
-                rounded-lg shadow-sm
-              "
-            />
-            <Image
-              src=""
-              alt="Project highlight preview 2"
-              width={640}
-              height={640}
-              className="
-                aspect-square h-64 md:h-64 w-full
-                object-cover
-                rounded-lg shadow-sm
-              "
-            /> */}
-          </div>
-        </motion.section>
-
-        {/* calendar section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeUp}
-          className="relative py-20 px-5 md:py-28 overflow-hidden"
-        >
-          <div className="container mx-auto">
-            {/* ── Headline ── */}
-            <motion.h2
-              variants={slideLeft}
-              initial="hidden"
-              whileInView="visible"
-              className="max-w-4xl text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
-            >
-              Expand your network. Find new opportunities.
-              <br className="hidden lg:block" />
-              Stay in the know.
-            </motion.h2>
-
-            {/* ── Calendar + copy grid ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
-              {/* ✦ descriptive copy — first on ≤md, second on ≥lg */}
-              <p
-                className="
-                  order-1 lg:order-2
-                  lg:col-span-2
-                  text-center lg:text-left
-                  text-muted-foreground leading-relaxed
-                  text-sm sm:text-base md:text-lg
-                "
-              >
-                Our Nexus calendar lets you stay up to date with all of the
-                A&amp;M events that you wouldn’t want to miss. Looking to grow
-                your network? Find an upcoming networking event in your
-                industry. Trying to hone your technical skills? Look for a
-                workshop. We have it all right here, convenient and accessible.
-              </p>
-
-              {/* ✦ calendar preview — second on ≤md, first on ≥lg */}
-              <motion.div
-                className="order-2 lg:order-1 lg:col-span-3 border rounded-2xl"
-                initial={{ scale: 0.95, opacity: 0 }}
-                whileInView={{ scale: 1.08, opacity: 1 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                viewport={{ once: true, amount: 0.5 }}
-              >
-                <Card className="border-none shadow-none">
-                  <CardContent className="p-0">
-                    <Image
-                      src="/images/calendar-view.png"
-                      alt="Aggie Nexus calendar month-view"
-                      width={1200}
-                      height={800}
-                      className="w-full h-auto"
-                      priority
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </div>
-          </div>
-        </motion.section>
+                  </div>
 
-        {/* Event Highlights section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.3 }}
-          variants={slideRight}
-          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
-        >
-          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
-            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
-            <div
-              className="
-                flex-1
-                grid grid-rows-[auto_1fr_auto]  
-                text-center lg:text-left
-              "
-            >
-              {/* row-1 : title (stays top-left) */}
-              <motion.h2
-                variants={scaleIn}
-                initial="hidden"
-                whileInView="visible"
-                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
-              >
-                Event Highlight
-              </motion.h2>
+                  {/* Date + Time range picker */}
+                  <div className="lg:col-span-2">
+                    <div className="space-y-2">
+                      <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                        Event Date (choose start and end time)
+                        <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <div
+                        className={cn(
+                          "border rounded-md ",
+                          (!watchedValues.start_time ||
+                            !watchedValues.end_time) &&
+                            "border-red-300"
+                        )}
+                      >
+                        <DateTimePicker />
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-              {/* row-3 : subtitle + copy (sticks bottom-right) */}
-              <div
-                className="
-                  row-start-3
-                  place-self-center
-                  lg:place-self-end  
-                  text-center lg:text-right
-                  max-w-2xl mx-auto lg:mx-0 
-                  space-y-4
-                "
-              >
-                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
-                  Event Name, Host, Location, Speaker
-                </h3>
+                {/* Location Section - Switch and Input on Same Line */}
+                <div className="space-y-3">
+                  <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Event Location <span className="text-red-500">*</span>
+                  </FormLabel>
+                  <div className="flex items-center gap-4">
+                    <FormField
+                      name="is_online"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center gap-2">
+                            {field.value ? (
+                              <LinkIcon className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <MapPin className="h-4 w-4 text-green-600" />
+                            )}
+                            <span className="font-medium text-sm whitespace-nowrap text-slate-700 dark:text-slate-200">
+                              {field.value ? "Online" : "In-Person"}
+                            </span>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
 
-                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
-                  Lorem Ipsum is simply dummy text of the printing and
-                  typesetting industry. Lorem Ipsum has been the industry
-                  standard dummy text ever since the 1500s, when an unknown
-                  printer took a galley of type and scrambled it to make a type
-                  specimen book. It has survived not only five centuries, but
-                  also the leap into electronic typesetting, remaining
-                  essentially unchanged. It was popularised in the 1960s with
-                  the release of Letraset sheets containing Lorem Ipsum
-                  passages, and more recently with desktop publishing software
-                  like Aldus PageMaker including versions of Lorem Ipsum
-                </p>
+                    <div className="flex-1">
+                      {isOnline ? (
+                        <FormField
+                          name="event_link"
+                          control={form.control}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  placeholder="https://zoom.us/j/..."
+                                  {...field}
+                                  className={cn(
+                                    "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                    isOnline &&
+                                      !field.value?.trim() &&
+                                      "border-red-300 focus:border-red-500"
+                                  )}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <FormField
+                          name="location"
+                          control={form.control}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  placeholder="123 Main St, City, State"
+                                  {...field}
+                                  className={cn(
+                                    "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                    !isOnline &&
+                                      !field.value?.trim() &&
+                                      "border-red-300 focus:border-red-500"
+                                  )}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description and Poster - Stacked Vertically */}
+                <div className="space-y-4">
+                  <FormField
+                    name="description"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium">
+                          Description
+                        </FormLabel>
+                        <FormControl>
+                          <Textarea
+                            className={cn(
+                              "min-h-[80px] resize-none",
+                              !field.value?.trim() &&
+                                "border-red-300 focus:border-red-500"
+                            )}
+                            {...field}
+                            placeholder="Tell people about your event..."
+                          />
+                        </FormControl>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground">
+                            Optional
+                          </span>
+                          <span
+                            className={cn(
+                              "font-medium",
+                              descWords > 350
+                                ? "text-destructive"
+                                : "text-muted-foreground dark:text-slate-400"
+                            )}
+                          >
+                            {descWords}/350 words
+                          </span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-2 block">
+                      Event Poster
+                    </label>
+                    <FileUpload onChange={setPosterFile} />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Optional - helps promote your event
+                    </p>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 h-10 dark:bg-slate-800 dark:border-slate-600"
+                    onClick={() => setShowPreview(true)}
+                  >
+                    Preview Event Page
+                  </Button>
+                  <AlertDialog>
+                    {/* primary button just OPENS the dialog */}
+                    <AlertDialogTrigger asChild onClick={() => form.trigger()}>
+                      <Button
+                        type="button" // no immediate submit
+                        className={cn(
+                          "flex-1 h-10 font-medium",
+                          hasMissingFields
+                            ? "bg-gray-400 cursor-not-allowed"
+                            : "bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
+                        )}
+                        disabled={submitting || hasMissingFields}
+                      >
+                        {submitting ? (
+                          <>
+                            <div className="animate-spin h-3 w-3 mr-2 border-b-2 border-white rounded-full" />
+                            Creating…
+                          </>
+                        ) : hasMissingFields ? (
+                          "Complete Required Fields"
+                        ) : (
+                          "Create Event"
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+
+                    {/* confirmation dialog */}
+                    <AlertDialogContent className="dark:bg-slate-800 dark:border-slate-700">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Heads-up!</AlertDialogTitle>
+
+                        <AlertDialogDescription>
+                          {/* Missing Fields Alert */}
+                          {hasMissingFields && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="mb-4"
+                            >
+                              <Alert
+                                variant="destructive"
+                                className="border-red-200 bg-red-50"
+                              >
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription className="text-sm font-medium">
+                                  {getAlertMessage()}
+                                </AlertDescription>
+                                {!showCustomAlert && (
+                                  <ul className="mt-2 text-sm space-y-1">
+                                    {missingFields.map((field, index) => (
+                                      <li
+                                        key={index}
+                                        className="flex items-center gap-2"
+                                      >
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                        {field}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </Alert>
+                            </motion.div>
+                          )}
+                          Once you create the event you{" "}
+                          <strong>won't be able to edit it.</strong>
+                          <br />
+                          Double-check all details!
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="w-full sm:w-auto">
+                          Go back &amp; review
+                        </AlertDialogCancel>
+
+                        {/* final "Send anyway" — calls the SAME RHF submit */}
+                        <AlertDialogAction
+                          className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                          onClick={() =>
+                            form.handleSubmit(async (data) => {
+                              await onSubmit(data); // your existing submit fn
+                              toast.success(
+                                "Event submitted successfully 🎉 Wait for updates on email!"
+                              );
+                            })()
+                          }
+                        >
+                          Double-check&nbsp;and&nbsp;Send&nbsp;anyway
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </motion.form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+      {/* Event Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="w-full max-h-[100dvh] p-0 overflow-hidden scrollbar-hidden overflow-y-auto sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:text-slate-1500 dark:bg-slate-800/70">
+          <div className="py-5 px-4">
+            <div className="space-y-6">
+              {/* Poster preview (only if a file was chosen) */}
+              {posterPreview && (
+                <SquarePoster src={posterPreview} alt={`Preview poster`} />
+              )}
+
+              {/* Event Information */}
+              <div className="space-y-2">
+                <div className="pb-2">
+                  <DialogTitle className="text-2xl font-bold">
+                    {form.watch("title") || "Event Title"}
+                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    {/* Avatar */}
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden border bg-muted border-border flex items-center justify-center transition-transform duration-200">
+                      {!profile ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      ) : profile.avatar ? (
+                        <Image
+                          src={profile.avatar}
+                          alt={profile.full_name ?? "Avatar"}
+                          fill
+                          className="object-cover"
+                          sizes="64px"
+                          priority
+                        />
+                      ) : (
+                        <span className="text-xs font-medium text-[#500000]">
+                          {profile.full_name?.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Host text */}
+                    <p className="text-sm font-semibold text-muted-foreground group-hover:underline group-hover:text-foreground transition-colors duration-200">
+                      Hosted by {profile?.full_name ?? "Unknown"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Date, Time & Location */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {/* Calendar Icon */}
+                    {form.watch("date") && (
+                      <>
+                        <div className="w-10 h-10 rounded-sm border bg-white text-center overflow-hidden shadow-sm shrink-0">
+                          <div className="bg-gray-100 text-[10px] font-medium text-gray-700 py-[3px] leading-none">
+                            {format(form.watch("date"), "MMM").toUpperCase()}
+                          </div>
+                          <div className="text-[15px] font-extrabold text-gray-900 leading-none pt-[3px]">
+                            {format(form.watch("date"), "d")}
+                          </div>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="text-sm">
+                          <p className="font-semibold text-[14px]">
+                            {format(form.watch("date"), "EEEE, MMMM d")}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {form.watch("start_time") &&
+                              form.watch("end_time") && (
+                                <>
+                                  {new Date(
+                                    `2000-01-01T${form.watch("start_time")}`
+                                  ).toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}{" "}
+                                  –{" "}
+                                  {new Date(
+                                    `2000-01-01T${form.watch("end_time")}`
+                                  ).toLocaleTimeString([], {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  })}
+                                </>
+                              )}
+                          </p>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="w-px h-6 bg-border" />
+                      </>
+                    )}
+
+                    {/* Location Info */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-10 h-10 border rounded-md bg-gray-100 flex items-center justify-center">
+                        {isOnline ? (
+                          <LinkIcon className="h-5 w-5 text-blue-600" />
+                        ) : (
+                          <MapPin className="h-5 w-5 text-gray-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-[14px]">
+                          {isOnline
+                            ? "Online Event"
+                            : form.watch("location") || "Venue Address"}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {isOnline ? "Virtual Meeting" : "In-person Event"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
-            <div
-              className="
-              flex-shrink-0
-              flex flex-col
-              md:flex-row md:justify-center
-              lg:flex-col lg:justify-start
-              gap-4
-              w-full lg:w-80
-            "
-            >
-              {/* square #1 */}
-              <div
-                className="
-                  aspect-square
-                  h-48 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
 
-              {/* square #2 */}
-              <div
-                className="
-                  aspect-square
-                  h-64 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
-            </div>
+              {/* Preview Notice */}
+              <Card className="border border-blue-200 bg-blue-50 p-4">
+                <div className="text-center text-sm text-blue-800">
+                  <h3 className="font-semibold text-base">Event Preview</h3>
+                  <p className="mt-1">
+                    This is how your event will appear to attendees
+                  </p>
+                </div>
+              </Card>
 
-            {/* <Image
-              src=""
-              alt="Project highlight preview 1"
-              width={640}
-              height={640}
-              priority
-              className="
-                aspect-square h-48 md:h-64 w-full
-                object-cover       
-                rounded-lg shadow-sm
-              "
-            />
-            <Image
-              src=""
-              alt="Project highlight preview 2"
-              width={640}
-              height={640}
-              className="
-                aspect-square h-64 md:h-64 w-full
-                object-cover
-                rounded-lg shadow-sm
-              "
-            /> */}
-          </div>
-        </motion.section>
-
-        {/* Our mission section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeUpSlow}
-          className="relative w-screen -mx-2 h-[60vh] overflow-hidden"
-        >
-          {/* background image (sits behind, covers whole section) */}
-          <Image
-            src="/images/design-center.jpg"
-            alt="Campus innovation workshop"
-            fill
-            className="object-cover z-[-1]"
-            priority
-          />
-
-          {/* dark overlay */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] z-0" />
-
-          {/* ────────────────────────────────
-            WRAPPER: takes full height, full width
-            flex column on mobile, row on ≥md
-        ──────────────────────────────── */}
-          <div className="relative z-10 flex h-full flex-col md:flex-row">
-            {/* text block */}
-            <div className="flex-[2] max-w-lg p-8 md:p-12 text-white">
-              <motion.h2
-                variants={fadeIn}
-                initial="hidden"
-                whileInView="visible"
-                className="text-3xl md:text-4xl lg:text-5xl font-light mb-6"
-              >
-                Our Mission
-              </motion.h2>
-              <p className="leading-relaxed font-light text-base md:text-lg">
-                Aggie&nbsp;Nexus exists to create a central hub of innovation by
-                connecting entrepreneurs, builders, and investors into a unified
-                ecosystem. Our mission is to accelerate technology
-                commercialization and foster transformative collaboration—rooted
-                in Texas&nbsp;A&amp;M University and its affiliated network.
-              </p>
+              {/* About Event */}
+              {form.watch("description")?.trim() && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    About Event
+                  </h3>
+                  <Separator />
+                  <div className="rounded-md px-4 py-2">
+                    <p className="text-sm leading-relaxed whitespace-pre-line">
+                      {form.watch("description")}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </motion.section>
-
-        {/* Footer */}
-        <div className="container py-8 text-center dark:text-white/60 text-muted-foreground border-t">
-          <div className="flex items-center justify-center gap-4 mb-2">
-            <Link href="/about" className="text-sm hover:underline">
-              About
-            </Link>
-            <span className="text-muted-foreground">•</span>
-            <Link href="/terms" className="text-sm hover:underline">
-              Terms
-            </Link>
-            <span className="text-muted-foreground">•</span>
-            <Link href="/privacy" className="text-sm hover:underline">
-              Privacy
-            </Link>
-          </div>
-          <p className="text-sm">© 2025 Aggie Nexus. All rights reserved.</p>
-        </div>
-      </section>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
   );
 }

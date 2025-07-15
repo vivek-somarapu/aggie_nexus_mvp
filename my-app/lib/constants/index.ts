@@ -184,7 +184,7 @@ export type EventType =
 export const categories: Record<EventType, string> = {
   workshop: "Workshops",
   info_session: "Info Sessions",
-  networking: "Networking Events",
+  networking: "Networking",
   hackathon: "Hackathons",
   deadline: "Project Deadlines",
   meeting: "Meetings",

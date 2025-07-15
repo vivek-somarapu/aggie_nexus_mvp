@@ -18,6 +18,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isToday } from "date-fns";
 
 /* ------------------------------------------------------------------ */
 /*  constants                                                         */
@@ -60,8 +61,8 @@ const timeSlots: string[] = (() => {
     d.setHours(0, mins);
     out.push(
       d.toLocaleTimeString([], {
-        hour12: false,
-        hour: "2-digit",
+        hour12: true,
+        hour: "numeric",
         minute: "2-digit",
       })
     );
@@ -97,8 +98,9 @@ export default function DateTimePicker() {
 
   /* helpers ------------------------------------------------------- */
   const t2m = (t: string) => {
-    const [h, m] = t.split(/[:\s]/).map(Number);
-    const pm = /pm/i.test(t);
+    const [time, period] = t.split(" ");
+    const [h, m] = time.split(":").map(Number);
+    const pm = period.toLowerCase() === "pm";
     const hour = (pm && h !== 12 ? h + 12 : !pm && h === 12 ? 0 : h) % 24;
     return hour * 60 + m;
   };
@@ -146,8 +148,6 @@ export default function DateTimePicker() {
       control={form.control}
       render={({ field }) => (
         <FormItem>
-          <FormLabel className="text-sm font-medium">Event Date</FormLabel>
-
           <Popover>
             <PopoverTrigger asChild>
               <FormControl>
@@ -178,8 +178,17 @@ export default function DateTimePicker() {
                   disabled={(d) => d < new Date()}
                   showOutsideDays
                   className="p-6"
-                  classNames={defaultClassNames}
+                  classNames={{
+                    ...defaultClassNames,
+                    day_button: cn(
+                      defaultClassNames.day_button,
+                      "hover:bg-accent"
+                    ),
+                  }}
                   components={{ Chevron }}
+                  modifiers={{
+                    today: (date) => isToday(date),
+                  }}
                   initialFocus
                 />
 
