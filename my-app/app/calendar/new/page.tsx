@@ -40,7 +40,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { LinkIcon, MapPin, ChevronLeft, Loader2 } from "lucide-react";
+import {
+  LinkIcon,
+  MapPin,
+  ChevronLeft,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { pageVariants, calendarVariants, categories } from "@/lib/constants";
 import {
   Select,
@@ -58,9 +64,6 @@ import { format } from "date-fns";
 
 /* ------------------------------------------------------------------
   Validation Schema
--------------------------------------------------------------------*/
-/* ------------------------------------------------------------------
-  Validation Schema  ➜  drop-in replacement
 -------------------------------------------------------------------*/
 const schema = z
   .object({
@@ -183,17 +186,82 @@ export default function NewEventPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      title: "",
+      event_type: "",
       date: new Date(),
+      start_time: "",
+      end_time: "",
       is_online: false,
-    } as any,
+      location: "",
+      event_link: "",
+      description: "",
+    },
   });
 
   const isOnline = form.watch("is_online");
-  const descWords = form
-    .watch("description", "")
+  const watchedValues = form.watch();
+  const descWords = (watchedValues.description || "")
     .trim()
     .split(/\s+/)
     .filter(Boolean).length;
+
+  // --- New: Sync end_time with start_time by default ---
+  const [prevStartTime, setPrevStartTime] = useState("");
+  useEffect(() => {
+    const startTime = form.getValues("start_time");
+    const endTime = form.getValues("end_time");
+    // If end time is empty or matches the previous start time, update it
+    if (startTime && (endTime === "" || endTime === prevStartTime)) {
+      form.setValue("end_time", startTime);
+    }
+    setPrevStartTime(startTime);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch("start_time")]);
+
+  // Check for missing required fields
+  const missingFields = useMemo(() => {
+    const fields: string[] = [];
+
+    if (!watchedValues.title?.trim()) fields.push("Event Title");
+    if (!watchedValues.event_type) fields.push("Event Category");
+    if (!watchedValues.start_time) fields.push("Start Time");
+    if (!watchedValues.end_time) fields.push("End Time");
+    if (isOnline && !watchedValues.event_link?.trim()) {
+      fields.push("Event Link (required for online events)");
+    } else if (!isOnline && !watchedValues.location?.trim()) {
+      fields.push("Event Location (required for in-person events)");
+    }
+
+    return fields;
+  }, [watchedValues, isOnline]);
+
+  const hasMissingFields = missingFields.length > 0;
+
+  // Check for specific missing field types for custom messages
+  const missingTimeFields =
+    !watchedValues.start_time || !watchedValues.end_time;
+  const missingCategory = !watchedValues.event_type;
+  const hasTitleDescriptionLocation =
+    watchedValues.title?.trim() &&
+    (watchedValues.description?.trim() ||
+      watchedValues.location?.trim() ||
+      watchedValues.event_link?.trim());
+
+  // Custom alert message based on what's missing
+  const getAlertMessage = () => {
+    if (missingTimeFields && hasTitleDescriptionLocation) {
+      return "You do not have start/end time of event";
+    }
+    if (missingCategory && hasTitleDescriptionLocation) {
+      return "Type in category";
+    }
+    if (hasMissingFields) {
+      return "Please complete the following required fields:";
+    }
+    return "";
+  };
+
+  const showCustomAlert = missingTimeFields || missingCategory;
 
   async function onSubmit(data: FormValues) {
     setSubmitting(true);
@@ -234,13 +302,14 @@ export default function NewEventPage() {
       setSubmitting(false);
     }
   }
+
   // 🔗 preview URL for the selected poster (or null)
   const posterPreview = useMemo(
     () => (posterFile ? URL.createObjectURL(posterFile) : null),
     [posterFile]
   );
 
-  // 🧹 revoke the object URL when it’s no longer needed
+  // 🧹 revoke the object URL when it's no longer needed
   useEffect(() => {
     return () => {
       if (posterPreview) URL.revokeObjectURL(posterPreview);
@@ -274,6 +343,7 @@ export default function NewEventPage() {
             New Event Request
           </h1>
         </div>
+
         <Alert className="mb-4 bg-blue-50" variant="info">
           <AlertDescription className="text-sm">
             Please submit your event at least{" "}
@@ -307,18 +377,22 @@ export default function NewEventPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Event Title
+                            Event Title <span className="text-red-500">*</span>
                           </FormLabel>
                           <div className="relative">
                             <FormControl>
                               <Input
                                 {...field}
                                 placeholder="Enter your event title..."
-                                className="h-10 pr-36 dark:bg-slate-900/80 dark:text-slate-200"
+                                className={cn(
+                                  "h-10 pr-36 dark:bg-slate-900/80 dark:text-slate-200",
+                                  !field.value?.trim() &&
+                                    "border-red-300 focus:border-red-500"
+                                )}
                               />
                             </FormControl>
 
-                            {/* Category dropdown in the input’s right corner */}
+                            {/* Category dropdown in the input's right corner */}
                             <div className="absolute inset-y-0 right-0 flex items-center pr-1">
                               <FormField
                                 name="event_type"
@@ -328,8 +402,13 @@ export default function NewEventPage() {
                                     value={categoryField.value}
                                     onValueChange={categoryField.onChange}
                                   >
-                                    <SelectTrigger className="h-8 w-36 bg-muted/50 border-0 text-xs">
-                                      <SelectValue placeholder="Category" />
+                                    <SelectTrigger
+                                      className={cn(
+                                        "h-8 w-36 bg-muted/50 border-0 text-xs",
+                                        !categoryField.value && "border-red-300"
+                                      )}
+                                    >
+                                      <SelectValue placeholder="Category *" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {eventTypes.map((t) => (
@@ -354,14 +433,24 @@ export default function NewEventPage() {
 
                   {/* Date + Time range picker */}
                   <div className="lg:col-span-2">
-                    <DateTimePicker />
+                    <div className="space-y-2">
+                      <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                        Event Date (choose start and end time)
+                        <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <DateTimePicker
+                        error={
+                          !watchedValues.start_time || !watchedValues.end_time
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
 
                 {/* Location Section - Switch and Input on Same Line */}
                 <div className="space-y-3">
                   <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Event Location
+                    Event Location <span className="text-red-500">*</span>
                   </FormLabel>
                   <div className="flex items-center gap-4">
                     <FormField
@@ -400,7 +489,12 @@ export default function NewEventPage() {
                                 <Input
                                   placeholder="https://zoom.us/j/..."
                                   {...field}
-                                  className="h-10 dark:bg-slate-900/80 dark:text-slate-200"
+                                  className={cn(
+                                    "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                    isOnline &&
+                                      !field.value?.trim() &&
+                                      "border-red-300 focus:border-red-500"
+                                  )}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -417,7 +511,12 @@ export default function NewEventPage() {
                                 <Input
                                   placeholder="123 Main St, City, State"
                                   {...field}
-                                  className="h-10 dark:bg-slate-900/80 dark:text-slate-200"
+                                  className={cn(
+                                    "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                    !isOnline &&
+                                      !field.value?.trim() &&
+                                      "border-red-300 focus:border-red-500"
+                                  )}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -441,7 +540,11 @@ export default function NewEventPage() {
                         </FormLabel>
                         <FormControl>
                           <Textarea
-                            className="min-h-[80px] resize-none"
+                            className={cn(
+                              "min-h-[80px] resize-none",
+                              !field.value?.trim() &&
+                                "border-red-300 focus:border-red-500"
+                            )}
                             {...field}
                             placeholder="Tell people about your event..."
                           />
@@ -466,7 +569,15 @@ export default function NewEventPage() {
                     )}
                   />
 
-                  <FileUpload onChange={setPosterFile} />
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-2 block">
+                      Event Poster
+                    </label>
+                    <FileUpload onChange={setPosterFile} />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Optional - helps promote your event
+                    </p>
+                  </div>
                 </div>
 
                 {/* Submit Button */}
@@ -504,9 +615,43 @@ export default function NewEventPage() {
                     <AlertDialogContent className="dark:bg-slate-800 dark:border-slate-700">
                       <AlertDialogHeader>
                         <AlertDialogTitle>Heads-up!</AlertDialogTitle>
+
                         <AlertDialogDescription>
+                          {/* Missing Fields Alert */}
+                          {hasMissingFields && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="mb-4"
+                            >
+                              <Alert
+                                variant="destructive"
+                                className="border-red-200 bg-red-50"
+                              >
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription className="text-sm font-medium">
+                                  {getAlertMessage()}
+                                </AlertDescription>
+                                {(!showCustomAlert ||
+                                  getAlertMessage() ===
+                                    "Please complete the following required fields:") && (
+                                  <ul className="mt-2 text-sm space-y-1">
+                                    {missingFields.map((field, index) => (
+                                      <li
+                                        key={index}
+                                        className="flex items-center gap-2"
+                                      >
+                                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                        {field}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </Alert>
+                            </motion.div>
+                          )}
                           Once you create the event you{" "}
-                          <strong>won’t be able to edit it.</strong>
+                          <strong>won't be able to edit it.</strong>
                           <br />
                           Double-check all details!
                         </AlertDialogDescription>
@@ -517,7 +662,7 @@ export default function NewEventPage() {
                           Go back &amp; review
                         </AlertDialogCancel>
 
-                        {/* final “Send anyway” — calls the SAME RHF submit */}
+                        {/* final "Send anyway" — calls the SAME RHF submit */}
                         <AlertDialogAction
                           className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
                           onClick={() =>
