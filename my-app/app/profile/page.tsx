@@ -768,7 +768,7 @@ export default function ProfilePage() {
                       whileHover={{ y: -5, transition: { duration: 0.2 } }}
                     >
                       <Card className="shadow-sm h-full flex flex-col">
-                        <CardHeader className="pb-3">
+                        <CardHeader className="-mb-2">
                           <div className="flex flex-wrap gap-2 mb-2">
                             {project.is_idea ? (
                               <Badge variant="outline">Idea</Badge>
@@ -790,10 +790,12 @@ export default function ProfilePage() {
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="flex-1">
-                          <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                          <p className="text-sm text-muted-foreground line-clamp-3">
                             {project.description}
                           </p>
-                          <div className="flex flex-wrap gap-1 mb-2">
+                        </CardContent>
+                        <CardFooter className="flex flex-col">
+                          <div className="flex flex-wrap gap-2 mb-4 self-start">
                             {project.industry.slice(0, 3).map((ind) => (
                               <Badge
                                 key={ind}
@@ -809,19 +811,19 @@ export default function ProfilePage() {
                               </Badge>
                             )}
                           </div>
-                        </CardContent>
-                        <CardFooter className="flex justify-between">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/projects/${project.id}`}>
-                              View Details
-                            </Link>
-                          </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/projects/edit/${project.id}`}>
-                              <PenLine className="h-3 w-3 mr-1" />
-                              Edit
-                            </Link>
-                          </Button>
+                          <div className="flex justify-between w-full">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/projects/${project.id}`}>
+                                View Details
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/projects/edit/${project.id}`}>
+                                <PenLine className="h-3 w-3 mr-1" />
+                                Edit
+                              </Link>
+                            </Button>
+                          </div>
                         </CardFooter>
                       </Card>
                     </motion.div>
@@ -1221,7 +1223,7 @@ export default function ProfilePage() {
                                     {project.recruitment_status}
                                   </Badge>
                                 </div>
-                                <CardTitle className="text-lg">
+                                <CardTitle className="text-lg -mb-2">
                                   {project.title}
                                 </CardTitle>
                               </CardHeader>
@@ -1230,7 +1232,23 @@ export default function ProfilePage() {
                                   {project.description}
                                 </p>
                               </CardContent>
-                              <CardFooter>
+                              <CardFooter className="flex flex-col">
+                                 <div className="flex flex-wrap gap-2 mb-4 self-start">
+                                  {project.industry.slice(0, 3).map((ind) => (
+                                    <Badge
+                                      key={ind}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {ind}
+                                    </Badge>
+                                  ))}
+                                  {project.industry.length > 3 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      +{project.industry.length - 3} more
+                                    </Badge>
+                                  )}
+                                </div>
                                 <motion.div
                                   whileHover={{ scale: 1.03 }}
                                   whileTap={{ scale: 0.97 }}
