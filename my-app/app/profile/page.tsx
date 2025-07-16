@@ -60,6 +60,7 @@ import { cardVariants, containerVariants, dialogVariants, pageVariants } from "@
 
 /* ────── Icons ────── */
 import {
+  Calendar,
   CalendarIcon,
   Filter,
   Loader2,
@@ -303,6 +304,7 @@ export default function ProfilePage() {
       try {
         setBookmarksLoading(true);
         const bookmarks = await bookmarkService.getAllBookmarks(profile.id);
+        console.log("Fetched user bookmarks:", bookmarks);
         setBookmarkedProjects(bookmarks.projects);
         setBookmarkedUsers(bookmarks.users as unknown as Profile[]);
       } catch (err) {
@@ -355,7 +357,6 @@ export default function ProfilePage() {
           .filter(Boolean)
           .filter(event => new Date(event.end) > new Date());
         validEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-        console.log("Fetched user events:", events);
         setUserEvents(validEvents);
       } catch (err) {
         console.error("Error fetching user events:", err);
@@ -788,7 +789,7 @@ export default function ProfilePage() {
                             Created on {formatDate(project.created_at)}
                           </CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="flex-1">
                           <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
                             {project.description}
                           </p>
@@ -809,7 +810,7 @@ export default function ProfilePage() {
                             )}
                           </div>
                         </CardContent>
-                        <CardFooter className="border-t pt-3 flex justify-between">
+                        <CardFooter className="flex justify-between">
                           <Button variant="outline" size="sm" asChild>
                             <Link href={`/projects/${project.id}`}>
                               View Details
@@ -1194,7 +1195,7 @@ export default function ProfilePage() {
                       transition={{ delay: 0.2 }}
                     >
                       <motion.div
-                        className="grid gap-4 md:grid-cols-2"
+                        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
                         variants={containerVariants}
                         initial="hidden"
                         animate="visible"
@@ -1208,8 +1209,8 @@ export default function ProfilePage() {
                               transition: { duration: 0.2 },
                             }}
                           >
-                            <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
-                              <CardHeader className="pb-3">
+                            <Card className="shadow-sm h-full flex flex-col hover:shadow-md transition-shadow">
+                              <CardHeader>
                                 <div className="flex flex-wrap gap-2 mb-2">
                                   {project.is_idea ? (
                                     <Badge variant="outline">Idea</Badge>
@@ -1224,12 +1225,12 @@ export default function ProfilePage() {
                                   {project.title}
                                 </CardTitle>
                               </CardHeader>
-                              <CardContent>
+                              <CardContent className="flex-1">
                                 <p className="text-sm text-muted-foreground line-clamp-3">
                                   {project.description}
                                 </p>
                               </CardContent>
-                              <CardFooter className="border-t pt-3">
+                              <CardFooter>
                                 <motion.div
                                   whileHover={{ scale: 1.03 }}
                                   whileTap={{ scale: 0.97 }}
@@ -1413,23 +1414,28 @@ export default function ProfilePage() {
                                 transition: { duration: 0.2 },
                               }}
                             >
-                              <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
-                                <CardHeader>
-                                  <CardTitle className="text-lg line-clamp-1">
-                                    {rsvp.title} 
+                              <Card className="shadow-sm h-full flex flex-col hover:shadow-md transition-shadow">
+                                <CardHeader className="-mb-2">
+                                  <CardTitle className="text-xl font-semibold line-clamp-1">
+                                    {rsvp.title}
                                   </CardTitle>
-                                  <div className="">
-                                    {format(rsvp.start_time, "h:mm a")} -{" "}
-                                    {format(rsvp.end_time, "h:mm a")} •{" "}
-                                    {format(rsvp.end_time, "MMM d")}
-                                  </div>
                                 </CardHeader>
-                                <CardContent>
-                                  <p className="text-sm text-muted-foreground line-clamp-3">
-                                    {rsvp.description}  
-                                  </p>
+                                <CardContent className="flex-1">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Calendar className="w-4 h-4" />
+                                      {format(rsvp.end_time, "MMM d, yyyy")}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <MapPin className="w-4 h-4" />
+                                      <span className="line-clamp-1">{rsvp.location}</span>
+                                    </div>
+                                    <p className="text-sm mt-4 text-muted-foreground line-clamp-3">
+                                      {rsvp.description}
+                                    </p>
+                                  </div>
                                 </CardContent>
-                                <CardFooter className="border-t pt-3">
+                                <CardFooter>
                                   <motion.div
                                     whileHover={{ scale: 1.03 }}
                                     whileTap={{ scale: 0.97 }}
@@ -1440,7 +1446,7 @@ export default function ProfilePage() {
                                       variant="outline"
                                       onClick={() => handleEventClick(rsvp)}
                                     >
-                                      View Event 
+                                      View Details 
                                     </Button>
                                   </motion.div>
                                 </CardFooter>
@@ -1453,7 +1459,7 @@ export default function ProfilePage() {
                   )}
 
                   {/* Events your hosting */}
-                  {userEvents.length > 0 && ( // replace with events backend
+                  {userEvents.length > 0 && ( 
                     <motion.div
                       className="space-y-4 mt-6"
                       initial={{ opacity: 0, y: 20 }}
@@ -1469,7 +1475,7 @@ export default function ProfilePage() {
                         initial="hidden"
                         animate="visible"
                       >
-                        {userEvents.map((event) => ( // replace with events backend
+                        {userEvents.map((event) => ( 
                           <motion.div
                             key={event.id}
                             variants={cardVariants}
@@ -1478,45 +1484,43 @@ export default function ProfilePage() {
                               transition: { duration: 0.2 },
                             }}
                           >
-                            <Card className="shadow-sm hover:shadow-md transition-shadow">
-                              <CardContent>
-                                <div className="flex flex-col items-center text-center">
-                                  <motion.div
-                                    whileHover={{ scale: 1.05 }}
-                                    transition={{
-                                      type: "spring",
-                                      stiffness: 300,
-                                    }}
-                                  >
-                                  </motion.div>
-                                  <div>
-                                    <h3 className="font-semibold text-lg line-clamp-1">
-                                      {event.title}
-                                    </h3>
-                                    <div className="">
-                                      {format(event.start, "h:mm a")} -{" "}
-                                      {format(event.end, "h:mm a")} •{" "}
-                                      {format(event.end, "MMM d")}
+                            <Card className="shadow-sm h-full flex flex-col hover:shadow-md transition-shadow">
+                                <CardHeader className="-mb-2">
+                                  <CardTitle className="text-xl font-semibold line-clamp-1">
+                                    {event.title}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex-1">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Calendar className="w-4 h-4" />
+                                      {format(event.end, "MMM d, yyyy")}
                                     </div>
-                                    <p className="text-sm text-muted-foreground line-clamp-2">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <MapPin className="w-4 h-4" />
+                                      <span className="line-clamp-1">{event.location}</span>
+                                    </div>
+                                    <p className="text-sm mt-4 text-muted-foreground line-clamp-3">
                                       {event.description}
                                     </p>
-                                    <motion.div
-                                      whileHover={{ scale: 1.05 }}
-                                      whileTap={{ scale: 0.95 }}
-                                    >
-                                      <Button
-                                        className="w-full h-10"
-                                        variant="outline"
-                                        onClick={() => handleEventClick(event)}
-                                      >
-                                        View Event 
-                                      </Button>
-                                    </motion.div>
                                   </div>
-                                </div>
-                              </CardContent>
-                            </Card>
+                                </CardContent>
+                                <CardFooter>
+                                  <motion.div
+                                    whileHover={{ scale: 1.03 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    className="w-full"
+                                  >
+                                    <Button
+                                      className="w-full h-10"
+                                      variant="outline"
+                                      onClick={() => handleEventClick(event)}
+                                    >
+                                      View Details 
+                                    </Button>
+                                  </motion.div>
+                                </CardFooter>
+                              </Card>
                           </motion.div>
                         ))}
                       </motion.div>
