@@ -75,38 +75,53 @@ export async function POST(req: NextRequest) {
 /* ----------  GET /api/rsvps?eventId=  ---------- */
 /* event organiser view – returns array of RSVPs for an event               */
 export async function GET(req: NextRequest) {
-  const eventId = req.nextUrl.searchParams.get("eventId");
-  if (!eventId) {
-    return NextResponse.json(
-      { error: "eventId query param is required" },
-      { status: 400 }
-    );
-  }
+  const url = req.nextUrl;
+  const eventId = url.searchParams.get("eventId");
+  const userId = url.searchParams.get("userId");
 
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("rsvps")
-    .select("*")
-    .eq("event_id", eventId);
 
-  if (error) {
-    console.error("[RSVP] fetch error", error);
+  try {
+    let query = supabase.from("rsvps").select("*");
+
+    if (eventId) {
+      query = query.eq("event_id", eventId);
+    } else if (userId) {
+      query = query.eq("user_id", userId);
+    } else {
+      return NextResponse.json(
+        { error: "eventId or userId query param is required" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[RSVP] fetch error", error);
+      return NextResponse.json(
+        { error: "Database error: " + error.message },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Database error: " + error.message },
+      data.map((r) => ({
+        id: r.id,
+        eventId: r.event_id,
+        name: r.participant_name,
+        email: r.participant_email,
+        phone: r.phone,
+        notes: r.notes,
+        status: r.status,
+        createdAt: r.created_at,
+      }))
+    );
+  } catch (err: any) {
+    console.error("[RSVP] fatal", err);
+    return NextResponse.json(
+      { error: "Unexpected error: " + err.message },
       { status: 500 }
     );
   }
-
-  return NextResponse.json(
-    data.map((r) => ({
-      id: r.id,
-      eventId: r.event_id,
-      name: r.participant_name,
-      email: r.participant_email,
-      phone: r.phone,
-      notes: r.notes,
-      status: r.status,
-      createdAt: r.created_at,
-    }))
-  );
 }

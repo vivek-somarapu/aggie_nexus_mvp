@@ -8,6 +8,7 @@ import type { EventType } from "@/lib/services/event-service";
 export async function GET(request: NextRequest) {
   // 1) parse & validate status query
   const raw = request.nextUrl.searchParams.get("status")?.trim().toLowerCase();
+  const creator = request.nextUrl.searchParams.get("creator");
   const valid = ["pending", "approved", "rejected"] as const;
   const status: "pending" | "approved" | "rejected" = valid.includes(raw as any)
     ? (raw as any)
@@ -31,6 +32,39 @@ export async function GET(request: NextRequest) {
       }
 
       // now that user is manager, fetch
+      // If filtering by creator
+      if (creator) {
+        const { data, error } = await supabase
+          .from("events")
+          .select("*")
+          .eq("created_by", creator)
+          .eq("status", status)
+          .order("start_time", { ascending: true });
+
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json(
+          data.map((e) => ({
+            id: e.id,
+            title: e.title,
+            description: e.description,
+            start: e.start_time,
+            end: e.end_time,
+            location: e.location,
+            event_type: e.event_type,
+            poster_url: e.poster_url,
+            created_by: e.created_by,
+            status: e.status,
+            approved_by: e.approved_by,
+            approved_at: e.approved_at,
+            created_at: e.created_at,
+            updated_at: e.updated_at,
+          }))
+        );
+      }
+
       const events = await getEventsByStatus(status);
       return NextResponse.json(
         events.map((e) => ({
@@ -54,6 +88,40 @@ export async function GET(request: NextRequest) {
   }
 
   // 3) otherwise public GET for approved
+  // If filtering by creator
+  if (creator) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .eq("created_by", creator)
+      .eq("status", status)
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(
+      data.map((e) => ({
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        start: e.start_time,
+        end: e.end_time,
+        location: e.location,
+        event_type: e.event_type,
+        poster_url: e.poster_url,
+        created_by: e.created_by,
+        status: e.status,
+        approved_by: e.approved_by,
+        approved_at: e.approved_at,
+        created_at: e.created_at,
+        updated_at: e.updated_at,
+      }))
+    );
+  }
+
   const events = await getEventsByStatus(status);
   return NextResponse.json(
     events.map((e) => ({

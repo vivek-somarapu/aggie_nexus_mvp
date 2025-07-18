@@ -331,7 +331,7 @@ export default function NewEventPage() {
           {/* BACK → Calendar */}
           <Button
             type="button"
-            onClick={() => router.push("/calendar")}
+            onClick={() => router.back()}
             className="h-9 px-3 rounded-md bg-muted/90 hover:bg-muted text-foreground font-medium shadow-sm"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
