@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import { X, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { projectService } from "@/lib/services/project-service";
@@ -16,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
 import {
   Select,
   SelectContent,
@@ -30,27 +32,246 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
+import { TagSelector } from "@/components/ui/search-tag-selector";
+
 
 // Industry options
 const industryOptions = [
-  "Technology",
-  "Healthcare",
-  "Education",
+  "Agriculture, Food & Natural Resources",
+  "Architecture & Construction",
+  "Arts, A/V Technology & Communications",
+  "Business Management & Administration",
+  "Education & Training",
   "Finance",
-  "Entertainment",
-  "Retail",
+  "Government & Public Administration",
+  "Health Science",
+  "Human Services",
+  "Hospitality & Tourism",
+  "Information Technology",
+  "Law, Public Safety, Corrections & Security",
   "Manufacturing",
-  "Agriculture",
-  "Energy",
-  "Transportation",
-  "Real Estate",
-  "Nonprofit",
-  "Sports",
-  "Food & Beverage",
-  "Other",
+  "Marketing",
+  "Science, Technology, Engineering & Mathematics",
+  "Transportation, Distribution & Logistics",
 ];
 
-// Skill options
+const industrySkillsMap: { [industryOptions: string]: string[] } = {
+  "Agriculture, Food & Natural Resources": [
+    "Crop Management",
+    "Animal Science",
+    "Sustainable Farming",
+    "Agribusiness",
+    "Soil Analysis",
+    "Food Safety",
+    "Irrigation Systems",
+    "Livestock Management",
+    "Greenhouse Management",
+    "Organic Farming",
+    "Environmental Science"
+  ],
+  "Architecture & Construction": [
+    "Blueprint Reading",
+    "AutoCAD",
+    "Structural Analysis",
+    "Construction Management",
+    "Building Codes",
+    "Surveying",
+    "Revit",
+    "Construction Safety",
+    "OSHA Regulations",
+    "HVAC Systems",
+    "Electrical Systems"
+  ],
+  "Arts, A/V Technology & Communications": [
+    "Graphic Design",
+    "Video Editing",
+    "Photography",
+    "Animation",
+    "Public Speaking",
+    "Content Creation",
+    "3D Modeling",
+    "UX/UI Design",
+    "Sound Engineering",
+    "Typography",
+    "Web Design"
+  ],
+  "Business Management & Administration": [
+    "Project Management",
+    "Strategic Planning",
+    "Business Analysis",
+    "Operations Management",
+    "Microsoft Excel",
+    "Budgeting",
+    "Human Resources",
+    "Negotiation",
+    "Customer Relationship Management (CRM)",
+    "Data Analytics",
+    "Business Communication"
+  ],
+  "Education & Training": [
+    "Curriculum Design",
+    "Classroom Management",
+    "Lesson Planning",
+    "Instructional Design",
+    "Student Assessment",
+    "Educational Technology",
+    "Learning Management Systems (LMS)",
+    "Special Education",
+    "Behavior Management",
+    "STEM Education",
+    "E-learning Tools"
+  ],
+  "Finance": [
+    "Financial Modeling",
+    "Excel",
+    "Accounting",
+    "Investment Analysis",
+    "Budget Forecasting",
+    "Risk Management",
+    "Corporate Finance",
+    "Tax Preparation",
+    "Audit",
+    "Valuation",
+    "Portfolio Management"
+  ],
+  "Government & Public Administration": [
+    "Policy Analysis",
+    "Public Speaking",
+    "Regulatory Compliance",
+    "Budget Planning",
+    "Civic Engagement",
+    "Research",
+    "Public Policy",
+    "Legislative Analysis",
+    "Urban Planning",
+    "Crisis Management",
+    "Intergovernmental Relations"
+  ],
+  "Health Science": [
+    "EMR Systems",
+    "HIPAA Compliance",
+    "Clinical Skills",
+    "Medical Terminology",
+    "Patient Care",
+    "Pharmacology",
+    "Anatomy & Physiology",
+    "Health Informatics",
+    "Medical Coding",
+    "Patient Education",
+    "Nutrition"
+  ],
+  "Human Services": [
+    "Counseling",
+    "Case Management",
+    "Crisis Intervention",
+    "Empathy",
+    "Social Work",
+    "Community Outreach",
+    "Addiction Counseling",
+    "Family Support Services",
+    "Therapeutic Techniques",
+    "Youth Services",
+    "Cultural Competence"
+  ],
+  "Hospitality & Tourism": [
+    "Customer Service",
+    "Event Planning",
+    "Food & Beverage Service",
+    "Hotel Management",
+    "Travel Coordination",
+    "Conflict Resolution",
+    "Tourism Marketing",
+    "Hospitality Law",
+    "Event Budgeting",
+    "Culinary Arts",
+    "Guest Services"
+  ],
+  "Information Technology": [
+    "Programming",
+    "Data Analysis",
+    "Cybersecurity",
+    "Cloud Computing",
+    "Networking",
+    "IT Support",
+    "Fullstack Developer",
+    "Backend Developer",
+    "DevOps",
+    "Agile Methodologies",
+    "Machine Learning",
+    "Mobile App Development",
+    "Database Administration",
+    "System Architecture",
+    "Version Control (e.g. Git)"
+  ],
+  "Law, Public Safety, Corrections & Security": [
+    "Legal Research",
+    "Criminal Justice",
+    "Emergency Response",
+    "Security Operations",
+    "Report Writing",
+    "Surveillance",
+    "Court Procedures",
+    "Forensic Science",
+    "Law Enforcement Tactics",
+    "Correctional Management",
+    "Criminal Psychology"
+  ],
+  "Manufacturing": [
+    "Machine Operation",
+    "Quality Control",
+    "Lean Manufacturing",
+    "CAD/CAM",
+    "Industrial Safety",
+    "Inventory Management",
+    "Robotics",
+    "Welding",
+    "Production Planning",
+    "CNC Programming",
+    "Assembly Line Operations"
+  ],
+  "Marketing": [
+    "Digital Marketing",
+    "SEO",
+    "Market Research",
+    "Brand Management",
+    "Copywriting",
+    "Social Media",
+    "Email Marketing",
+    "Content Strategy",
+    "Influencer Marketing",
+    "CRM Tools",
+    "Marketing Automation"
+  ],
+  "Science, Technology, Engineering & Mathematics": [
+    "Lab Skills",
+    "Data Analysis",
+    "Mathematical Modeling",
+    "Scientific Research",
+    "Engineering Design",
+    "Critical Thinking",
+    "Python Programming",
+    "Control Systems",
+    "Circuit Design",
+    "Systems Engineering",
+    "Simulation Modeling"
+  ],
+  "Transportation, Distribution & Logistics": [
+    "Logistics Management",
+    "Supply Chain Operations",
+    "Fleet Management",
+    "Route Optimization",
+    "Inventory Tracking",
+    "Warehousing",
+    "Freight Handling",
+    "DOT Compliance",
+    "GPS Navigation Systems",
+    "Customs Regulations",
+    "Logistics Software"
+  ]
+};
+
+
+// Default skill options
 const skillOptions = [
   "Programming",
   "Design",
@@ -130,6 +351,49 @@ export default function NewProjectPage() {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+  if (selectedIndustries.length === 0) {
+    // No industries selected, use default skills
+    return;
+  }
+
+  // Get all skills from selected industries
+  const industrySkills = selectedIndustries.reduce((allSkills: string[], industry) => {
+    const skills = industrySkillsMap[industry] || [];
+    return [...allSkills, ...skills];
+  }, []);
+
+  // Remove duplicates
+  const uniqueIndustrySkills = [...new Set(industrySkills)];
+
+  // Filter out selected skills that are no longer available
+  const validSelectedSkills = selectedSkills.filter(skill => 
+    uniqueIndustrySkills.includes(skill)
+  );
+
+  // Update selected skills if any were filtered out
+  if (validSelectedSkills.length !== selectedSkills.length) {
+    setSelectedSkills(validSelectedSkills);
+  }
+}, [selectedIndustries]); // Only depend on selectedIndustries to avoid infinite loops
+
+// Create a computed value for available skills
+const getAvailableSkills = () => {
+  if (selectedIndustries.length === 0) {
+    return skillOptions; // Return default skills when no industry is selected
+  }
+
+  // Get skills from selected industries
+  const industrySkills = selectedIndustries.reduce((allSkills: string[], industry) => {
+    const skills = industrySkillsMap[industry] || [];
+    return [...allSkills, ...skills];
+  }, []);
+
+  // Remove duplicates and sort
+  return [...new Set(industrySkills)].sort();
+};
+
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -411,58 +675,42 @@ export default function NewProjectPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Categories & Skills</CardTitle>
+              <CardTitle>Industries & Skills</CardTitle>
               <CardDescription>
-                Categorize your project and specify required skills
+                Categorize your project by industry
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label>Industries (Select all that apply)</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                  {industryOptions.map((industry) => (
-                    <div key={industry} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`industry-${industry}`}
-                        checked={selectedIndustries.includes(industry)}
-                        onChange={() => handleIndustrySelect(industry)}
-                        className="rounded border-gray-300"
-                      />
-                      <Label
-                        htmlFor={`industry-${industry}`}
-                        className="font-normal"
-                      >
-                        {industry}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                <TagSelector
+                  label="Industries"
+                  options={industryOptions}
+                  selected={selectedIndustries}
+                  onChange={setSelectedIndustries}
+                  maxTags={10}
+                  placeholder="Type and press Enter"
+                />
               </div>
 
               <Separator />
 
               <div className="space-y-2">
-                <Label>Required Skills (Select all that apply)</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                  {skillOptions.map((skill) => (
-                    <div key={skill} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`skill-${skill}`}
-                        checked={selectedSkills.includes(skill)}
-                        onChange={() => handleSkillSelect(skill)}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor={`skill-${skill}`} className="font-normal">
-                        {skill}
-                      </Label>
-                    </div>
-                  ))}
+                <TagSelector
+                  label="Required Skills"
+                  options={getAvailableSkills()}
+                  selected={selectedSkills}
+                  onChange={setSelectedSkills}
+                  maxTags={10}
+                  placeholder="Type and press Enter"
+                />
+                <div className="text-sm text-muted-foreground">
+                
+                  
                 </div>
               </div>
             </CardContent>
           </Card>
+
 
           <Card>
             <CardHeader>
