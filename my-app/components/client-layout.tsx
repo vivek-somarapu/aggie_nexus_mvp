@@ -91,7 +91,7 @@ export default function ClientLayout({
     // Return fallback UI for critical auth errors
     return (
       <div className="flex flex-col">
-        <div className="flex-1 container mx-auto py-5 px-4">
+        <div className="flex-1 container mx-auto py-5 px-2">
           <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-md">
             <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">
               Authentication Error
@@ -134,7 +134,7 @@ export default function ClientLayout({
               </p>
             </div>
           )}
-          <main className="flex-1 container mx-auto py-5 px-4">{children}</main>
+          <main className="flex-1 container mx-auto py-5 px-2">{children}</main>
         </>
       ) : (
         <>
@@ -146,7 +146,7 @@ export default function ClientLayout({
               </p>
             </div>
           )}
-          <main className="flex-1 container mx-auto py-5 px-4">{children}</main>
+          <main className="flex-1 container mx-auto py-5 px-2">{children}</main>
         </>
       )}
       <ThemeToggle />

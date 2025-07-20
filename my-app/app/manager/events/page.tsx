@@ -1,46 +1,68 @@
+// app/(manager)/manager-events/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/client";
+import { eventService } from "@/lib/services/event-service";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Calendar, CheckCircle, Clock, Info, MapPin, UserCircle2, XCircle } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import {
+  AlertCircle,
+  CheckCircle,
+  Info,
+  Calendar as CalendarIcon,
+  MapPin,
+  XCircle,
+} from "lucide-react";
 import { motion } from "framer-motion";
+import { format } from "date-fns";
+import Link from "next/link";
+import Image from "next/image";
+import { SquarePoster } from "@/components/ui/SquarePoster";
 
-// Define Event type for this page
+type Status = "pending" | "approved" | "rejected";
+
+interface Creator {
+  id: string;
+  full_name: string;
+  avatar: string | null;
+}
+
 interface Event {
   id: string;
   title: string;
-  description: string;
-  start_time: string;
-  end_time: string;
-  location: string;
-  color: string;
+  description: string | null;
+  start: string;
+  end: string;
+  location: string | null;
   event_type: string;
   created_by: string;
+  creator?: Creator;
+  poster_url?: string | null;
   created_at: string;
-  status: 'pending' | 'approved' | 'rejected';
-  organizer_name?: string;
+  status: Status;
 }
 
-// Animation variants
 const pageVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      duration: 0.5,
-      when: "beforeChildren",
-      staggerChildren: 0.1
-    }
-  }
+    transition: { when: "beforeChildren", staggerChildren: 0.1 },
+  },
 };
 
 const itemVariants = {
@@ -48,120 +70,99 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: "spring", damping: 12, stiffness: 100 }
-  }
+    transition: { type: "spring", damping: 12, stiffness: 100 },
+  },
 };
 
 export default function ManagerEventsPage() {
   const { user, isLoading: authLoading, isManager } = useAuth();
   const router = useRouter();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [activeTab, setActiveTab] = useState<Status>("pending");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Redirect non-managers
+  // redirect non‑managers
   useEffect(() => {
     if (!authLoading && !isManager) {
-      router.push('/calendar');
+      router.push("/calendar");
     }
   }, [authLoading, isManager, router]);
 
-  // Fetch events based on status
-  const fetchEvents = async (status: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const supabase = createClient();
-      
-      // Fetch events with the specified status
-      const { data, error } = await supabase
-        .from('events')
-        .select(`
-          *,
-          profiles:created_by (full_name)
-        `)
-        .eq('status', status)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Map the data to include organizer name
-      const eventsWithOrganizerName = data.map((event: any) => ({
-        ...event,
-        organizer_name: event.profiles?.full_name || 'Unknown',
-      }));
-      
-      setEvents(eventsWithOrganizerName);
-    } catch (err) {
-      console.error("Error fetching events:", err);
-      setError("Failed to load events. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch events on tab change
+  // load & rehydrate on tab change
   useEffect(() => {
     if (!authLoading && isManager) {
-      fetchEvents(activeTab);
+      (async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+          // 1️⃣ fetch lightweight list
+          const list = await eventService.getEventsByStatus(activeTab);
+
+          // 2️⃣ fetch full details including .creator & .poster_url
+          const enriched = await Promise.all(
+            list.map(async (e) => {
+              const full = await eventService.getEvent(e.id);
+              return {
+                ...e,
+                creator: full?.creator,
+                poster_url: full?.poster_url,
+              };
+            })
+          );
+
+          setEvents(enriched);
+        } catch {
+          setError("Failed to load events.");
+        } finally {
+          setIsLoading(false);
+        }
+      })();
     }
   }, [activeTab, authLoading, isManager]);
 
-  // Handle event status update
-  const updateEventStatus = async (eventId: string, status: 'approved' | 'rejected') => {
+  const handleChangeStatus = async (id: string, newStatus: Status) => {
     try {
       setError(null);
-      
-      const supabase = createClient();
-      
-      // Call the database function to update the event status
-      const { data, error } = await supabase.rpc('update_event_status', {
-        event_id: eventId,
-        new_status: status,
-        manager_id: user?.id
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Update local state
-      setEvents(prev => prev.filter(event => event.id !== eventId));
-      
-      // Show success message
-      setSuccess(`Event ${status === 'approved' ? 'approved' : 'rejected'} successfully.`);
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(null);
-      }, 3000);
-      
-    } catch (err) {
-      console.error("Error updating event status:", err);
-      setError("Failed to update event status. Please try again.");
+      await eventService.updateEventStatus(id, newStatus);
+
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+
+      toast.success(
+        `Event ${
+          newStatus === "approved"
+            ? "Approved ✅"
+            : newStatus === "rejected"
+            ? "Rejected ❌"
+            : "Updated"
+        }`
+      );
+    } catch {
+      setError("Could not update status. Try again.");
+      toast.error("Could not update status. Try again.");
     }
   };
 
-  // Event type category labels
   const categories: Record<string, string> = {
     workshop: "Workshop",
     info_session: "Info Session",
-    networking: "Networking Event",
+    networking: "Networking",
     hackathon: "Hackathon",
-    deadline: "Project Deadline",
+    deadline: "Deadline",
     meeting: "Meeting",
-    personal: "Personal Event",
-    other: "Other Event"
+    personal: "Personal",
+    other: "Other",
   };
 
-  // Function to get badge variant based on event type
   const getBadgeVariant = (type: string) => {
-    switch(type) {
+    switch (type) {
       case "workshop":
         return "blue";
       case "info_session":
@@ -183,13 +184,12 @@ export default function ManagerEventsPage() {
 
   if (authLoading) {
     return (
-      <div className="container mx-auto max-w-7xl p-4 space-y-6">
-        <div className="h-8 w-64 bg-muted rounded animate-pulse mb-4"></div>
-        <div className="h-6 w-96 bg-muted/60 rounded animate-pulse mb-8"></div>
-        <Skeleton className="h-12 w-full mb-6" />
-        <div className="grid gap-6 md:grid-cols-2">
-          {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="h-60 w-full" />
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-6 w-64" />
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-40 w-full" />
           ))}
         </div>
       </div>
@@ -197,20 +197,18 @@ export default function ManagerEventsPage() {
   }
 
   if (!isManager) {
-    return null; // Will be redirected by the useEffect
+    return null;
   }
 
   return (
-    <motion.div 
+    <motion.div
       className="container mx-auto max-w-7xl p-4 space-y-6"
       variants={pageVariants}
       initial="hidden"
       animate="visible"
     >
       <motion.div variants={itemVariants}>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Event Management
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Event Management</h1>
         <p className="text-muted-foreground">
           Review, approve, or reject event submissions
         </p>
@@ -225,272 +223,399 @@ export default function ManagerEventsPage() {
         </motion.div>
       )}
 
-      {success && (
-        <motion.div variants={itemVariants}>
-          <Alert className="bg-green-50 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        </motion.div>
-      )}
-
       <motion.div variants={itemVariants}>
-        <Tabs 
-          defaultValue="pending" 
+        <div className=" mb-4 flex flex-wrap items-center justify-between gap-4">
+          {/* 🔎 Search Bar */}
+          <input
+            type="text"
+            placeholder="Search by title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="px-3 py-2 text-sm border rounded-md w-full sm:w-64"
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 📂 Event Type Filter */}
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-3 py-2 text-sm border rounded-md"
+            >
+              <option value="all">All Types</option>
+              {Object.entries(categories).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            {/* ⬆️⬇️ Sort Dropdown */}
+            <select
+              value={sortOrder}
+              onChange={(e) =>
+                setSortOrder(e.target.value as "newest" | "oldest")
+              }
+              className="px-3 py-2 text-sm border rounded-md"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </div>
+        </div>
+
+        <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as 'pending' | 'approved' | 'rejected')}
-          className="w-full"
+          onValueChange={(v) => setActiveTab(v as Status)}
         >
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid grid-cols-3 w-full">
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="approved">Approved</TabsTrigger>
             <TabsTrigger value="rejected">Rejected</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="pending">
-            {isLoading ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-60 w-full" />
-                ))}
-              </div>
-            ) : events.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6 text-center">
-                  <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No pending events to review</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                {events.map((event) => (
-                  <motion.div 
-                    key={event.id}
-                    variants={itemVariants}
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                  >
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <Badge variant={getBadgeVariant(event.event_type) as any}>
-                            {categories[event.event_type] || 'Event'}
-                          </Badge>
-                          <Badge variant="outline">Pending</Badge>
-                        </div>
-                        <CardTitle>{event.title}</CardTitle>
-                        <CardDescription>
-                          <div className="flex items-center gap-1 text-sm">
-                            <UserCircle2 className="h-3 w-3" />
-                            <span>Submitted by {event.organizer_name}</span>
-                          </div>
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="flex items-start gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm">
-                              {format(parseISO(event.start_time), "MMMM d, yyyy")}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(parseISO(event.start_time), "h:mm a")} - {format(parseISO(event.end_time), "h:mm a")}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {event.location && (
-                          <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                            <p className="text-sm">{event.location}</p>
-                          </div>
-                        )}
-                        
-                        <div className="flex items-start gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                          <p className="text-xs text-muted-foreground">
-                            Submitted {format(parseISO(event.created_at), "MMM d, yyyy 'at' h:mm a")}
-                          </p>
-                        </div>
-                        
-                        {event.description && (
-                          <div className="mt-2">
-                            <p className="text-sm line-clamp-3">{event.description}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter className="flex flex-col gap-2">
-                        <Button 
-                          variant="outline" 
-                          className="w-full" 
-                          onClick={() => updateEventStatus(event.id, 'rejected')}
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Reject
-                        </Button>
-                        <Button 
-                          className="w-full" 
-                          onClick={() => updateEventStatus(event.id, 'approved')}
-                        >
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Approve
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="approved">
-            {isLoading ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-60 w-full" />
-                ))}
-              </div>
-            ) : events.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6 text-center">
-                  <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No approved events</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                {events.map((event) => (
-                  <motion.div 
-                    key={event.id}
-                    variants={itemVariants}
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                  >
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <Badge variant={getBadgeVariant(event.event_type) as any}>
-                            {categories[event.event_type] || 'Event'}
-                          </Badge>
-                          <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-300">Approved</Badge>
-                        </div>
-                        <CardTitle>{event.title}</CardTitle>
-                        <CardDescription>
-                          <div className="flex items-center gap-1 text-sm">
-                            <UserCircle2 className="h-3 w-3" />
-                            <span>Organized by {event.organizer_name}</span>
-                          </div>
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="flex items-start gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm">
-                              {format(parseISO(event.start_time), "MMMM d, yyyy")}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(parseISO(event.start_time), "h:mm a")} - {format(parseISO(event.end_time), "h:mm a")}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {event.location && (
-                          <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                            <p className="text-sm">{event.location}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter>
-                        <Button 
-                          variant="outline" 
-                          className="w-full" 
-                          onClick={() => router.push(`/calendar/${event.id}`)}
-                        >
-                          View Details
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="rejected">
-            {isLoading ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-60 w-full" />
-                ))}
-              </div>
-            ) : events.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6 text-center">
-                  <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No rejected events</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                {events.map((event) => (
-                  <motion.div 
-                    key={event.id}
-                    variants={itemVariants}
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                  >
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <Badge variant={getBadgeVariant(event.event_type) as any}>
-                            {categories[event.event_type] || 'Event'}
-                          </Badge>
-                          <Badge variant="destructive">Rejected</Badge>
-                        </div>
-                        <CardTitle>{event.title}</CardTitle>
-                        <CardDescription>
-                          <div className="flex items-center gap-1 text-sm">
-                            <UserCircle2 className="h-3 w-3" />
-                            <span>Submitted by {event.organizer_name}</span>
-                          </div>
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="flex items-start gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm">
-                              {format(parseISO(event.start_time), "MMMM d, yyyy")}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(parseISO(event.start_time), "h:mm a")} - {format(parseISO(event.end_time), "h:mm a")}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {event.location && (
-                          <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                            <p className="text-sm">{event.location}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardFooter>
-                        <Button 
-                          variant="outline" 
-                          className="w-full" 
-                          onClick={() => updateEventStatus(event.id, 'approved')}
-                        >
-                          Move to Approved
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
+
+          {(["pending", "approved", "rejected"] as Status[]).map((status) => (
+            <TabsContent key={status} value={status}>
+              {isLoading ? (
+                <div className="grid grid-cols-2 gap-4">
+                  {[1, 2].map((i) => (
+                    <Skeleton key={i} className="h-40 w-full" />
+                  ))}
+                </div>
+              ) : events.length === 0 ? (
+                <Card>
+                  <CardContent className="py-6 text-center">
+                    <Info className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground">No {status} events</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {events
+                    .filter((e) =>
+                      filterType === "all" ? true : e.event_type === filterType
+                    )
+                    .filter((e) =>
+                      e.title.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .sort((a, b) => {
+                      const dateA = new Date(a.start).getTime();
+                      const dateB = new Date(b.start).getTime();
+                      return sortOrder === "newest"
+                        ? dateB - dateA
+                        : dateA - dateB;
+                    })
+                    .map((e) => (
+                      <motion.div
+                        key={e.id}
+                        variants={itemVariants}
+                        whileHover={{ y: -4 }}
+                      >
+                        <Card>
+                          <CardHeader>
+                            <div className="flex justify-between items-center">
+                              <Badge variant={getBadgeVariant(e.event_type)}>
+                                {categories[e.event_type] || "Event"}
+                              </Badge>
+                              <Badge
+                                variant={
+                                  status === "pending"
+                                    ? "outline"
+                                    : status === "approved"
+                                    ? "secondary"
+                                    : "destructive"
+                                }
+                              >
+                                {status.charAt(0).toUpperCase() +
+                                  status.slice(1)}
+                              </Badge>
+                            </div>
+                            <CardTitle className="pt-2">{e.title}</CardTitle>
+                            {e.creator && (
+                              <CardDescription>
+                                <div className="flex items-center gap-2 group">
+                                  <Link
+                                    href={`/users/${e.created_by}`}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <motion.div
+                                      whileHover={{ scale: 1.05 }}
+                                      transition={{
+                                        type: "spring",
+                                        stiffness: 400,
+                                        damping: 10,
+                                      }}
+                                      className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
+                                    >
+                                      {e.creator.avatar ? (
+                                        <Image
+                                          src={e.creator.avatar}
+                                          alt={e.creator.full_name}
+                                          fill
+                                          className="object-cover"
+                                          sizes="32px"
+                                          priority
+                                        />
+                                      ) : (
+                                        <span className="text-xs font-medium text-[#500000]">
+                                          {e.creator.full_name
+                                            .charAt(0)
+                                            .toUpperCase()}
+                                        </span>
+                                      )}
+                                    </motion.div>
+                                    <p className="text-sm text-muted-foreground font-semibold group-hover:underline group-hover:text-foreground transition-colors duration-200">
+                                      Submitted by {e.creator.full_name}
+                                    </p>
+                                  </Link>
+                                </div>
+                              </CardDescription>
+                            )}
+                            {e.poster_url && (
+                              <div className="mt-2">
+                                <SquarePoster
+                                  src={e.poster_url}
+                                  alt={e.title}
+                                />
+                              </div>
+                            )}
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            {/* Date, Time & Location */}
+                            <div className="flex items-center gap-3 text-xs flex-wrap">
+                              {/* Calendar date icon */}
+                              <div className="w-8 h-8 rounded-sm border bg-background text-center overflow-hidden shadow-sm shrink-0">
+                                <div className="bg-muted text-[8px] font-medium py-[3px] leading-none">
+                                  {format(e.start, "MMM").toUpperCase()}
+                                </div>
+                                <div className="text-[12px] font-bold text-foreground leading-none pt-[2px]">
+                                  {format(e.start, "d")}
+                                </div>
+                              </div>
+
+                              {/* Date & Time */}
+                              <div className="text-[10px] dark:text-slate-100">
+                                <p className="font-semibold text-[14px]">
+                                  {format(e.start, "EEE, MMMM d")}
+                                </p>
+                                <p className="text-muted-foreground">
+                                  {format(e.start, "h:mm a")} –{" "}
+                                  {format(e.end, "h:mm a")}
+                                </p>
+                              </div>
+
+                              {/* Separator */}
+                              {e.location && (
+                                <span className="text-muted-foreground">|</span>
+                              )}
+
+                              {/* Location */}
+                              {e.location && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <MapPin className="h-3 w-3" />
+                                  <span className="truncate max-w-[140px]">
+                                    {/^(https?:\/\/)/i.test(e.location)
+                                      ? "Online Event"
+                                      : e.location.split(",")[0]}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {e.description && (
+                              <p className="text-sm line-clamp-3">
+                                {e.description}
+                              </p>
+                            )}
+                          </CardContent>
+                          {status === "pending" && (
+                            <CardFooter className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  handleChangeStatus(e.id, "rejected")
+                                }
+                                className="flex-1"
+                              >
+                                <XCircle className="mr-1 h-4 w-4" /> Reject
+                              </Button>
+                              <Button
+                                onClick={() =>
+                                  handleChangeStatus(e.id, "approved")
+                                }
+                                className="flex-1"
+                              >
+                                <CheckCircle className="mr-1 h-4 w-4" /> Approve
+                              </Button>
+                            </CardFooter>
+                          )}
+                          {status === "approved" && (
+                            <CardFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedEvent(e);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                View Details
+                              </Button>
+                            </CardFooter>
+                          )}
+
+                          {status === "rejected" && (
+                            <CardFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  handleChangeStatus(e.id, "approved")
+                                }
+                              >
+                                Move to Approved
+                              </Button>
+                            </CardFooter>
+                          )}
+                        </Card>
+                      </motion.div>
+                    ))}
+                </div>
+              )}
+            </TabsContent>
+          ))}
         </Tabs>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent
+            className="w-full max-h-[100dvh] p-0 overflow-hidden overflow-y-auto scrollbar-hidden 
+      sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:bg-slate-900/80"
+          >
+            {selectedEvent && (
+              <div className="py-5 px-4 space-y-6">
+                {/* Poster */}
+                {selectedEvent.poster_url && (
+                  <SquarePoster
+                    src={selectedEvent.poster_url}
+                    alt={`${selectedEvent.title} poster`}
+                  />
+                )}
+
+                {/* Title & Host */}
+                <div className="pb-2">
+                  <DialogTitle className="text-2xl font-bold dark:text-slate-100">
+                    {selectedEvent.title}
+                  </DialogTitle>
+                  {selectedEvent.creator && (
+                    <div className="flex items-center gap-2 pt-2 group">
+                      <Link
+                        href={`/users/${selectedEvent.created_by}`}
+                        className="flex items-center gap-2"
+                      >
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 10,
+                          }}
+                          className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
+                        >
+                          {selectedEvent.creator.avatar ? (
+                            <Image
+                              src={selectedEvent.creator.avatar}
+                              alt={selectedEvent.creator.full_name}
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                              priority
+                            />
+                          ) : (
+                            <span className="text-xs font-medium text-[#500000]">
+                              {selectedEvent.creator.full_name
+                                .charAt(0)
+                                .toUpperCase()}
+                            </span>
+                          )}
+                        </motion.div>
+                        <p className="text-sm text-muted-foreground font-semibold group-hover:underline group-hover:text-foreground transition-colors duration-200">
+                          Hosted by {selectedEvent.creator.full_name}
+                        </p>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+
+                {/* Date, Time & Location */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="w-10 h-10 rounded-sm border bg-background text-center overflow-hidden shadow-sm shrink-0">
+                    <div className="bg-muted text-[10px] dark:text-slate-100 font-medium py-[3px] leading-none">
+                      {format(selectedEvent.start, "MMM").toUpperCase()}
+                    </div>
+                    <div className="text-[15px] dark:text-slate-100 font-extrabold text-foreground leading-none pt-[3px]">
+                      {format(selectedEvent.start, "d")}
+                    </div>
+                  </div>
+                  <div className="text-sm dark:text-slate-100">
+                    <p className="font-semibold text-[14px]">
+                      {format(selectedEvent.start, "EEE, MMMM d")}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {format(selectedEvent.start, "h:mm a")} –{" "}
+                      {format(selectedEvent.end, "h:mm a")}
+                    </p>
+                  </div>
+
+                  {selectedEvent.location && (
+                    <div className="w-px h-6 bg-border" />
+                  )}
+
+                  {selectedEvent.location && (
+                    <div className="flex items-center gap-2 text-sm dark:text-slate-100">
+                      <div className="w-10 h-10 border rounded-md bg-background flex items-center justify-center">
+                        <MapPin className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-[14px]">
+                          {/^(https?:\/\/)/i.test(selectedEvent.location)
+                            ? "Online Event"
+                            : selectedEvent.location}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {/^(https?:\/\/)/i.test(selectedEvent.location)
+                            ? ""
+                            : "In-person Event"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* About Event */}
+                {selectedEvent.description && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                      About Event
+                    </h3>
+                    <div className="rounded-md px-4 py-2">
+                      <p className="text-sm leading-relaxed dark:text-slate-200">
+                        {selectedEvent.description.trim()}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      router.push(`/calendar/${selectedEvent.id}`);
+                    }}
+                  >
+                    See Event in Calendar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </motion.div>
     </motion.div>
   );
-} 
+}
