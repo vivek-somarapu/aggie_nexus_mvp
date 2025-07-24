@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     
     // Apply filters if provided
     if (searchTerm) {
-      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      // Match projects whose title contains the search term (case-insensitive)
+      query = query.ilike('title', `%${searchTerm}%`);
     }
     
     if (skill) {
