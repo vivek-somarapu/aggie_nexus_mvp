@@ -33,47 +33,12 @@ import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-
-// Animation variants
-const pageVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5 },
-  },
-  exit: {
-    opacity: 0,
-    transition: { duration: 0.3 },
-  },
-};
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.07,
-    },
-  },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: "spring",
-      damping: 15,
-      stiffness: 100,
-    },
-  },
-};
-
-const buttonVariants = {
-  tap: { scale: 0.98 },
-};
+import {
+  pageVariants,
+  containerVariants,
+  cardVariants,
+  buttonVariants,
+} from "@/lib/constants";
 
 export default function ProjectsPage() {
   const { authUser: currentUser, isLoading: authLoading } = useAuth();
@@ -278,8 +243,8 @@ export default function ProjectsPage() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.5 }}
             >
-              Discover innovative ideas and collaborate on impactful projects with
-              fellow Aggies
+              Discover innovative ideas and collaborate on impactful projects
+              with fellow Aggies
             </motion.p>
           </div>
         </div>
@@ -288,7 +253,10 @@ export default function ProjectsPage() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.4 }}
         >
-          <Button asChild className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white">
+          <Button
+            asChild
+            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white"
+          >
             <Link href="/projects/new">Create New Project</Link>
           </Button>
         </motion.div>
@@ -524,15 +492,17 @@ export default function ProjectsPage() {
                           </div>
                         </CardContent>
                         <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                          {project.industry.slice(0, 3).map((ind: string, indIndex: number) => (
-                            <Badge
-                              key={`${project.id}-industry-${indIndex}`}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {ind}
-                            </Badge>
-                          ))}
+                          {project.industry
+                            .slice(0, 3)
+                            .map((ind: string, indIndex: number) => (
+                              <Badge
+                                key={`${project.id}-industry-${indIndex}`}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {ind}
+                              </Badge>
+                            ))}
                           {project.industry.length > 3 && (
                             <Badge variant="secondary" className="text-xs">
                               +{project.industry.length - 3}

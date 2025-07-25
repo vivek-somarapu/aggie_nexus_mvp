@@ -3,9 +3,13 @@
 import { useState, useEffect } from "react";
 import { useParams, notFound, redirect, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import Image from "next/image";
+import { format } from "date-fns";
+import clsx from "clsx";
+
 import {
   Card,
   CardContent,
@@ -32,7 +36,7 @@ import {
   Clock,
   Eye,
   Flag,
-  Globe,
+  Phone,
   Loader2,
   Mail,
   MapPin,
@@ -41,6 +45,7 @@ import {
   User,
   Pencil,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 import { projectService, Project } from "@/lib/services/project-service";
 import { userService } from "@/lib/services/user-service";
@@ -49,6 +54,11 @@ import { bookmarkService } from "@/lib/services/bookmark-service";
 import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createClient } from "@/lib/supabase/client";
+import {
+  projectStatusColors,
+  recruitmentStatusColors,
+  badgeShadowVariants,
+} from "@/lib/constants";
 
 export default function ProjectPage() {
   const { id } = useParams() as { id: string };
@@ -117,15 +127,13 @@ export default function ProjectPage() {
   useEffect(() => {
     const fetchBookmarkData = async () => {
       if (!currentUser || !project) return;
-      
+
       try {
         setIsBookmarkLoading(true);
         const bookmarks = await bookmarkService.getProjectBookmarks(
           currentUser.id
         );
-        const isProjectBookmarked = bookmarks.some(
-          (b) => b.project_id === id
-        );
+        const isProjectBookmarked = bookmarks.some((b) => b.project_id === id);
         setIsBookmarked(isProjectBookmarked);
       } catch (err) {
         console.error("Error fetching bookmark data:", err);
@@ -263,43 +271,139 @@ export default function ProjectPage() {
       <div className="grid gap-6 md:grid-cols-4">
         {/* Main Content - Left Column */}
         <div className="md:col-span-3 space-y-6">
-          <Card className="shadow-sm">
+          <Card className="shadow-sm gap-0">
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {project.is_idea ? (
-                      <Badge variant="outline">Idea</Badge>
+                      <Badge
+                        variant="outline"
+                        className={clsx(
+                          "bg-yellow-100 text-black border-none transition-shadow",
+                          "hover:shadow-[0_0_6px_2px_rgba(250,204,21,0.30)]" // yellow-ish glow (#facc15)
+                        )}
+                      >
+                        Idea
+                      </Badge>
                     ) : (
-                      <Badge variant="outline">Project</Badge>
+                      <Badge
+                        variant="outline"
+                        className={clsx(
+                          "bg-green-100 text-black border-none transition-shadow",
+                          "hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]" // green glow
+                        )}
+                      >
+                        Project
+                      </Badge>
                     )}
-                    <Badge variant="outline">{project.project_status}</Badge>
-                    <Badge variant="outline">
+
+                    <Badge
+                      className={clsx(
+                        "border-none transition-shadow", // keep base styles
+                        projectStatusColors[project.project_status] ??
+                          "bg-gray-100 text-gray-700"
+                      )}
+                    >
+                      {project.project_status}
+                    </Badge>
+
+                    <Badge
+                      className={clsx(
+                        "border-none transition-shadow",
+                        recruitmentStatusColors[project.recruitment_status] ??
+                          "bg-gray-100 text-gray-700"
+                      )}
+                    >
                       {project.recruitment_status}
                     </Badge>
                   </div>
                   <CardTitle className="text-2xl">{project.title}</CardTitle>
-                  <CardDescription className="flex items-center gap-2 mt-2">
-                    <Calendar className="h-4 w-4" />
-                    Posted on {formatDate(project.created_at)}
-                    <Separator orientation="vertical" className="h-4" />
-                    <Eye className="h-4 w-4" />
-                    {project.views} views
-                  </CardDescription>
+                  <div className="my-2 flex flex-wrap items-center gap-6 text-xs dark:text-slate-100">
+                    {/* ✅ Date */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 flex-col overflow-hidden rounded-sm border bg-background text-center shadow-sm">
+                        <div className="bg-muted py-[2px] text-[9px] font-medium leading-none dark:text-slate-100">
+                          {format(
+                            new Date(project.estimated_start!),
+                            "MMM"
+                          ).toUpperCase()}
+                        </div>
+                        <div className="pt-[1px] text-[13px] font-extrabold leading-none text-foreground dark:text-slate-100">
+                          {format(new Date(project.estimated_start!), "d")}
+                        </div>
+                      </div>
+                      <p className="font-medium">
+                        {format(new Date(project.estimated_start!), "MMM d")}
+                        {project.estimated_end &&
+                          ` – ${format(
+                            new Date(project.estimated_end!),
+                            "MMM d"
+                          )}`}
+                      </p>
+                    </div>
+
+                    {/* ✅ Location */}
+                    {project.location_type && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-background">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <p className="font-medium">{project.location_type}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {owner && (
+                    <Link
+                      href={`/users/${owner.id}`}
+                      className="flex items-center gap-2 group"
+                    >
+                      {/* Avatar */}
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 10,
+                        }}
+                        className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
+                      >
+                        {!owner.id ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        ) : owner.avatar ? (
+                          <Image
+                            src={owner.avatar}
+                            alt={owner.full_name}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                            priority
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full w-full bg-muted">
+                            <span className="text-xs font-medium text-[#500000]">
+                              {owner.full_name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </motion.div>
+                      <span className="text-sm font-semibold text-muted-foreground group-hover:underline group-hover:text-foreground">
+                        Hosted by {owner.full_name}
+                      </span>
+                    </Link>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  {currentUser?.id == owner?.id && 
-                  <Button 
-                    variant="outline" 
+                  {currentUser?.id == owner?.id && (
+                    <Button variant="outline" size="icon" onClick={handleEdit}>
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Edit project</span>
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
                     size="icon"
-                    onClick={handleEdit}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    <span className="sr-only">Edit project</span>
-                  </Button>}
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
                     onClick={handleBookmarkToggle}
                     disabled={isBookmarkLoading || !currentUser}
                   >
@@ -330,88 +434,150 @@ export default function ProjectPage() {
                   {project.description}
                 </p>
               </div>
+              {/* ✅ Subtle metadata under description */}
+              <div className="flex border-t items-center gap-2 pt-3 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                Posted on {formatDate(project.created_at)}
+                <Separator orientation="vertical" className="h-3" />
+                <Eye className="h-3 w-3" />
+                {project.views} views
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Project Details</h3>
-                  <div className="grid gap-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Flag className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Status:</span>
-                      <span>{project.project_status}</span>
+                <section className="space-y-4">
+                  {/* ✅ Contact Email */}
+                  {project.contact_info?.email && (
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
+                        <Mail className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <a
+                          href={`mailto:${project.contact_info.email}`}
+                          className="text-[14px] font-medium text-primary hover:underline"
+                        >
+                          {project.contact_info.email}
+                        </a>
+                        <p className="text-xs text-muted-foreground">Email</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Location:</span>
-                      <span>{project.location_type}</span>
+                  )}
+
+                  {/* ✅ Contact Phone */}
+                  {project.contact_info?.phone && (
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
+                        <Phone className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        {/* Format phone as (111) 111-1111 */}
+                        {(() => {
+                          const raw = project.contact_info.phone.replace(
+                            /\D/g,
+                            ""
+                          ); // keep only digits
+                          const formatted = raw.replace(
+                            /(\d{3})(\d{3})(\d{4})/,
+                            "($1) $2-$3"
+                          );
+
+                          return (
+                            <a
+                              href={`sms:${raw}`} // ✅ Opens messaging app on mobile
+                              className="text-[14px] font-medium text-primary hover:underline"
+                            >
+                              {formatted}
+                            </a>
+                          );
+                        })()}
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Start Date:</span>
-                      <span>{formatDate(project.estimated_start)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">End Date:</span>
-                      <span>{formatDate(project.estimated_end)}</span>
-                    </div>
-                  </div>
-                </div>
+                  )}
+                </section>
 
                 <div className="space-y-2">
                   <h3 className="font-semibold">Industry & Skills</h3>
+
+                  {/* ✅ Industry Badges with hover shadows */}
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {project.industry.map((ind, indIndex) => (
-                      <Badge key={`project-${project.id}-industry-${indIndex}`} variant="secondary">
-                        {ind}
-                      </Badge>
-                    ))}
+                    {project.industry.map((ind, indIndex) => {
+                      const randomShadow =
+                        badgeShadowVariants[
+                          Math.floor(Math.random() * badgeShadowVariants.length)
+                        ];
+                      return (
+                        <Badge
+                          key={`project-${project.id}-industry-${indIndex}`}
+                          variant="secondary"
+                          className={cn(
+                            "transition-shadow duration-200",
+                            randomShadow
+                          )}
+                        >
+                          {ind}
+                        </Badge>
+                      );
+                    })}
                   </div>
+
                   <h4 className="text-sm font-medium">Required Skills</h4>
+
+                  {/* ✅ Skills Badges with hover shadows */}
                   <div className="flex flex-wrap gap-2">
-                    {project.required_skills.map((skill, skillIndex) => (
-                      <Badge key={`project-${project.id}-skill-${skillIndex}`} variant="outline">
-                        {skill}
-                      </Badge>
-                    ))}
+                    {project.required_skills.map((skill, skillIndex) => {
+                      const randomShadow =
+                        badgeShadowVariants[
+                          Math.floor(Math.random() * badgeShadowVariants.length)
+                        ];
+                      return (
+                        <Badge
+                          key={`project-${project.id}-skill-${skillIndex}`}
+                          variant="outline"
+                          className={cn(
+                            "transition-shadow duration-200",
+                            randomShadow
+                          )}
+                        >
+                          {skill}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="border-t pt-6 flex justify-between">
-              {owner && (
-                <Button variant="outline" asChild>
-                  <Link href={`/users/${owner.id}`}>
-                    <User className="h-4 w-4 mr-2" />
-                    View Owner Profile
-                  </Link>
-                </Button>
-              )}
-
-              {/* Replace contact buttons with Inquire dialog */}
+            <CardFooter className="border-t mt-2 pt-3 flex justify-end">
+              {/* Inquire dialog for non-owners */}
               {!isOwner && (
                 <Dialog open={isInquiryOpen} onOpenChange={setIsInquiryOpen}>
                   <DialogTrigger asChild>
-                    <Button disabled={!currentUser}>
+                    <Button
+                      className={clsx(
+                        "relative overflow-hidden h-10 px-4 text-white font-medium",
+                        "bg-gradient-to-r from-[#400404] to-[#bc0404]",
+                        "transition-all duration-300",
+                        "hover:from-[#5a0505] hover:to-[#d30606]",
+                        "hover:shadow-[0_0_10px_2px_rgba(188,4,4,0.5)]"
+                      )}
+                    >
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Inquire About Project
                     </Button>
                   </DialogTrigger>
+
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Inquire About {project.title}</DialogTitle>
                       <DialogDescription>
                         Send a note to the project owner about your interest.
-                        They will be able to see your profile details and
-                        contact you back.
                       </DialogDescription>
                     </DialogHeader>
 
                     {inquirySuccess ? (
                       <Alert className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
                         <AlertDescription>
-                          Your inquiry has been submitted successfully! The
-                          project owner will review it soon.
+                          Your inquiry has been submitted successfully!
                         </AlertDescription>
                       </Alert>
                     ) : (
@@ -423,7 +589,7 @@ export default function ProjectPage() {
                         )}
 
                         <Textarea
-                          placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
+                          placeholder="Why are you interested in this project?"
                           value={inquiryNote}
                           onChange={(e) => setInquiryNote(e.target.value)}
                           rows={5}
@@ -445,6 +611,13 @@ export default function ProjectPage() {
                               !inquiryNote.trim() ||
                               !currentUser
                             }
+                            className={clsx(
+                              "relative overflow-hidden text-white font-medium",
+                              "bg-gradient-to-r from-[#400404] to-[#bc0404]",
+                              "transition-all duration-300",
+                              "hover:from-[#5a0505] hover:to-[#d30606]",
+                              "hover:shadow-[0_0_10px_2px_rgba(188,4,4,0.5)]"
+                            )}
                           >
                             {isSubmitting ? (
                               <>
@@ -462,7 +635,7 @@ export default function ProjectPage() {
                 </Dialog>
               )}
 
-              {/* Show manage inquiries button for project owner */}
+              {/* Manage inquiries for owners */}
               {isOwner && (
                 <Button asChild>
                   <Link href="/profile?tab=inquiries">
@@ -510,71 +683,6 @@ export default function ProjectPage() {
 
         {/* Sidebar - Right Column */}
         <div className="space-y-6">
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Project Owner</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {owner ? (
-                <div className="flex flex-col items-center text-center">
-                  <Avatar className="h-20 w-20 mb-4">
-                    <AvatarImage
-                      src={owner.avatar ?? ""}
-                      alt={owner.full_name}
-                    />
-                    <AvatarFallback>{owner.full_name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <h3 className="font-semibold text-lg">{owner.full_name}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {owner.bio && owner.bio.substring(0, 100)}
-                    {owner.bio && owner.bio.length > 100 ? "..." : ""}
-                  </p>
-                  <div className="flex gap-2 mb-4">
-                    {owner.is_texas_am_affiliate && (
-                      <Badge variant="secondary">Texas A&M Affiliate</Badge>
-                    )}
-                  </div>
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href={`/users/${owner.id}`}>View Full Profile</Link>
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-center">
-                  Owner information not available
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Only show contact info, not contact buttons */}
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{project.contact_info.email}</span>
-              </div>
-              {project.contact_info.phone && (
-                <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-muted-foreground" />
-                  <span>{project.contact_info.phone}</span>
-                </div>
-              )}
-              {!isOwner && (
-                <Button
-                  className="w-full"
-                  onClick={() => setIsInquiryOpen(true)}
-                  disabled={!currentUser}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Inquire About Project
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Similar Projects - Only visible on desktop */}
           <Card className="shadow-sm hidden md:block">
             <CardHeader className="pb-3">

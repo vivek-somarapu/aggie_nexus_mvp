@@ -1,23 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { X, Check } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
-import { projectService } from "@/lib/services/project-service";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/lib/auth";
+import { projectService } from "@/lib/services/project-service";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar } from "@/components/ui/calendar-range";
+import { TagSelector } from "@/components/ui/search-tag-selector";
 import {
   Select,
   SelectContent,
@@ -25,291 +26,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import {
+  industryOptions,
+  industrySkillsMap,
+  projectStatusOptions,
+  skillOptions,
+  locationTypeOptions,
+  recruitmentStatusOptions,
+} from "@/lib/constants";
 import { ChevronLeft, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
-import { DatePicker } from "@/components/ui/date-picker";
-import { TagSelector } from "@/components/ui/search-tag-selector";
-
-
-// Industry options
-const industryOptions = [
-  "Agriculture, Food & Natural Resources",
-  "Architecture & Construction",
-  "Arts, A/V Technology & Communications",
-  "Business Management & Administration",
-  "Education & Training",
-  "Finance",
-  "Government & Public Administration",
-  "Health Science",
-  "Human Services",
-  "Hospitality & Tourism",
-  "Information Technology",
-  "Law, Public Safety, Corrections & Security",
-  "Manufacturing",
-  "Marketing",
-  "Science, Technology, Engineering & Mathematics",
-  "Transportation, Distribution & Logistics",
-];
-
-const industrySkillsMap: { [industryOptions: string]: string[] } = {
-  "Agriculture, Food & Natural Resources": [
-    "Crop Management",
-    "Animal Science",
-    "Sustainable Farming",
-    "Agribusiness",
-    "Soil Analysis",
-    "Food Safety",
-    "Irrigation Systems",
-    "Livestock Management",
-    "Greenhouse Management",
-    "Organic Farming",
-    "Environmental Science"
-  ],
-  "Architecture & Construction": [
-    "Blueprint Reading",
-    "AutoCAD",
-    "Structural Analysis",
-    "Construction Management",
-    "Building Codes",
-    "Surveying",
-    "Revit",
-    "Construction Safety",
-    "OSHA Regulations",
-    "HVAC Systems",
-    "Electrical Systems"
-  ],
-  "Arts, A/V Technology & Communications": [
-    "Graphic Design",
-    "Video Editing",
-    "Photography",
-    "Animation",
-    "Public Speaking",
-    "Content Creation",
-    "3D Modeling",
-    "UX/UI Design",
-    "Sound Engineering",
-    "Typography",
-    "Web Design"
-  ],
-  "Business Management & Administration": [
-    "Project Management",
-    "Strategic Planning",
-    "Business Analysis",
-    "Operations Management",
-    "Microsoft Excel",
-    "Budgeting",
-    "Human Resources",
-    "Negotiation",
-    "Customer Relationship Management (CRM)",
-    "Data Analytics",
-    "Business Communication"
-  ],
-  "Education & Training": [
-    "Curriculum Design",
-    "Classroom Management",
-    "Lesson Planning",
-    "Instructional Design",
-    "Student Assessment",
-    "Educational Technology",
-    "Learning Management Systems (LMS)",
-    "Special Education",
-    "Behavior Management",
-    "STEM Education",
-    "E-learning Tools"
-  ],
-  "Finance": [
-    "Financial Modeling",
-    "Excel",
-    "Accounting",
-    "Investment Analysis",
-    "Budget Forecasting",
-    "Risk Management",
-    "Corporate Finance",
-    "Tax Preparation",
-    "Audit",
-    "Valuation",
-    "Portfolio Management"
-  ],
-  "Government & Public Administration": [
-    "Policy Analysis",
-    "Public Speaking",
-    "Regulatory Compliance",
-    "Budget Planning",
-    "Civic Engagement",
-    "Research",
-    "Public Policy",
-    "Legislative Analysis",
-    "Urban Planning",
-    "Crisis Management",
-    "Intergovernmental Relations"
-  ],
-  "Health Science": [
-    "EMR Systems",
-    "HIPAA Compliance",
-    "Clinical Skills",
-    "Medical Terminology",
-    "Patient Care",
-    "Pharmacology",
-    "Anatomy & Physiology",
-    "Health Informatics",
-    "Medical Coding",
-    "Patient Education",
-    "Nutrition"
-  ],
-  "Human Services": [
-    "Counseling",
-    "Case Management",
-    "Crisis Intervention",
-    "Empathy",
-    "Social Work",
-    "Community Outreach",
-    "Addiction Counseling",
-    "Family Support Services",
-    "Therapeutic Techniques",
-    "Youth Services",
-    "Cultural Competence"
-  ],
-  "Hospitality & Tourism": [
-    "Customer Service",
-    "Event Planning",
-    "Food & Beverage Service",
-    "Hotel Management",
-    "Travel Coordination",
-    "Conflict Resolution",
-    "Tourism Marketing",
-    "Hospitality Law",
-    "Event Budgeting",
-    "Culinary Arts",
-    "Guest Services"
-  ],
-  "Information Technology": [
-    "Programming",
-    "Data Analysis",
-    "Cybersecurity",
-    "Cloud Computing",
-    "Networking",
-    "IT Support",
-    "Fullstack Developer",
-    "Backend Developer",
-    "DevOps",
-    "Agile Methodologies",
-    "Machine Learning",
-    "Mobile App Development",
-    "Database Administration",
-    "System Architecture",
-    "Version Control (e.g. Git)"
-  ],
-  "Law, Public Safety, Corrections & Security": [
-    "Legal Research",
-    "Criminal Justice",
-    "Emergency Response",
-    "Security Operations",
-    "Report Writing",
-    "Surveillance",
-    "Court Procedures",
-    "Forensic Science",
-    "Law Enforcement Tactics",
-    "Correctional Management",
-    "Criminal Psychology"
-  ],
-  "Manufacturing": [
-    "Machine Operation",
-    "Quality Control",
-    "Lean Manufacturing",
-    "CAD/CAM",
-    "Industrial Safety",
-    "Inventory Management",
-    "Robotics",
-    "Welding",
-    "Production Planning",
-    "CNC Programming",
-    "Assembly Line Operations"
-  ],
-  "Marketing": [
-    "Digital Marketing",
-    "SEO",
-    "Market Research",
-    "Brand Management",
-    "Copywriting",
-    "Social Media",
-    "Email Marketing",
-    "Content Strategy",
-    "Influencer Marketing",
-    "CRM Tools",
-    "Marketing Automation"
-  ],
-  "Science, Technology, Engineering & Mathematics": [
-    "Lab Skills",
-    "Data Analysis",
-    "Mathematical Modeling",
-    "Scientific Research",
-    "Engineering Design",
-    "Critical Thinking",
-    "Python Programming",
-    "Control Systems",
-    "Circuit Design",
-    "Systems Engineering",
-    "Simulation Modeling"
-  ],
-  "Transportation, Distribution & Logistics": [
-    "Logistics Management",
-    "Supply Chain Operations",
-    "Fleet Management",
-    "Route Optimization",
-    "Inventory Tracking",
-    "Warehousing",
-    "Freight Handling",
-    "DOT Compliance",
-    "GPS Navigation Systems",
-    "Customs Regulations",
-    "Logistics Software"
-  ]
-};
-
-
-// Default skill options
-const skillOptions = [
-  "Programming",
-  "Design",
-  "Marketing",
-  "Sales",
-  "Finance",
-  "Management",
-  "Writing",
-  "Research",
-  "Customer Service",
-  "Data Analysis",
-  "Project Management",
-  "Leadership",
-  "Communication",
-  "Problem Solving",
-  "Creativity",
-];
-
-// Project status options
-const projectStatusOptions = [
-  "Idea Phase",
-  "Not Started",
-  "Planning",
-  "In Progress",
-  "Advanced Stage",
-  "Completed",
-];
-
-// Recruitment status options
-const recruitmentStatusOptions = [
-  "Not Recruiting",
-  "Open to Collaboration",
-  "Actively Recruiting",
-  "Team Complete",
-];
-
-// Location type options
-const locationTypeOptions = ["Remote", "On-site", "Hybrid", "Flexible"];
+import { toast } from "sonner";
+import { format } from "date-fns";
 
 export default function NewProjectPage() {
   const { authUser: user, isLoading: authLoading } = useAuth();
@@ -318,12 +48,12 @@ export default function NewProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
-    undefined
-  );
-  const [selectedEndDate, setSelectedEndDate] = useState<Date | undefined>(
-    undefined
-  );
+  const [descriptionWords, setDescriptionWords] = useState(0);
+
+  const [range, setRange] = useState<{
+    start: Date | null;
+    end: Date | null;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -353,56 +83,64 @@ export default function NewProjectPage() {
   }, [user]);
 
   useEffect(() => {
-  if (selectedIndustries.length === 0) {
-    // No industries selected, use default skills
-    return;
-  }
+    if (selectedIndustries.length === 0) {
+      // No industries selected, use default skills
+      return;
+    }
 
-  // Get all skills from selected industries
-  const industrySkills = selectedIndustries.reduce((allSkills: string[], industry) => {
-    const skills = industrySkillsMap[industry] || [];
-    return [...allSkills, ...skills];
-  }, []);
+    // Get all skills from selected industries
+    const industrySkills = selectedIndustries.reduce(
+      (allSkills: string[], industry) => {
+        const skills = industrySkillsMap[industry] || [];
+        return [...allSkills, ...skills];
+      },
+      []
+    );
 
-  // Remove duplicates
-  const uniqueIndustrySkills = [...new Set(industrySkills)];
+    // Remove duplicates
+    const uniqueIndustrySkills = [...new Set(industrySkills)];
 
-  // Filter out selected skills that are no longer available
-  const validSelectedSkills = selectedSkills.filter(skill => 
-    uniqueIndustrySkills.includes(skill)
-  );
+    // Filter out selected skills that are no longer available
+    const validSelectedSkills = selectedSkills.filter((skill) =>
+      uniqueIndustrySkills.includes(skill)
+    );
 
-  // Update selected skills if any were filtered out
-  if (validSelectedSkills.length !== selectedSkills.length) {
-    setSelectedSkills(validSelectedSkills);
-  }
-}, [selectedIndustries]); // Only depend on selectedIndustries to avoid infinite loops
+    // Update selected skills if any were filtered out
+    if (validSelectedSkills.length !== selectedSkills.length) {
+      setSelectedSkills(validSelectedSkills);
+    }
+  }, [selectedIndustries]); // Only depend on selectedIndustries to avoid infinite loops
 
-// Create a computed value for available skills
-const getAvailableSkills = () => {
-  if (selectedIndustries.length === 0) {
-    return skillOptions; // Return default skills when no industry is selected
-  }
+  // Create a computed value for available skills
+  const getAvailableSkills = () => {
+    if (selectedIndustries.length === 0) {
+      return skillOptions; // Return default skills when no industry is selected
+    }
 
-  // Get skills from selected industries
-  const industrySkills = selectedIndustries.reduce((allSkills: string[], industry) => {
-    const skills = industrySkillsMap[industry] || [];
-    return [...allSkills, ...skills];
-  }, []);
+    // Get skills from selected industries
+    const industrySkills = selectedIndustries.reduce(
+      (allSkills: string[], industry) => {
+        const skills = industrySkillsMap[industry] || [];
+        return [...allSkills, ...skills];
+      },
+      []
+    );
 
-  // Remove duplicates and sort
-  return [...new Set(industrySkills)].sort();
-};
-
+    // Remove duplicates and sort
+    return [...new Set(industrySkills)].sort();
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+
+    if (name === "description") {
+      const words = value.trim().split(/\s+/).filter(Boolean).length;
+      setDescriptionWords(words);
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -432,38 +170,6 @@ const getAvailableSkills = () => {
     }));
   };
 
-  const handleIndustrySelect = (industry: string) => {
-    if (selectedIndustries.includes(industry)) {
-      setSelectedIndustries(selectedIndustries.filter((i) => i !== industry));
-    } else {
-      setSelectedIndustries([...selectedIndustries, industry]);
-    }
-  };
-
-  const handleSkillSelect = (skill: string) => {
-    if (selectedSkills.includes(skill)) {
-      setSelectedSkills(selectedSkills.filter((s) => s !== skill));
-    } else {
-      setSelectedSkills([...selectedSkills, skill]);
-    }
-  };
-
-  const handleStartDateSelect = (date: Date | undefined) => {
-    setSelectedStartDate(date);
-    setFormData((prev) => ({
-      ...prev,
-      estimated_start: date ? date.toISOString() : "",
-    }));
-  };
-
-  const handleEndDateSelect = (date: Date | undefined) => {
-    setSelectedEndDate(date);
-    setFormData((prev) => ({
-      ...prev,
-      estimated_end: date ? date.toISOString() : "",
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -481,7 +187,7 @@ const getAvailableSkills = () => {
         throw new Error("Project title is required");
       }
 
-      if (!formData.description.trim()) {
+      if (formData.description.replace(/\s/g, "") === "") {
         throw new Error("Project description is required");
       }
 
@@ -579,10 +285,22 @@ const getAvailableSkills = () => {
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  placeholder="Describe your project, its goals, and what you're looking to achieve"
+                  placeholder="Describe your project (max 400 words)"
                   rows={5}
                   required
                 />
+
+                <div className="text-right text-sm mt-1">
+                  <span
+                    className={
+                      descriptionWords > 400
+                        ? "text-red-600"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {descriptionWords}/400&nbsp;words
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -644,30 +362,59 @@ const getAvailableSkills = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Timeline</CardTitle>
+              <CardTitle>Timeline & Recruitment</CardTitle>
               <CardDescription>
-                When will your project start and end?
+                When will your project start and end? Specify if you're looking
+                for collaborators
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="estimated_start">Estimated Start Date</Label>
-                  <DatePicker
-                    selected={selectedStartDate}
-                    onSelect={handleStartDateSelect}
-                    placeholderText="Select start date"
-                  />
+                  <Label htmlFor="estimated_start">Estimated Timeline</Label>
+                  <div className="space-y-2 md:col-span-2">
+                    <Calendar value={range} onChange={setRange} allowClear />
+                    {/* ✅ Prettier display */}
+                    <div className="mt-2 text-sm text-gray-700">
+                      {range?.start && range?.end ? (
+                        <>
+                          <p>
+                            {format(range.start, "MMM dd, yyyy")}
+                            {" - "} {format(range.end, "MMM dd, yyyy")}
+                          </p>
+                        </>
+                      ) : range?.start ? (
+                        <p>
+                          <strong>Start:</strong>{" "}
+                          {format(range.start, "MMM dd, yyyy")} (end not
+                          selected yet)
+                        </p>
+                      ) : (
+                        <p>No date selected</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="estimated_end">Estimated End Date</Label>
-                  <DatePicker
-                    selected={selectedEndDate}
-                    onSelect={handleEndDateSelect}
-                    placeholderText="Select end date"
-                    minDate={selectedStartDate}
-                  />
+                  <Label htmlFor="recruitment_status">Recruitment Status</Label>
+                  <Select
+                    value={formData.recruitment_status}
+                    onValueChange={(value) =>
+                      handleSelectChange("recruitment_status", value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select recruitment status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {recruitmentStatusOptions.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
@@ -703,42 +450,7 @@ const getAvailableSkills = () => {
                   maxTags={10}
                   placeholder="Type and press Enter"
                 />
-                <div className="text-sm text-muted-foreground">
-                
-                  
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Team & Recruitment</CardTitle>
-              <CardDescription>
-                Specify if you're looking for collaborators
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="recruitment_status">Recruitment Status</Label>
-                <Select
-                  value={formData.recruitment_status}
-                  onValueChange={(value) =>
-                    handleSelectChange("recruitment_status", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select recruitment status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {recruitmentStatusOptions.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="text-sm text-muted-foreground"></div>
               </div>
             </CardContent>
           </Card>

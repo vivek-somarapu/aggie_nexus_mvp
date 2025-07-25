@@ -168,7 +168,15 @@ export async function updateProject(id: string, projectData: Partial<Project>): 
   
   // Filter out fields we don't want to update directly
   const { id: _, views, created_at, last_updated, ...updateData } = projectData as any;
-  
+
+  // Sanitize date fields
+  if (typeof updateData.estimated_start === 'undefined' || updateData.estimated_start === '') {
+    updateData.estimated_start = null;
+  }
+  if (typeof updateData.estimated_end === 'undefined' || updateData.estimated_end === '') {
+    updateData.estimated_end = null;
+  }
+
   const { data, error } = await supabase
     .from('projects')
     .update({

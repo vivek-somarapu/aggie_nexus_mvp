@@ -1,6 +1,5 @@
 // ---------- Animation Variants ----------
 
-// Page-level fade with staggered children
 export const pageVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -17,7 +16,6 @@ export const pageVariants = {
   },
 };
 
-// For container components (e.g., list wrappers)
 export const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -28,7 +26,6 @@ export const containerVariants = {
   },
 };
 
-// Standard card appearance
 export const cardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
@@ -42,7 +39,10 @@ export const cardVariants = {
   },
 };
 
-// For list items sliding in from the side
+export const buttonVariants = {
+  tap: { scale: 0.98 },
+};
+
 export const itemVariants = {
   hidden: { opacity: 0, x: -10 },
   visible: {
@@ -52,7 +52,6 @@ export const itemVariants = {
   },
 };
 
-// For onboarding or step transitions
 export const stepVariants = {
   initial: { opacity: 0, x: 50, y: 20 },
   animate: {
@@ -75,7 +74,6 @@ export const stepVariants = {
   },
 };
 
-// For calendar pop-in UI elements
 export const calendarVariants = {
   hidden: { opacity: 0, scale: 0.95 },
   visible: {
@@ -85,7 +83,6 @@ export const calendarVariants = {
   },
 };
 
-// Dialog/modal transitions
 export const dialogVariants = {
   hidden: {
     opacity: 0,
@@ -110,7 +107,6 @@ export const dialogVariants = {
   },
 };
 
-// Event card with hover/tap interaction
 export const eventCardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
@@ -130,25 +126,241 @@ export const eventCardVariants = {
   },
 };
 
-// ---------- Select Options ----------
+// ---------- Industry & Skills ----------
 
 export const industryOptions = [
-  "Technology",
-  "Healthcare",
-  "Education",
+  "Agriculture, Food & Natural Resources",
+  "Architecture & Construction",
+  "Arts, A/V Technology & Communications",
+  "Business Management & Administration",
+  "Education & Training",
   "Finance",
-  "Entertainment",
-  "Retail",
+  "Government & Public Administration",
+  "Health Science",
+  "Human Services",
+  "Hospitality & Tourism",
+  "Information Technology",
+  "Law, Public Safety, Corrections & Security",
   "Manufacturing",
-  "Agriculture",
-  "Energy",
-  "Transportation",
-  "Real Estate",
-  "Nonprofit",
-  "Sports",
-  "Food & Beverage",
-  "Other",
+  "Marketing",
+  "Science, Technology, Engineering & Mathematics",
+  "Transportation, Distribution & Logistics",
 ];
+
+export const industrySkillsMap: Record<string, string[]> = {
+  "Agriculture, Food & Natural Resources": [
+    "Crop Management",
+    "Animal Science",
+    "Sustainable Farming",
+    "Agribusiness",
+    "Soil Analysis",
+    "Food Safety",
+    "Irrigation Systems",
+    "Livestock Management",
+    "Greenhouse Management",
+    "Organic Farming",
+    "Environmental Science",
+  ],
+  "Architecture & Construction": [
+    "Blueprint Reading",
+    "AutoCAD",
+    "Structural Analysis",
+    "Construction Management",
+    "Building Codes",
+    "Surveying",
+    "Revit",
+    "Construction Safety",
+    "OSHA Regulations",
+    "HVAC Systems",
+    "Electrical Systems",
+  ],
+  "Arts, A/V Technology & Communications": [
+    "Graphic Design",
+    "Video Editing",
+    "Photography",
+    "Animation",
+    "Public Speaking",
+    "Content Creation",
+    "3D Modeling",
+    "UX/UI Design",
+    "Sound Engineering",
+    "Typography",
+    "Web Design",
+  ],
+  "Business Management & Administration": [
+    "Project Management",
+    "Strategic Planning",
+    "Business Analysis",
+    "Operations Management",
+    "Microsoft Excel",
+    "Budgeting",
+    "Human Resources",
+    "Negotiation",
+    "Customer Relationship Management (CRM)",
+    "Data Analytics",
+    "Business Communication",
+  ],
+  "Education & Training": [
+    "Curriculum Design",
+    "Classroom Management",
+    "Lesson Planning",
+    "Instructional Design",
+    "Student Assessment",
+    "Educational Technology",
+    "Learning Management Systems (LMS)",
+    "Special Education",
+    "Behavior Management",
+    "STEM Education",
+    "E-learning Tools",
+  ],
+  Finance: [
+    "Financial Modeling",
+    "Excel",
+    "Accounting",
+    "Investment Analysis",
+    "Budget Forecasting",
+    "Risk Management",
+    "Corporate Finance",
+    "Tax Preparation",
+    "Audit",
+    "Valuation",
+    "Portfolio Management",
+  ],
+  "Government & Public Administration": [
+    "Policy Analysis",
+    "Public Speaking",
+    "Regulatory Compliance",
+    "Budget Planning",
+    "Civic Engagement",
+    "Research",
+    "Public Policy",
+    "Legislative Analysis",
+    "Urban Planning",
+    "Crisis Management",
+    "Intergovernmental Relations",
+  ],
+  "Health Science": [
+    "EMR Systems",
+    "HIPAA Compliance",
+    "Clinical Skills",
+    "Medical Terminology",
+    "Patient Care",
+    "Pharmacology",
+    "Anatomy & Physiology",
+    "Health Informatics",
+    "Medical Coding",
+    "Patient Education",
+    "Nutrition",
+  ],
+  "Human Services": [
+    "Counseling",
+    "Case Management",
+    "Crisis Intervention",
+    "Empathy",
+    "Social Work",
+    "Community Outreach",
+    "Addiction Counseling",
+    "Family Support Services",
+    "Therapeutic Techniques",
+    "Youth Services",
+    "Cultural Competence",
+  ],
+  "Hospitality & Tourism": [
+    "Customer Service",
+    "Event Planning",
+    "Food & Beverage Service",
+    "Hotel Management",
+    "Travel Coordination",
+    "Conflict Resolution",
+    "Tourism Marketing",
+    "Hospitality Law",
+    "Event Budgeting",
+    "Culinary Arts",
+    "Guest Services",
+  ],
+  "Information Technology": [
+    "Programming",
+    "Data Analysis",
+    "Cybersecurity",
+    "Cloud Computing",
+    "Networking",
+    "IT Support",
+    "Fullstack Developer",
+    "Backend Developer",
+    "DevOps",
+    "Agile Methodologies",
+    "Machine Learning",
+    "Mobile App Development",
+    "Database Administration",
+    "System Architecture",
+    "Version Control (e.g. Git)",
+  ],
+  "Law, Public Safety, Corrections & Security": [
+    "Legal Research",
+    "Criminal Justice",
+    "Emergency Response",
+    "Security Operations",
+    "Report Writing",
+    "Surveillance",
+    "Court Procedures",
+    "Forensic Science",
+    "Law Enforcement Tactics",
+    "Correctional Management",
+    "Criminal Psychology",
+  ],
+  Manufacturing: [
+    "Machine Operation",
+    "Quality Control",
+    "Lean Manufacturing",
+    "CAD/CAM",
+    "Industrial Safety",
+    "Inventory Management",
+    "Robotics",
+    "Welding",
+    "Production Planning",
+    "CNC Programming",
+    "Assembly Line Operations",
+  ],
+  Marketing: [
+    "Digital Marketing",
+    "SEO",
+    "Market Research",
+    "Brand Management",
+    "Copywriting",
+    "Social Media",
+    "Email Marketing",
+    "Content Strategy",
+    "Influencer Marketing",
+    "CRM Tools",
+    "Marketing Automation",
+  ],
+  "Science, Technology, Engineering & Mathematics": [
+    "Lab Skills",
+    "Data Analysis",
+    "Mathematical Modeling",
+    "Scientific Research",
+    "Engineering Design",
+    "Critical Thinking",
+    "Python Programming",
+    "Control Systems",
+    "Circuit Design",
+    "Systems Engineering",
+    "Simulation Modeling",
+  ],
+  "Transportation, Distribution & Logistics": [
+    "Logistics Management",
+    "Supply Chain Operations",
+    "Fleet Management",
+    "Route Optimization",
+    "Inventory Tracking",
+    "Warehousing",
+    "Freight Handling",
+    "DOT Compliance",
+    "GPS Navigation Systems",
+    "Customs Regulations",
+    "Logistics Software",
+  ],
+};
 
 export const skillOptions = [
   "Programming",
@@ -168,6 +380,50 @@ export const skillOptions = [
   "Creativity",
 ];
 
+export const projectStatusOptions = [
+  "Idea Phase",
+  "Not Started",
+  "Planning",
+  "In Progress",
+  "Advanced Stage",
+  "Completed",
+];
+
+export const recruitmentStatusOptions = [
+  "Not Recruiting",
+  "Open to Collaboration",
+  "Actively Recruiting",
+  "Team Complete",
+];
+
+export const projectStatusColors: Record<string, string> = {
+  "Idea Phase":
+    "bg-slate-100 text-slate-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]", // blue-ish
+  "Not Started":
+    "bg-gray-100 text-gray-700 hover:shadow-[0_0_6px_2px_rgba(140,10,4,0.30)]", // red-ish
+  Planning:
+    "bg-yellow-100 text-yellow-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
+  "In Progress":
+    "bg-blue-100 text-blue-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
+  "Advanced Stage":
+    "bg-purple-100 text-purple-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
+  Completed:
+    "bg-green-100 text-green-700 hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]",
+};
+
+export const recruitmentStatusColors: Record<string, string> = {
+  "Not Recruiting":
+    "bg-gray-100 text-gray-700 hover:shadow-[0_0_6px_2px_rgba(140,10,4,0.30)]", // red-ish
+  "Open to Collaboration":
+    "bg-blue-100 text-blue-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
+  "Actively Recruiting":
+    "bg-green-100 text-green-700 hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]",
+  "Team Complete":
+    "bg-slate-100 text-slate-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
+};
+
+export const locationTypeOptions = ["Remote", "On-site", "Hybrid", "Flexible"];
+
 // ---------- Calendar event options ----------
 
 export type EventType =
@@ -180,7 +436,6 @@ export type EventType =
   | "other"
   | "personal";
 
-// Maps event types to readable category names
 export const categories: Record<EventType, string> = {
   workshop: "Workshops",
   info_session: "Info Sessions",
@@ -192,7 +447,6 @@ export const categories: Record<EventType, string> = {
   personal: "Personal Events",
 };
 
-// Tailwind-safe color palette used in event variants or tags
 export const colorPalette = [
   "blue",
   "green",
@@ -211,7 +465,6 @@ export const colorPalette = [
   "sky",
 ] as const;
 
-// Scrollbar styles for custom scrollbars
 export const customScrollStyles = `
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -222,8 +475,6 @@ export const customScrollStyles = `
   .scrollbar-track-transparent {
     scrollbar-track-color: transparent;
   }
-  
-  /* Webkit scrollbar styles */
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -239,3 +490,9 @@ export const customScrollStyles = `
     background-color: hsl(var(--foreground));
   }
 `;
+
+export const badgeShadowVariants = [
+  "hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]", // green
+  "hover:shadow-[0_0_6px_2px_rgba(140,10,4,0.30)]", // red
+  "hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]", // blue
+];
