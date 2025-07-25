@@ -32,6 +32,7 @@ import { bookmarkService } from "@/lib/services/bookmark-service";
 import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
+import type { Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 // Animation variants
@@ -58,7 +59,7 @@ const containerVariants = {
   },
 };
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
@@ -233,6 +234,20 @@ export default function ProjectsPage() {
     const isMatch = matchesIndustry && matchesStatus;
     return isMatch;
   });
+
+  // Sort: titles that start with searchQuery first, then those that contain it elsewhere
+  const sortedProjects = searchQuery
+    ? [...filteredProjects].sort((a, b) => {
+        const query = searchQuery.toLowerCase();
+        const aTitle = a.title.toLowerCase();
+        const bTitle = b.title.toLowerCase();
+        const aStarts = aTitle.startsWith(query);
+        const bStarts = bTitle.startsWith(query);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      })
+    : filteredProjects;
 
   // Log filtering results for debugging
   useEffect(() => {
@@ -415,7 +430,7 @@ export default function ProjectsPage() {
                   </AlertDescription>
                 </Alert>
               </motion.div>
-            ) : filteredProjects.length === 0 ? (
+            ) : sortedProjects.length === 0 ? (
               <motion.div
                 key="empty"
                 className="text-center py-12"
@@ -436,7 +451,7 @@ export default function ProjectsPage() {
                 initial="hidden"
                 animate="visible"
               >
-                {filteredProjects.map((project: Project, index: number) => (
+                {sortedProjects.map((project: Project, index: number) => (
                   <motion.div
                     key={project.id}
                     variants={cardVariants}
