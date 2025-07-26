@@ -84,8 +84,8 @@ export default function Navbar() {
   // Common routes for signed-in users
   const routes = [
     { href: "/projects", label: "Projects" },
-    { href: "/users", label: "Talent" },
-    { href: "/calendar", label: "Calendar" },
+    { href: "/users", label: "Community" },
+    { href: "/calendar", label: "Events" },
   ];
 
   const hasResolvedOnce = useRef(false);
@@ -187,7 +187,7 @@ export default function Navbar() {
                   "text-muted-foreground dark:text-white dark:hover:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground"
                 )}
               >
-                Calendar
+                Events
               </Link>
             </nav>
           ) : (
@@ -412,7 +412,7 @@ export default function Navbar() {
                     )}
                     onClick={() => setOpenNavigation(false)}
                   >
-                    Calendar
+                    Events
                   </Link>
                 </li>
               ) : (
