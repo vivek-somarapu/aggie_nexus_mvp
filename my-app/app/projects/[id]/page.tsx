@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, notFound, redirect } from "next/navigation";
+import { useParams, notFound, redirect, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function ProjectPage() {
   const { id } = useParams() as { id: string };
   const { authUser: currentUser, isAuthReady } = useAuth();
+  const router = useRouter();
 
   const [project, setProject] = useState<Project | null>(null);
   const [owner, setOwner] = useState<UserType | null>(null);
@@ -249,10 +250,13 @@ export default function ProjectPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/projects">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center"
+          >
             <ChevronLeft className="h-4 w-4 mr-1" />
-            Back to Projects
-          </Link>
+            Back
+          </button>
         </Button>
       </div>
 

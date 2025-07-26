@@ -2,6 +2,7 @@
 
 /* ────── React & Next ────── */
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -11,6 +12,7 @@ import type { Profile } from "@/lib/auth";
 
 import { Profile as ProfileType, useAuth } from "@/lib/auth";
 import { profileSetupStatus } from "@/lib/profile-utils";
+import { RSVPResponse } from "@/lib/services/rsvp-service";
 
 /* ────── Components: UI ────── */
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -43,24 +45,27 @@ import { ProfileCard } from "@/components/profile/profile-card";
 import { ProfileTab } from "@/components/profile/profile-tab";
 
 /* ────── Libs ────── */
-
 import { formatDate } from "@/lib/utils";
+import { format } from "date-fns";
 
 /* ────── Services ────── */
 import { bookmarkService } from "@/lib/services/bookmark-service";
+import { rsvpService } from "@/lib/services/rsvp-service";
 import { ProjectInquiry, inquiryService } from "@/lib/services/inquiry-service";
 import { Project, projectService } from "@/lib/services/project-service";
 import { userService } from "@/lib/services/user-service";
 
 /* ────── Constants ────── */
-import { cardVariants, containerVariants, pageVariants } from "@/lib/constants";
+import { cardVariants, containerVariants, dialogVariants, pageVariants } from "@/lib/constants";
 
 /* ────── Icons ────── */
 import {
+  Calendar,
   CalendarIcon,
   Filter,
   Loader2,
   Mail,
+  MapPin,
   MessageSquare,
   PenLine,
   Plus,
@@ -70,6 +75,12 @@ import {
 } from "lucide-react";
 
 import { toast } from "sonner";
+import { se } from "date-fns/locale";
+import { eventService } from "@/lib/services/event-service";
+import { SquarePoster } from "@/components/ui/SquarePoster";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@radix-ui/react-dropdown-menu";
+import { Event } from "@/lib/models/events";
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
@@ -82,18 +93,26 @@ export default function ProfilePage() {
   const [bookmarksLoading, setBookmarksLoading] = useState(true);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [inquiriesLoading, setInquiriesLoading] = useState(true);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const [RSVPLoading, setRSVPLoading] = useState(true);
+  const [userEventLoading, setUserEventLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const router = useRouter();
 
   const [bookmarkedProjects, setBookmarkedProjects] = useState<Project[]>([]);
   const [bookmarkedUsers, setBookmarkedUsers] = useState<ProfileType[]>([]);
+  const [userRSVP, setUserRSVP] = useState<Event[]>([]); // events user RSVP to
+  const [userEvents, setUserEvents] = useState<Event[]>([]); // events user is hosting
   const [userProjects, setUserProjects] = useState<Project[]>([]);
   const [receivedInquiries, setReceivedInquiries] = useState<ProjectInquiry[]>(
     []
   );
   const [sentInquiries, setSentInquiries] = useState<ProjectInquiry[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  // for event dialogs
+  const startTime = selectedEvent?.start_time ?? selectedEvent?.start;
+  const endTime = selectedEvent?.end_time ?? selectedEvent?.end;
 
   const [error, setError] = useState<string | null>(null);
   const [showCompletionBanner, setShowCompletionBanner] = useState(false);
@@ -145,6 +164,17 @@ export default function ProfilePage() {
     router.replace(url.toString(), { scroll: false })
   }
 
+  // Handle rsvp event click
+  const handleEventClick = async (evt: Event) => {
+    try {
+      setSelectedEvent(evt)
+
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error("Failed to load event details");
+    }
+  };
+
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -187,48 +217,6 @@ export default function ProfilePage() {
     const { shouldSetupProfile } = profileSetupStatus(profile, true);
     setShowCompletionBanner(shouldSetupProfile);
     setIsLoading(false);
-  }, [profile]);
-
-  // Load bookmarks
-  useEffect(() => {
-    const fetchBookmarks = async () => {
-      if (!profile) return;
-
-      try {
-        setBookmarksLoading(true);
-        const bookmarks = await bookmarkService.getAllBookmarks(profile.id);
-        setBookmarkedProjects(bookmarks.projects);
-        setBookmarkedUsers(bookmarks.users as unknown as Profile[]);
-      } catch (err) {
-        console.error("Error fetching bookmarks:", err);
-        setError("Failed to load bookmarks. Please try again later.");
-      } finally {
-        setBookmarksLoading(false);
-      }
-    };
-
-    fetchBookmarks();
-  }, [profile]);
-
-  // Load user's events
-   useEffect(() => {
-    const fetchEvents = async () => {
-      if (!profile) return;
-
-      try {
-        setEventsLoading(true);
-        // i think it'd go something like this
-        // const events = await rsvpService.get(profile.id); ???
-        // set(UserEvents(events)); 
-      } catch (err) {
-        console.error("Error fetching events:", err);
-        setError("Failed to load events. Please try again later.");
-      } finally {
-        setEventsLoading(false);
-      }
-    };
-
-    fetchEvents();
   }, [profile]);
 
   // Load user's projects
@@ -307,6 +295,79 @@ export default function ProfilePage() {
     receivedInquiries,
     sentInquiries,
   ]);
+
+    // Load bookmarks
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      if (!profile) return;
+
+      try {
+        setBookmarksLoading(true);
+        const bookmarks = await bookmarkService.getAllBookmarks(profile.id);
+        console.log("Fetched user bookmarks:", bookmarks);
+        setBookmarkedProjects(bookmarks.projects);
+        setBookmarkedUsers(bookmarks.users as unknown as Profile[]);
+      } catch (err) {
+        console.error("Error fetching bookmarks:", err);
+        setError("Failed to load bookmarks. Please try again later.");
+      } finally {
+        setBookmarksLoading(false);
+      }
+    };
+
+    fetchBookmarks();
+  }, [profile]);
+
+  // Load user's rsvps
+  useEffect(() => {
+    const fetchRSVP = async () => {
+      if (!profile) return;
+
+      try {
+        setRSVPLoading(true);
+        const rsvps = await rsvpService.getUserRSVPs(profile.id);
+        const events = await Promise.all(
+          rsvps.map((rsvp) => eventService.getEvent(rsvp.eventId))
+        );
+        const validEvents = events
+          .filter(Boolean)
+          .filter(event => new Date(event.end_time) > new Date());
+        validEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+        setUserRSVP(validEvents);
+      } catch (err) {
+        console.error("Error fetching RSVPs:", err);
+        setError("Failed to load RSVPs. Please try again later.");
+      } finally {
+        setRSVPLoading(false);
+      }
+    };
+
+    fetchRSVP();
+  }, [profile]);
+
+  // Load user's events
+  useEffect(() => {
+    const fetchUserEvents = async () => {
+      if (!profile) return;
+
+      try {
+        setUserEventLoading(true);
+        const events = await eventService.getEventsByCreator(profile.id);
+        const validEvents = events
+          .filter(Boolean)
+          .filter(event => new Date(event.end) > new Date());
+        validEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        setUserEvents(validEvents);
+      } catch (err) {
+        console.error("Error fetching user events:", err);
+        setError("Failed to load user events. Please try again later.");
+      } finally {
+        setUserEventLoading(false);
+      }
+    };
+
+    fetchUserEvents();
+  }, [profile]);
 
   const handleDeleteInquiry = async (inquiryId: string) => {
     if (!profile) return;
@@ -707,7 +768,7 @@ export default function ProfilePage() {
                       whileHover={{ y: -5, transition: { duration: 0.2 } }}
                     >
                       <Card className="shadow-sm h-full flex flex-col">
-                        <CardHeader className="pb-3">
+                        <CardHeader className="-mb-2">
                           <div className="flex flex-wrap gap-2 mb-2">
                             {project.is_idea ? (
                               <Badge variant="outline">Idea</Badge>
@@ -728,11 +789,13 @@ export default function ProfilePage() {
                             Created on {formatDate(project.created_at)}
                           </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                        <CardContent className="flex-1">
+                          <p className="text-sm text-muted-foreground line-clamp-3">
                             {project.description}
                           </p>
-                          <div className="flex flex-wrap gap-1 mb-2">
+                        </CardContent>
+                        <CardFooter className="flex flex-col">
+                          <div className="flex flex-wrap gap-2 mb-4 self-start">
                             {project.industry.slice(0, 3).map((ind) => (
                               <Badge
                                 key={ind}
@@ -748,19 +811,19 @@ export default function ProfilePage() {
                               </Badge>
                             )}
                           </div>
-                        </CardContent>
-                        <CardFooter className="border-t pt-3 flex justify-between">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/projects/${project.id}`}>
-                              View Details
-                            </Link>
-                          </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/projects/edit/${project.id}`}>
-                              <PenLine className="h-3 w-3 mr-1" />
-                              Edit
-                            </Link>
-                          </Button>
+                          <div className="flex justify-between w-full">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/projects/${project.id}`}>
+                                View Details
+                              </Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/projects/edit/${project.id}`}>
+                                <PenLine className="h-3 w-3 mr-1" />
+                                Edit
+                              </Link>
+                            </Button>
+                          </div>
                         </CardFooter>
                       </Card>
                     </motion.div>
@@ -926,7 +989,7 @@ export default function ProfilePage() {
                                     />
                                     <AvatarFallback>
                                       {inquiry.applicant_name.charAt(0)}
-                                    </AvatarFallback>
+                                    </AvatarFallback> 
                                   </Avatar>
                                   <div className="text-center sm:text-left md:text-center">
                                     <h3 className="font-medium">
@@ -1134,7 +1197,7 @@ export default function ProfilePage() {
                       transition={{ delay: 0.2 }}
                     >
                       <motion.div
-                        className="grid gap-4 md:grid-cols-2"
+                        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
                         variants={containerVariants}
                         initial="hidden"
                         animate="visible"
@@ -1148,8 +1211,8 @@ export default function ProfilePage() {
                               transition: { duration: 0.2 },
                             }}
                           >
-                            <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
-                              <CardHeader className="pb-3">
+                            <Card className="shadow-sm h-full flex flex-col hover:shadow-md transition-shadow">
+                              <CardHeader>
                                 <div className="flex flex-wrap gap-2 mb-2">
                                   {project.is_idea ? (
                                     <Badge variant="outline">Idea</Badge>
@@ -1160,16 +1223,32 @@ export default function ProfilePage() {
                                     {project.recruitment_status}
                                   </Badge>
                                 </div>
-                                <CardTitle className="text-lg">
+                                <CardTitle className="text-lg -mb-2">
                                   {project.title}
                                 </CardTitle>
                               </CardHeader>
-                              <CardContent>
+                              <CardContent className="flex-1">
                                 <p className="text-sm text-muted-foreground line-clamp-3">
                                   {project.description}
                                 </p>
                               </CardContent>
-                              <CardFooter className="border-t pt-3">
+                              <CardFooter className="flex flex-col">
+                                 <div className="flex flex-wrap gap-2 mb-4 self-start">
+                                  {project.industry.slice(0, 3).map((ind) => (
+                                    <Badge
+                                      key={ind}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {ind}
+                                    </Badge>
+                                  ))}
+                                  {project.industry.length > 3 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      +{project.industry.length - 3} more
+                                    </Badge>
+                                  )}
+                                </div>
                                 <motion.div
                                   whileHover={{ scale: 1.03 }}
                                   whileTap={{ scale: 0.97 }}
@@ -1274,7 +1353,7 @@ export default function ProfilePage() {
             </AnimatePresence>
           </TabsContent>
 
-          {/* Events Tab */} {/* right now am using bookmarks card for backend placeholders, that way i can see the ui */}
+          {/* Events Tab for */}
           <TabsContent value="events" className="space-y-6">
             <motion.div
               className="flex justify-between items-center mb-4"
@@ -1282,11 +1361,23 @@ export default function ProfilePage() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.1 }}
             >
-              <h2 className="text-xl font-semibold">My Events</h2>
+              <h2 className="text-xl font-semibold">Upcoming Events</h2>
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <Button asChild>
+                  <Link href="/calendar/new">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Event
+                  </Link>
+                </Button>
+              </motion.div>
             </motion.div>
 
+            {/* Events you've RSVP to */}
             <AnimatePresence mode="wait">
-              {eventsLoading ? (
+              {RSVPLoading ? (
                 <motion.div
                   key="loading"
                   className="flex justify-center items-center py-12"
@@ -1297,8 +1388,8 @@ export default function ProfilePage() {
                   <Loader2 className="h-8 w-8 text-primary animate-spin" />
                   <span className="ml-2">Loading your events...</span>
                 </motion.div>
-              ) : bookmarkedProjects.length === 0 && // replace with events backend
-                bookmarkedUsers.length === 0 ? ( // replace with events backend
+              ) : userRSVP.length === 0 && 
+                userRSVP.length === 0 ? ( 
                 <motion.div
                   key="no-events"
                   initial={{ opacity: 0 }}
@@ -1318,7 +1409,7 @@ export default function ProfilePage() {
                 </motion.div>
               ) : (
                 <>
-                  {bookmarkedProjects.length > 0 && ( // replace with events backend
+                  {userRSVP.length > 0 && ( 
                     <motion.div
                       className="space-y-4"
                       initial={{ opacity: 0, y: 20 }}
@@ -1331,52 +1422,62 @@ export default function ProfilePage() {
                         initial="hidden"
                         animate="visible"
                       >
-                        {bookmarkedProjects.map((project) => ( // replace with events backend
-                          <motion.div
-                            key={project.id} // replace with events backend ?
-                            variants={cardVariants}
-                            whileHover={{
-                              y: -5,
-                              transition: { duration: 0.2 },
-                            }}
-                          >
-                            <Card className="shadow-sm h-full hover:shadow-md transition-shadow">
-                              <CardHeader>
-                                <CardTitle className="text-lg">
-                                  Event Title {/* replace with events backend */}
-                                </CardTitle>
-                                <div className="">Event Date</div>
-                              </CardHeader>
-                              <CardContent>
-                                <p className="text-sm text-muted-foreground line-clamp-3">
-                                  Event Details  {/* replace with events backend */}
-                                </p>
-                              </CardContent>
-                              <CardFooter className="border-t pt-3">
-                                <motion.div
-                                  whileHover={{ scale: 1.03 }}
-                                  whileTap={{ scale: 0.97 }}
-                                  className="w-full"
-                                >
-                                  <Button
+                        {userRSVP.map((rsvp) => {
+                          return (
+                            <motion.div
+                              key={rsvp.id} 
+                              variants={cardVariants}
+                              whileHover={{
+                                y: -5,
+                                transition: { duration: 0.2 },
+                              }}
+                            >
+                              <Card className="shadow-sm h-full flex flex-col hover:shadow-md transition-shadow">
+                                <CardHeader className="-mb-2">
+                                  <CardTitle className="text-xl font-semibold line-clamp-1">
+                                    {rsvp.title}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex-1">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Calendar className="w-4 h-4" />
+                                      {format(rsvp.end_time, "MMM d, yyyy")}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <MapPin className="w-4 h-4" />
+                                      <span className="line-clamp-1">{rsvp.location}</span>
+                                    </div>
+                                    <p className="text-sm mt-4 text-muted-foreground line-clamp-3">
+                                      {rsvp.description}
+                                    </p>
+                                  </div>
+                                </CardContent>
+                                <CardFooter>
+                                  <motion.div
+                                    whileHover={{ scale: 1.03 }}
+                                    whileTap={{ scale: 0.97 }}
                                     className="w-full"
-                                    variant="outline"
-                                    asChild
                                   >
-                                    <Link href={'/calendar'}>  {/* replace with events backend */}
-                                      View Event {/* maybe the event card details can popup ? or link to calendar */}
-                                    </Link>
-                                  </Button>
-                                </motion.div>
-                              </CardFooter>
-                            </Card>
-                          </motion.div>
-                        ))}
+                                    <Button
+                                      className="w-full h-10"
+                                      variant="outline"
+                                      onClick={() => handleEventClick(rsvp)}
+                                    >
+                                      View Details 
+                                    </Button>
+                                  </motion.div>
+                                </CardFooter>
+                              </Card>
+                            </motion.div>
+                          );
+                        })}
                       </motion.div>
                     </motion.div>
                   )}
 
-                  {bookmarkedUsers.length > 0 && ( // replace with events backend
+                  {/* Events your hosting */}
+                  {userEvents.length > 0 && ( 
                     <motion.div
                       className="space-y-4 mt-6"
                       initial={{ opacity: 0, y: 20 }}
@@ -1384,7 +1485,7 @@ export default function ProfilePage() {
                       transition={{ delay: 0.3 }}
                     >
                       <h3 className="text-lg font-semibold">
-                        Events I'm Hosting
+                        My Events
                       </h3>
                       <motion.div
                         className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
@@ -1392,61 +1493,52 @@ export default function ProfilePage() {
                         initial="hidden"
                         animate="visible"
                       >
-                        {bookmarkedUsers.map((user) => ( // replace with events backend
+                        {userEvents.map((event) => ( 
                           <motion.div
-                            key={user.id}
+                            key={event.id}
                             variants={cardVariants}
                             whileHover={{
                               y: -5,
                               transition: { duration: 0.2 },
                             }}
                           >
-                            <Card className="shadow-sm hover:shadow-md transition-shadow">
-                              <CardContent className="pt-6">
-                                <div className="flex flex-col items-center text-center gap-4">
-                                  <motion.div
-                                    whileHover={{ scale: 1.05 }}
-                                    transition={{
-                                      type: "spring",
-                                      stiffness: 300,
-                                    }}
-                                  >
-                                    <Avatar className="h-16 w-16">
-                                      <AvatarImage
-                                        src={user.avatar || ""} // replace with events backend
-                                        alt={user.full_name} // replace with events backend
-                                      />
-                                      <AvatarFallback>
-                                        {user.full_name?.charAt(0)} {/* replace with events backend */}
-                                      </AvatarFallback> 
-                                    </Avatar>
-                                  </motion.div>
-                                  <div>
-                                    <h3 className="font-semibold text-lg">
-                                      Event Title {/* replace with events backend */}
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground line-clamp-2">
-                                      Event Description {/* replace with events backend */}
+                            <Card className="shadow-sm h-full flex flex-col hover:shadow-md transition-shadow">
+                                <CardHeader className="-mb-2">
+                                  <CardTitle className="text-xl font-semibold line-clamp-1">
+                                    {event.title}
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex-1">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Calendar className="w-4 h-4" />
+                                      {format(event.end, "MMM d, yyyy")}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <MapPin className="w-4 h-4" />
+                                      <span className="line-clamp-1">{event.location}</span>
+                                    </div>
+                                    <p className="text-sm mt-4 text-muted-foreground line-clamp-3">
+                                      {event.description}
                                     </p>
-                                    <motion.div
-                                      whileHover={{ scale: 1.05 }}
-                                      whileTap={{ scale: 0.95 }}
-                                    >
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="mt-4"
-                                        asChild
-                                      >
-                                        <Link href={'/calendar'}> {/* replace with events backend */}
-                                          View Event {/* maybe the event card details can popup ? or link to calendar */}
-                                        </Link>
-                                      </Button>
-                                    </motion.div>
                                   </div>
-                                </div>
-                              </CardContent>
-                            </Card>
+                                </CardContent>
+                                <CardFooter>
+                                  <motion.div
+                                    whileHover={{ scale: 1.03 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    className="w-full"
+                                  >
+                                    <Button
+                                      className="w-full h-10"
+                                      variant="outline"
+                                      onClick={() => handleEventClick(event)}
+                                    >
+                                      View Details 
+                                    </Button>
+                                  </motion.div>
+                                </CardFooter>
+                              </Card>
                           </motion.div>
                         ))}
                       </motion.div>
@@ -1458,6 +1550,168 @@ export default function ProfilePage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Event Information Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent
+          className="w-full max-h-[100dvh] p-0 overflow-hidden overflow-y-auto scrollbar-hidden 
+            sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:bg-slate-900/80"
+        >
+          <motion.div
+            variants={dialogVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="py-5 px-4"
+          >
+            {selectedEvent && (
+              <div className="space-y-6">
+                {/* Event Information */}
+                <div className="space-y-2">
+                  {/* Poster preview */}
+                  {selectedEvent?.poster_url && (
+                    <SquarePoster
+                      src={selectedEvent.poster_url}
+                      alt={`${selectedEvent.title} poster`}
+                    />
+                  )}
+                  <div className="pb-2">
+                    <DialogTitle className="text-2xl font-bold dark:text-slate-100">
+                      {selectedEvent.title}
+                    </DialogTitle>
+                    <div className="flex items-center gap-2 pt-2 group">
+                      <Link
+                        href={`/users/${selectedEvent?.created_by}`}
+                        className="flex items-center gap-2"
+                      >
+                        {/* Avatar */}
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 10,
+                          }}
+                          className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
+                        >
+                          {selectedEvent.created_by === profile.id && profile.avatar ? (
+                            <Image
+                              src={profile.avatar}
+                              alt={profile.full_name}
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                              priority
+                            />
+                          ) : selectedEvent.creator && selectedEvent.creator.avatar ? (
+                            <Image
+                              src={selectedEvent.creator.avatar}
+                              alt={selectedEvent.creator.full_name}
+                              fill
+                              className="object-cover"
+                              sizes="64px"
+                              priority
+                            />
+                          ) : selectedEvent.creator ? (
+                            <div className="flex items-center justify-center h-full w-full bg-muted">
+                              <span className="text-xs font-medium text-[#500000]">
+                                {selectedEvent.creator.full_name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          ) : (
+                            // fallback for when creator is missing (should rarely happen)
+                            <div className="flex items-center justify-center h-full w-full bg-muted">
+                              <span className="text-xs font-medium text-[#500000]">
+                                {profile.full_name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                        </motion.div>
+
+                        {/* Host text */}
+                        <p className="text-sm text-muted-foreground font-semibold group-hover:underline group-hover:text-foreground transition-colors duration-200">
+                          Hosted by{" "}
+                          {selectedEvent.created_by === profile.id
+                            ? "You"
+                            : selectedEvent.creator?.full_name ?? "Unknown"}
+                        </p>
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Date, Time & Location */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      {/* Calendar Icon */}
+                      <div
+                        className="w-10 h-10 rounded-sm border bg-background text-center
+                          overflow-hidden shadow-sm shrink-0"
+                      >
+                        <div className="bg-muted text-[10px] dark:text-slate-100 font-medium py-[3px] leading-none">
+                          {format(startTime, "MMM").toUpperCase()}
+                        </div>
+                        <div className="text-[15px] dark:text-slate-100 font-extrabold text-foreground leading-none pt-[3px]">
+                          {format(startTime, "d")}
+                        </div>
+                      </div>
+
+                      {/* Date & Time */}
+                      <div className="text-sm dark:text-slate-100">
+                        <p className="font-semibold text-[14px]">
+                          {format(startTime, "EEEE, MMMM d")}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {format(startTime, "h:mm a")} –{" "}
+                          {format(endTime, "h:mm a")}
+                        </p>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="w-px h-6 bg-border" />
+
+                      {/* Location Info */}
+                      {selectedEvent.location && (
+                        <div className="flex items-center gap-2 text-sm dark:text-slate-100">
+                          <div className="w-10 h-10 border rounded-md bg-background flex items-center justify-center">
+                            <MapPin className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-[14px]">
+                              {/^(https?:\/\/)/i.test(selectedEvent.location)
+                                ? "Online Event"
+                                : selectedEvent.location}
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                              {/^(https?:\/\/)/i.test(selectedEvent.location)
+                                ? ""
+                                : "In-person Event"}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* About Event */}
+                {selectedEvent.description?.trim() && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                      About Event
+                    </h3>
+                    <Separator />
+                    <div className="rounded-md px-4 py-2">
+                      <p className="text-sm leading-relaxed dark:text-slate-200">
+                        {selectedEvent.description.trimStart()}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
