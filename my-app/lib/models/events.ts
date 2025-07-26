@@ -15,6 +15,7 @@ export type Event = {
   approved_at?: string | null;
   event_type: 'workshop' | 'info_session' | 'networking' | 'hackathon' | 'deadline' | 'meeting' | 'other' | 'personal';
   poster_url?: string | null;
+  industry: string[];
 };
 
 type EventWithCreator = Event & {
@@ -103,7 +104,8 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
       created_by: eventData.created_by,
       status: eventData.status || 'pending',
       event_type: eventData.event_type || 'other',
-      poster_url: eventData.poster_url
+      poster_url: eventData.poster_url,
+      industry: eventData.industry || []
     })
     .select()
     .single();

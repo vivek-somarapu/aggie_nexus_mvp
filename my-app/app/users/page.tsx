@@ -17,6 +17,7 @@ import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import type { Variants } from "framer-motion"
 
 // Animation variants
 const pageVariants = {
@@ -42,7 +43,7 @@ const containerVariants = {
   }
 }
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { 
     opacity: 1, 

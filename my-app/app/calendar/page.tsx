@@ -71,6 +71,7 @@ import {
   customScrollStyles,
   colorPalette,
   categories,
+  industryOptions,
 } from "@/lib/constants";
 
 // Import and augment the Event type to match API response
@@ -116,6 +117,7 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [industryFilter, setIndustryFilter] = useState<string>("all");
   const [selectedEvent, setSelectedEvent] = useState<ProcessedEvent | null>(
     null
   );
@@ -176,11 +178,17 @@ export default function CalendarPage() {
     getEvents();
   }, [profile]); // Only re-fetch when user state changes
 
-  // Filter events based on category
+  // Filter events based on category and industry
   const filteredEvents = allEvents.filter(
-    (event) =>
-      categoryFilter === "all" ||
-      (event.event_type || event.color) === categoryFilter
+    (event) => {
+      const categoryMatch = categoryFilter === "all" ||
+        (event.event_type || event.color) === categoryFilter;
+      
+      const industryMatch = industryFilter === "all" ||
+        (event.industry && event.industry.includes(industryFilter));
+      
+      return categoryMatch && industryMatch;
+    }
   );
   const upcomingOrRecent = filteredEvents.filter(
     (ev) => new Date(ev.start) >= cutoff
@@ -299,6 +307,27 @@ export default function CalendarPage() {
 
             {/* Desktop: inline filters & stats */}
             <div className="hidden md:flex items-center gap-6">
+              {/* Industry Filter */}
+              <div>
+                <label className="sr-only">Industry</label>
+                <Select
+                  value={industryFilter}
+                  onValueChange={setIndustryFilter}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Industries" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Industries</SelectItem>
+                    {industryOptions.map((industry) => (
+                      <SelectItem key={industry} value={industry}>
+                        {industry}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Event Type */}
               <div>
                 <label className="sr-only">Event Type</label>
@@ -378,6 +407,32 @@ export default function CalendarPage() {
           className="md:hidden overflow-hidden px-6"
         >
           <div className="space-y-3 py-3 ">
+            {/* Industry Filter */}
+            <div>
+              <Label
+                htmlFor="mobile-filter-industry"
+                className="text-sm py-2 font-medium"
+              >
+                Industry
+              </Label>
+              <Select
+                value={industryFilter}
+                onValueChange={setIndustryFilter}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All Industries" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Industries</SelectItem>
+                  {industryOptions.map((industry) => (
+                    <SelectItem key={industry} value={industry}>
+                      {industry}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Event Type */}
             <div>
               <Label
@@ -387,7 +442,6 @@ export default function CalendarPage() {
                 Event Type
               </Label>
               <Select
-                id="mobile-filter-type"
                 value={categoryFilter}
                 onValueChange={setCategoryFilter}
               >

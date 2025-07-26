@@ -164,14 +164,14 @@ export function TagSelector({
         {showDropdown && (
           <div
             ref={dropdownRef}
-            className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
+            className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto"
           >
             {filteredOptions.map((option, index) => (
               <button
                 key={option}
                 type="button"
-                className={`w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none ${
-                  index === highlightedIndex ? 'bg-gray-100' : ''
+                className={`w-full px-3 py-2 text-left text-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none transition-colors ${
+                  index === highlightedIndex ? 'bg-accent text-accent-foreground' : ''
                 }`}
                 onClick={() => selectTag(option)}
                 onMouseEnter={() => setHighlightedIndex(index)}
@@ -179,7 +179,7 @@ export function TagSelector({
                 <div className="flex items-center justify-between">
                   <span>{option}</span>
                   {selected.includes(option) && (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-primary" />
                   )}
                 </div>
               </button>
@@ -191,13 +191,13 @@ export function TagSelector({
              !selected.includes(inputValue.trim()) && (
               <button
                 type="button"
-                className={`w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none border-t ${
-                  highlightedIndex === filteredOptions.length ? 'bg-gray-100' : ''
+                className={`w-full px-3 py-2 text-left text-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none border-t border-border transition-colors ${
+                  highlightedIndex === filteredOptions.length ? 'bg-accent text-accent-foreground' : ''
                 }`}
                 onClick={() => selectTag(inputValue.trim())}
                 onMouseEnter={() => setHighlightedIndex(filteredOptions.length)}
               >
-                <span className="text-black-600">Add "{inputValue.trim()}"</span>
+                <span className="text-primary">Add "{inputValue.trim()}"</span>
               </button>
             )}
           </div>

@@ -47,7 +47,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { pageVariants, calendarVariants, categories } from "@/lib/constants";
+import { pageVariants, calendarVariants, categories, industryOptions } from "@/lib/constants";
 import {
   Select,
   SelectTrigger,
@@ -69,6 +69,7 @@ const schema = z
   .object({
     title: z.string().min(1, "Title is required"),
     event_type: z.string().min(1, "Event type is required"),
+    industry: z.string().min(1, "Industry is required"),
 
     /* all three of these fields are needed to build the full Date-time */
     date: z.date({ required_error: "Date is required" }),
@@ -188,6 +189,7 @@ export default function NewEventPage() {
     defaultValues: {
       title: "",
       event_type: "",
+      industry: "",
       date: new Date(),
       start_time: "",
       end_time: "",
@@ -223,6 +225,7 @@ export default function NewEventPage() {
     const fields: string[] = [];
 
     if (!watchedValues.title?.trim()) fields.push("Event Title");
+    if (!watchedValues.industry) fields.push("Industry");
     if (!watchedValues.event_type) fields.push("Event Category");
     if (!watchedValues.start_time) fields.push("Start Time");
     if (!watchedValues.end_time) fields.push("End Time");
@@ -288,6 +291,7 @@ export default function NewEventPage() {
         start_time: startISO,
         end_time: endISO,
         event_type: data.event_type as any,
+        industry: [data.industry],
         location: data.is_online
           ? (data.event_link as string)
           : (data.location as string),
@@ -369,7 +373,7 @@ export default function NewEventPage() {
               >
                 {/* ── Title + Date/Time (responsive row) ────────────────────────── */}
                 <div className="grid gap-4 lg:grid-cols-4">
-                  {/* Event Title & Category */}
+                  {/* Event Title */}
                   <div className="lg:col-span-2">
                     <FormField
                       name="title"
@@ -379,52 +383,17 @@ export default function NewEventPage() {
                           <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
                             Event Title <span className="text-red-500">*</span>
                           </FormLabel>
-                          <div className="relative">
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter your event title..."
-                                className={cn(
-                                  "h-10 pr-36 dark:bg-slate-900/80 dark:text-slate-200",
-                                  !field.value?.trim() &&
-                                    "border-red-300 focus:border-red-500"
-                                )}
-                              />
-                            </FormControl>
-
-                            {/* Category dropdown in the input's right corner */}
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-1">
-                              <FormField
-                                name="event_type"
-                                control={form.control}
-                                render={({ field: categoryField }) => (
-                                  <Select
-                                    value={categoryField.value}
-                                    onValueChange={categoryField.onChange}
-                                  >
-                                    <SelectTrigger
-                                      className={cn(
-                                        "h-8 w-36 bg-muted/50 border-0 text-xs",
-                                        !categoryField.value && "border-red-300"
-                                      )}
-                                    >
-                                      <SelectValue placeholder="Category *" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {eventTypes.map((t) => (
-                                        <SelectItem
-                                          key={t.value}
-                                          value={t.value}
-                                        >
-                                          {t.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              />
-                            </div>
-                          </div>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter your event title..."
+                              className={cn(
+                                "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                !field.value?.trim() &&
+                                  "border-red-300 focus:border-red-500"
+                              )}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -444,6 +413,91 @@ export default function NewEventPage() {
                         }
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* ── Industry + Category (responsive row) ────────────────────────── */}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {/* Industry */}
+                  <div>
+                    <FormField
+                      name="industry"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Industry <span className="text-red-500">*</span>
+                          </FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger
+                                className={cn(
+                                  "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                  !field.value && "border-red-300 focus:border-red-500"
+                                )}
+                              >
+                                <SelectValue placeholder="Select an industry..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {industryOptions.map((industry) => (
+                                <SelectItem
+                                  key={industry}
+                                  value={industry}
+                                >
+                                  {industry}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Category */}
+                  <div>
+                    <FormField
+                      name="event_type"
+                      control={form.control}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Event Category <span className="text-red-500">*</span>
+                          </FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger
+                                className={cn(
+                                  "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                  !field.value && "border-red-300 focus:border-red-500"
+                                )}
+                              >
+                                <SelectValue placeholder="Select a category..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {eventTypes.map((t) => (
+                                <SelectItem
+                                  key={t.value}
+                                  value={t.value}
+                                >
+                                  {t.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
 

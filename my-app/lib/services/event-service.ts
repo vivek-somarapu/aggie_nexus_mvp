@@ -33,6 +33,7 @@ export interface Event {
   event_type: EventType;
   poster_url: string | null;
   created_by: string;
+  industry: string[];
 
   // denormalised creator (from /api/events/[id])
   creator?: { full_name: string; avatar: string | null };
