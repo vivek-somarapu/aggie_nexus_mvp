@@ -56,7 +56,10 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [bookmarkedProjects, setBookmarkedProjects] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+  const [bookmarkLoadingMap, setBookmarkLoadingMap] = useState<{
+    [key: string]: boolean;
+  }>({});
+
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -157,26 +160,43 @@ export default function ProjectsPage() {
     projectId: string,
     event: React.MouseEvent
   ) => {
-    event.preventDefault(); // Prevent navigating to project detail
-
+    event.preventDefault();
     if (!currentUser) return;
 
+    // ✅ Optimistically update the UI immediately
+    const isBookmarked = bookmarkedProjects.includes(projectId);
+    setBookmarkedProjects((prev) =>
+      isBookmarked
+        ? prev.filter((id) => id !== projectId)
+        : [...prev, projectId]
+    );
+
     try {
-      setIsBookmarkLoading(true);
       const result = await bookmarkService.toggleProjectBookmark(
         currentUser.id,
         projectId
       );
 
-      if (result.action === "added") {
-        setBookmarkedProjects((prev) => [...prev, projectId]);
-      } else {
-        setBookmarkedProjects((prev) => prev.filter((id) => id !== projectId));
+      // ✅ If API failed, revert UI (optional safety)
+      if (
+        (result.action === "added" && isBookmarked) ||
+        (result.action === "removed" && !isBookmarked)
+      ) {
+        setBookmarkedProjects((prev) =>
+          isBookmarked
+            ? [...prev, projectId]
+            : prev.filter((id) => id !== projectId)
+        );
       }
     } catch (err) {
       console.error("Error toggling bookmark:", err);
-    } finally {
-      setIsBookmarkLoading(false);
+
+      // ✅ Revert on error
+      setBookmarkedProjects((prev) =>
+        isBookmarked
+          ? [...prev, projectId]
+          : prev.filter((id) => id !== projectId)
+      );
     }
   };
 
@@ -428,22 +448,15 @@ export default function ProjectsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                disabled={isBookmarkLoading}
+                                disabled={bookmarkLoadingMap[project.id]}
                               >
-                                {isBookmarkLoading ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Bookmark
-                                    className={`h-4 w-4 ${
-                                      bookmarkedProjects.includes(project.id)
-                                        ? "fill-primary"
-                                        : ""
-                                    }`}
-                                  />
-                                )}
-                                <span className="sr-only">
-                                  Bookmark project
-                                </span>
+                                <Bookmark
+                                  className={`h-4 w-4 ${
+                                    bookmarkedProjects.includes(project.id)
+                                      ? "fill-primary"
+                                      : ""
+                                  }`}
+                                />
                               </Button>
                             </motion.div>
                           </div>
