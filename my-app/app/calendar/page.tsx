@@ -520,6 +520,7 @@ export default function CalendarPage() {
                     className="flex-1 flex flex-col"
                   >
                     <Calendar
+                      key={categoryFilter} 
                       events={calendarEvents}
                       /** keep the calendar locked to “month” view */
                       view="month"
