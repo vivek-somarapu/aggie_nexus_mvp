@@ -10,6 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import AvatarGroup from "@/components/profile/profile-avatar";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +27,7 @@ import { Bookmark, Calendar, MapPin, Users, Eye, Loader2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import {
   projectService,
+  ProjectWithMembers,
   Project,
   ProjectSearchParams,
 } from "@/lib/services/project-service";
@@ -33,11 +36,14 @@ import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import clsx from "clsx";
 import {
   pageVariants,
   containerVariants,
   cardVariants,
   buttonVariants,
+  projectStatusColors,
+  recruitmentStatusColors,
 } from "@/lib/constants";
 
 export default function ProjectsPage() {
@@ -53,13 +59,9 @@ export default function ProjectsPage() {
     }
   }, [currentUser, authLoading, router]);
 
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectWithMembers[]>([]);
   const [bookmarkedProjects, setBookmarkedProjects] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [bookmarkLoadingMap, setBookmarkLoadingMap] = useState<{
-    [key: string]: boolean;
-  }>({});
-
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -206,18 +208,20 @@ export default function ProjectsPage() {
   );
 
   // Filter projects based on filters
-  const filteredProjects = projects.filter((project: Project) => {
-    // Filter by industry
-    const matchesIndustry =
-      industryFilter === "all" || project.industry.includes(industryFilter);
+  const filteredProjects: ProjectWithMembers[] = projects.filter(
+    (project: ProjectWithMembers) => {
+      // Filter by industry
+      const matchesIndustry =
+        industryFilter === "all" || project.industry.includes(industryFilter);
 
-    // Filter by status
-    const matchesStatus =
-      statusFilter === "all" || project.project_status === statusFilter;
+      // Filter by status
+      const matchesStatus =
+        statusFilter === "all" || project.project_status === statusFilter;
 
-    const isMatch = matchesIndustry && matchesStatus;
-    return isMatch;
-  });
+      const isMatch = matchesIndustry && matchesStatus;
+      return isMatch;
+    }
+  );
 
   // Log filtering results for debugging
   useEffect(() => {
@@ -424,7 +428,7 @@ export default function ProjectsPage() {
                 initial="hidden"
                 animate="visible"
               >
-                {filteredProjects.map((project: Project, index: number) => (
+                {filteredProjects.map((project: ProjectWithMembers, index) => (
                   <motion.div
                     key={project.id}
                     variants={cardVariants}
@@ -432,96 +436,154 @@ export default function ProjectsPage() {
                     whileHover={{ y: -5, transition: { duration: 0.2 } }}
                   >
                     <Link href={`/projects/${project.id}`}>
-                      <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
-                        <CardHeader className="pb-2">
-                          <div className="flex justify-between items-start">
-                            <CardTitle className="line-clamp-1">
+                      <Card className="group h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600">
+                        <CardHeader
+                          className="p-4 pt-0 pb-3 flex flex-col"
+                          style={{
+                            minHeight: 140 /* adjust as needed to fit title + badges + metadata */,
+                          }}
+                        >
+                          {/* Title & bookmark row */}
+                          <div className="flex justify-between items-start gap-3 mb-2">
+                            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug ">
                               {project.title}
                             </CardTitle>
+
                             <motion.div
                               whileTap={buttonVariants.tap}
                               onClick={(e) =>
                                 handleBookmarkToggle(project.id, e)
                               }
+                              className="shrink-0"
                             >
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
-                                disabled={bookmarkLoadingMap[project.id]}
+                                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                aria-label="bookmark"
                               >
                                 <Bookmark
-                                  className={`h-4 w-4 ${
+                                  className={`h-4 w-4 transition-colors ${
                                     bookmarkedProjects.includes(project.id)
-                                      ? "fill-primary"
-                                      : ""
+                                      ? "fill-[#500000] text-[#500000]"
+                                      : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                                   }`}
                                 />
                               </Button>
                             </motion.div>
                           </div>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {project.is_idea ? (
-                              <Badge
-                                variant="outline"
-                                className="bg-yellow-100 text-black"
-                              >
-                                Idea
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="bg-green-100 text-black"
-                              >
-                                Project
-                              </Badge>
-                            )}
-                            <Badge variant="outline">
+
+                          {/* Status Badges */}
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            <Badge
+                              variant="secondary"
+                              className={clsx(
+                                projectStatusColors[project.project_status] ??
+                                  "",
+                                "border-0"
+                              )}
+                            >
                               {project.project_status}
                             </Badge>
+                            <Badge
+                              variant="secondary"
+                              className={clsx(
+                                recruitmentStatusColors[
+                                  project.recruitment_status
+                                ] ?? "",
+                                "border-0"
+                              )}
+                            >
+                              {project.recruitment_status}
+                            </Badge>
                           </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-muted-foreground line-clamp-3 mb-4">
-                            {project.description}
-                          </p>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <MapPin className="h-3 w-3" />
+
+                          {/* Prominent metadata: location & team size */}
+                          <div className="flex flex-wrap gap-4 text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-4 h-4" />
                               <span>{project.location_type}</span>
                             </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
-                              <span>{formatDate(project.estimated_start)}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Users className="h-3 w-3" />
-                              <span>{project.recruitment_status}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Eye className="h-3 w-3" />
-                              <span>{project.views} views</span>
+                            <div className="flex items-center gap-1.5">
+                              <AvatarGroup
+                                avatars={[
+                                  // Project owner: mark as owner
+                                  {
+                                    id: project.owner.id,
+                                    src:
+                                      project.owner.avatar ??
+                                      "/placeholder.png",
+                                    alt: project.owner.full_name,
+                                    label: project.owner.full_name,
+                                    isOwner: true,
+                                    role: "Owner",
+                                  },
+                                  // Other members get their actual role
+                                  ...(project.members || [])
+                                    .filter(
+                                      (m) => m.user.id !== project.owner.id
+                                    )
+                                    .map((m) => ({
+                                      id: m.user.id,
+                                      src: m.user.avatar ?? "/placeholder.png",
+                                      alt: m.user.full_name,
+                                      label: m.user.full_name,
+                                      role: m.role,
+                                    })),
+                                ]}
+                                maxVisible={4}
+                                size={24}
+                                overlap={8}
+                              />
                             </div>
                           </div>
-                        </CardContent>
-                        <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                          {project.industry
-                            .slice(0, 3)
-                            .map((ind: string, indIndex: number) => (
-                              <Badge
-                                key={`${project.id}-industry-${indIndex}`}
-                                variant="secondary"
-                                className="text-xs"
-                              >
-                                {ind}
-                              </Badge>
-                            ))}
-                          {project.industry.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{project.industry.length - 3}
-                            </Badge>
+                        </CardHeader>
+
+                        <CardContent className="px-4 flex-1 flex flex-col">
+                          <div className="flex-1 flex flex-col justify-end">
+                            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed mb-4">
+                              {(() => {
+                                const words = project.description.split(" ");
+                                return words.length > 25
+                                  ? words.slice(0, 25).join(" ") + "..."
+                                  : project.description;
+                              })()}
+                            </p>
+                          </div>
+
+                          <div className="flex border-t border-gray-100 items-center gap-1 pt-2 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            Posted on {formatDate(project.created_at)}
+                            <Eye className="h-3 w-3" />
+                            {project.views}
+                          </div>
+
+                          {project.industry.length > 0 && (
+                            <div className="pt-4 dark:border-gray-700">
+                              <div className="flex flex-wrap gap-2">
+                                {project.industry
+                                  .slice(0, 3)
+                                  .map((industry: string, index: number) => (
+                                    <Badge
+                                      key={index}
+                                      variant="outline"
+                                      className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    >
+                                      {industry}
+                                    </Badge>
+                                  ))}
+                                {project.industry.length > 3 && (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                  >
+                                    +{project.industry.length - 3} more
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
                           )}
-                        </CardFooter>
+                        </CardContent>
                       </Card>
                     </Link>
                   </motion.div>

@@ -7,6 +7,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  ProjectMember,
+  UserSearchSelector,
+} from "@/components/ui/user-search-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar-range";
 import { TagSelector } from "@/components/ui/search-tag-selector";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, X } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
 import {
@@ -80,6 +84,10 @@ export default function EditProjectPage({
     project_status: "Idea Phase",
   });
 
+  const [originalMembers, setOriginalMembers] = useState<ProjectMember[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<ProjectMember[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   /* ---------- fetch existing project ---------- */
   useEffect(() => {
     const load = async () => {
@@ -125,6 +133,10 @@ export default function EditProjectPage({
       } finally {
         setIsLoading(false);
       }
+
+      const members = await projectService.getProjectMembers(projectId);
+      setOriginalMembers(members);
+      setSelectedMembers(members);
     };
 
     if (!authLoading) load();
@@ -174,13 +186,47 @@ export default function EditProjectPage({
     e.preventDefault();
     if (!user) return setError("You must be logged in");
 
-    /* validation */
-    if (!formData.title.trim()) return setError("Project title is required");
-    if (formData.description.replace(/\s/g, "") === "")
-      return setError("Project description is required");
-    if (descriptionWords > 400)
-      return setError("Description must be 400 words or fewer");
+    const errors: Record<string, string> = {};
 
+    if (!formData.title.trim()) {
+      errors.title = "Project title is required";
+    }
+    if (!formData.description.trim()) {
+      errors.description = "Project description is required";
+    } else if (descriptionWords > 400) {
+      errors.description = "Must be 400 words or fewer";
+    }
+
+    if (!range?.start || !range?.end) {
+      errors.timeline = "Both start & end dates are required";
+    } else if (range.start > range.end) {
+      errors.timeline = "End date can’t be before start";
+    }
+
+    if (selectedIndustries.length === 0) {
+      errors.industry = "Select at least one industry";
+    }
+    if (selectedSkills.length === 0) {
+      errors.skills = "Select at least one skill";
+    }
+    for (const m of selectedMembers) {
+      if (!m.role.trim()) {
+        errors.members = `Role is required for ${m.user.full_name}`;
+        break;
+      }
+    }
+
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    // clear any old errors
+    setFieldErrors({});
+    setError(null);
+    setIsSubmitting(true);
+
+    // All validations passed
     try {
       setIsSubmitting(true);
       setError(null);
@@ -189,8 +235,8 @@ export default function EditProjectPage({
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
-        estimated_start: range?.start?.toISOString() ?? undefined,
-        estimated_end: range?.end?.toISOString() ?? undefined,
+        estimated_start: range.start.toISOString(),
+        estimated_end: range.end.toISOString(),
       });
 
       toast.success("Project updated successfully!");
@@ -199,6 +245,41 @@ export default function EditProjectPage({
       setError(err.message ?? "Update failed. Try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleMembersChange = async (newList: ProjectMember[]) => {
+    // who was removed?
+    const removedIds = originalMembers
+      .map((m) => m.user_id)
+      .filter((id) => !newList.some((m) => m.user_id === id));
+
+    // who was added?
+    const added = newList.filter(
+      (m) => !originalMembers.some((om) => om.user_id === m.user_id)
+    );
+
+    try {
+      // 1) delete removals
+      for (const uid of removedIds) {
+        await projectService.removeProjectMember(projectId, uid);
+      }
+
+      // 2) add additions
+      if (added.length) {
+        await projectService.addProjectMembers(
+          projectId,
+          added.map((m) => ({ user_id: m.user_id, role: m.role }))
+        );
+      }
+
+      // 3) on success, update both lists
+      setOriginalMembers(newList);
+      setSelectedMembers(newList);
+      toast.success("Team updated");
+    } catch (err) {
+      console.error("Team update error:", err);
+      toast.error("Failed to update team");
     }
   };
 
@@ -270,8 +351,14 @@ export default function EditProjectPage({
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
+                className={
+                  fieldErrors.title ? "border-red-500 focus:ring-red-500" : ""
+                }
                 required
               />
+              {fieldErrors.title && (
+                <p className="text-red-600 text-sm mt-1">{fieldErrors.title}</p>
+              )}
             </div>
 
             {/* description */}
@@ -284,8 +371,18 @@ export default function EditProjectPage({
                 onChange={handleChange}
                 placeholder="Describe your project (max 400 words)"
                 rows={5}
+                className={
+                  fieldErrors.description
+                    ? "border-red-500 focus:ring-red-500"
+                    : ""
+                }
                 required
               />
+              {fieldErrors.description && (
+                <p className="text-red-600 text-sm mt-1">
+                  {fieldErrors.description}
+                </p>
+              )}
               <div className="text-right text-sm">
                 <span
                   className={
@@ -369,6 +466,11 @@ export default function EditProjectPage({
               <div className="space-y-2">
                 <Label>Estimated Timeline</Label>
                 <Calendar value={range} onChange={setRange} allowClear />
+                {fieldErrors.timeline && (
+                  <p className="text-red-600 text-sm mt-1">
+                    {fieldErrors.timeline}
+                  </p>
+                )}
                 <p className="mt-2 text-sm text-gray-700">
                   {range?.start && range?.end
                     ? `${format(range.start, "MMM dd, yyyy")} – ${format(
@@ -422,6 +524,11 @@ export default function EditProjectPage({
               maxTags={10}
               placeholder="Type and press Enter"
             />
+            {fieldErrors.industry && (
+              <p className="text-red-600 text-sm mt-1">
+                {fieldErrors.industry}
+              </p>
+            )}
 
             <Separator />
 
@@ -433,6 +540,29 @@ export default function EditProjectPage({
               onChange={setSelectedSkills}
               maxTags={10}
               placeholder="Type and press Enter"
+            />
+            {fieldErrors.industry && (
+              <p className="text-red-600 text-sm mt-1">
+                {fieldErrors.industry}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Team Members</CardTitle>
+            <CardDescription>
+              Add or remove collaborators on this project
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <UserSearchSelector
+              selectedMembers={selectedMembers}
+              excludeUserIds={user ? [user.id] : []}
+              onChange={handleMembersChange}
+              maxMembers={10}
+              placeholder="Search users to add…"
             />
           </CardContent>
         </Card>

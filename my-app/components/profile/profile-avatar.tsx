@@ -1,12 +1,23 @@
 "use client";
-
-import { useRef, ChangeEvent } from "react";
+import * as React from "react";
+import { useRef, ChangeEvent, useState } from "react";
 import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserIcon, Upload, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { itemVariants } from "@/lib/constants";
+import { useRouter } from "next/navigation";
+
+/**
+ * Utility to extract the first letter of the first name.
+ */
+function getInitials(name?: string) {
+  if (!name) return "";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 interface ProfileAvatarEditProps {
   avatar: string | null;
@@ -20,7 +31,19 @@ interface ProfileAvatarProps {
   fullName: string | null;
   is_texas_am_affiliate: boolean;
 }
-
+export interface AvatarGroupProps {
+  avatars: Array<{
+    id?: string;
+    src: string;
+    alt?: string; // full name
+    label?: string; // fallback name
+    role?: string; // e.g. “Designer”
+    isOwner?: boolean; // true if this user is the project owner
+  }>;
+  maxVisible?: number;
+  size?: number;
+  overlap?: number;
+}
 /**
  * Editable avatar component with upload and delete
  */
@@ -138,5 +161,109 @@ export function ProfileAvatar({
         )}
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * AvatarGroup: shows overlapping avatars with hover tooltip, fallback initials,
+ * and each links to /users/[id] when an id is provided.
+ */
+
+export default function AvatarGroup({
+  avatars,
+  maxVisible = 5,
+  size = 40,
+  overlap = 14,
+}: AvatarGroupProps) {
+  const router = useRouter();
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  const visible = avatars.slice(0, maxVisible);
+  const extraCount = avatars.length - maxVisible;
+
+  const isImage = (src?: string) => !!src && !src.endsWith("/placeholder.png");
+
+  return (
+    <div className="flex items-center">
+      <div className="flex" style={{ marginLeft: -overlap }}>
+        {visible.map((a, idx) => {
+          const isHovered = idx === hoveredIdx;
+          const name = a.label ?? a.alt ?? "";
+
+          // Dedupe tags so "Owner" only appears once
+          const tagsSet = new Set<string>();
+          if (a.role) tagsSet.add(a.role);
+          if (a.isOwner) tagsSet.add("Owner");
+          const tags = Array.from(tagsSet);
+
+          const tooltip = `${name}${
+            tags.length ? ` (${tags.join(", ")})` : ""
+          }`;
+
+          return (
+            <div
+              key={idx}
+              className="relative cursor-pointer"
+              style={{
+                marginLeft: idx === 0 ? 0 : -overlap,
+                zIndex: isHovered ? 100 : visible.length - idx,
+                transition: "margin-left 0.3s, transform 0.3s",
+                transform: isHovered ? "translateY(-10px)" : "translateY(0)",
+              }}
+              onMouseEnter={() => setHoveredIdx(idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              onClick={() => a.id && router.push(`/users/${a.id}`)}
+            >
+              <Avatar
+                className="border-2 border-background ring-2 ring-border/40 shadow-md"
+                style={{ width: size, height: size }}
+              >
+                {isImage(a.src) ? (
+                  <AvatarImage
+                    src={a.src}
+                    alt={name}
+                    className="object-cover"
+                  />
+                ) : (
+                  <AvatarFallback className="bg-gray-200 text-gray-600 flex items-center justify-center text-[10px]">
+                    {getInitials(name)}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+
+              <AnimatePresence>
+                {isHovered && (
+                  <motion.div
+                    key="tooltip"
+                    initial={{ x: "-50%", y: 10, opacity: 0, scale: 0.7 }}
+                    animate={{ x: "-50%", y: 0, opacity: 1, scale: 1 }}
+                    exit={{ x: "-50%", y: 10, opacity: 0, scale: 0.7 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 24 }}
+                    className="absolute left-1/2 whitespace-nowrap rounded bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground shadow-lg pointer-events-none"
+                    style={{ top: -size * 0.7 }}
+                  >
+                    {tooltip}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+
+        {extraCount > 0 && (
+          <div
+            className="flex items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold border-2 border-background shadow-md"
+            style={{
+              width: size,
+              height: size,
+              marginLeft: -overlap,
+              fontSize: size * 0.32,
+            }}
+          >
+            +{extraCount}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

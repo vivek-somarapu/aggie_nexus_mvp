@@ -6,10 +6,11 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import Image from "next/image";
+import AvatarGroup from "@/components/profile/profile-avatar";
+
 import { format } from "date-fns";
 import clsx from "clsx";
-
+import { ProjectWithMembers } from "@/lib/services/project-service";
 import {
   Card,
   CardContent,
@@ -44,6 +45,7 @@ import {
   Share2,
   User,
   Pencil,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -65,7 +67,7 @@ export default function ProjectPage() {
   const { authUser: currentUser, isAuthReady } = useAuth();
   const router = useRouter();
 
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<ProjectWithMembers | null>(null);
   const [owner, setOwner] = useState<UserType | null>(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,28 +75,24 @@ export default function ProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [similarProjects, setSimilarProjects] = useState<Project[]>([]);
 
-  // Inquiry dialog state
   const [inquiryNote, setInquiryNote] = useState("");
   const [isInquiryOpen, setIsInquiryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inquiryError, setInquiryError] = useState<string | null>(null);
   const [inquirySuccess, setInquirySuccess] = useState(false);
 
-  // Fetch project data - independent of auth state
   useEffect(() => {
     const fetchProjectData = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Fetch project
-        const fetchedProject = await projectService.getProject(id);
-        if (!fetchedProject) {
-          notFound();
-        }
+        const fetchedProject = (await projectService.getProject(
+          id
+        )) as ProjectWithMembers;
+        if (!fetchedProject) return notFound();
         setProject(fetchedProject);
 
-        // Fetch project owner
         if (fetchedProject.owner_id) {
           const fetchedOwner = await userService.getUser(
             fetchedProject.owner_id
@@ -102,7 +100,6 @@ export default function ProjectPage() {
           setOwner(fetchedOwner);
         }
 
-        // Fetch similar projects
         const allProjects = await projectService.getProjects();
         const similar = allProjects
           .filter(
@@ -113,119 +110,93 @@ export default function ProjectPage() {
           .slice(0, 3);
         setSimilarProjects(similar);
       } catch (err) {
-        console.error("Error fetching project:", err);
+        console.error(err);
         setError("Failed to load project details. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchProjectData();
-  }, [id]); // Only depend on project ID, not auth state
+  }, [id]);
 
-  // Separate effect for bookmark data - only runs when auth is ready and user exists
   useEffect(() => {
     const fetchBookmarkData = async () => {
       if (!currentUser || !project) return;
-
       try {
         setIsBookmarkLoading(true);
         const bookmarks = await bookmarkService.getProjectBookmarks(
           currentUser.id
         );
-        const isProjectBookmarked = bookmarks.some((b) => b.project_id === id);
-        setIsBookmarked(isProjectBookmarked);
-      } catch (err) {
-        console.error("Error fetching bookmark data:", err);
-        // Don't show error for bookmark fetch failure
+        setIsBookmarked(bookmarks.some((b) => b.project_id === id));
+      } catch {
+        // ignore
       } finally {
         setIsBookmarkLoading(false);
       }
     };
-
     if (isAuthReady && currentUser && project) {
       fetchBookmarkData();
     }
-  }, [isAuthReady, currentUser?.id, project?.id]); // Use stable auth ready state
+  }, [isAuthReady, currentUser, project, id]);
 
-  const handleEdit = async () => {
-    redirect(`/projects/edit/${project?.id}`);
+  const handleEdit = () => {
+    if (project) redirect(`/projects/edit/${project.id}`);
   };
 
   const handleBookmarkToggle = async () => {
     if (!currentUser || !project) return;
 
+    setIsBookmarked((prev) => !prev);
+
     try {
-      setIsBookmarkLoading(true);
-      const result = await bookmarkService.toggleProjectBookmark(
-        currentUser.id,
-        project.id
-      );
-      setIsBookmarked(result.action === "added");
-    } catch (err) {
-      console.error("Error toggling bookmark:", err);
-    } finally {
-      setIsBookmarkLoading(false);
+      await bookmarkService.toggleProjectBookmark(currentUser.id, project.id);
+    } catch {
+      // Revert on error
+      setIsBookmarked((prev) => !prev);
     }
   };
 
-  // Handle inquiry submission
   const handleInquirySubmit = async () => {
     if (!currentUser || !project) {
       setInquiryError("You must be logged in to submit an inquiry");
       return;
     }
-
     if (!inquiryNote.trim()) {
       setInquiryError("Please provide a note about your interest");
       return;
     }
-
     try {
       setIsSubmitting(true);
       setInquiryError(null);
-
       const supabase = createClient();
-
-      // Check if user already applied to this project
-      const { data: existingApplications } = await supabase
+      const { data: existing } = await supabase
         .from("project_applications")
         .select("id")
         .eq("project_id", project.id)
         .eq("user_id", currentUser.id)
         .single();
-
-      if (existingApplications) {
+      if (existing) {
         setInquiryError(
           "You have already submitted an inquiry for this project"
         );
         return;
       }
-
-      // Submit new application
       const { error } = await supabase.from("project_applications").insert({
         project_id: project.id,
         user_id: currentUser.id,
         note: inquiryNote,
         status: "pending",
       });
-
       if (error) throw error;
-
-      // Show success message and reset form
       setInquirySuccess(true);
       setInquiryNote("");
-
-      // Close dialog after a delay
       setTimeout(() => {
         setIsInquiryOpen(false);
         setInquirySuccess(false);
       }, 2000);
     } catch (err: any) {
-      console.error("Error submitting inquiry:", err);
-      setInquiryError(
-        err?.message || "Failed to submit inquiry. Please try again."
-      );
+      console.error(err);
+      setInquiryError(err?.message || "Failed to submit inquiry.");
     } finally {
       setIsSubmitting(false);
     }
@@ -233,33 +204,37 @@ export default function ProjectPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-32">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
-        <span className="ml-2">Loading project details...</span>
+      <div className="flex justify-center items-center py-16">
+        <Loader2 className="h-6 w-6 text-primary animate-spin" />
+        <span className="ml-2 text-sm">Loading project details...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <Alert variant="destructive" className="my-6">
-        <AlertDescription>{error}</AlertDescription>
+      <Alert variant="destructive" className="my-4">
+        <AlertDescription className="text-sm">{error}</AlertDescription>
       </Alert>
     );
   }
 
-  if (!project) {
-    return notFound();
-  }
-
+  if (!project) return notFound();
   const isOwner = currentUser?.id === project.owner_id;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 text-sm">
+      {/* Back button */}
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              if (window.history.length > 2) {
+                router.back();
+              } else {
+                router.push("/projects");
+              }
+            }}
             className="inline-flex items-center"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
@@ -268,49 +243,38 @@ export default function ProjectPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        {/* Main Content - Left Column */}
-        <div className="md:col-span-3 space-y-6">
-          <Card className="shadow-sm gap-0">
-            <CardHeader>
+      <div className="grid gap-4 md:grid-cols-4">
+        {/* Main Content */}
+        <div className="md:col-span-3 space-y-4">
+          <Card className="shadow-sm gap-0 pb-0">
+            <CardHeader className="p-3 pb-2">
               <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {project.is_idea ? (
-                      <Badge
-                        variant="outline"
-                        className={clsx(
-                          "bg-yellow-100 text-black border-none transition-shadow",
-                          "hover:shadow-[0_0_6px_2px_rgba(250,204,21,0.30)]" // yellow-ish glow (#facc15)
-                        )}
-                      >
-                        Idea
-                      </Badge>
-                    ) : (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {!project.is_idea && (
                       <Badge
                         variant="outline"
                         className={clsx(
                           "bg-green-100 text-black border-none transition-shadow",
-                          "hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]" // green glow
+                          "hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]",
+                          "text-xs px-2 py-0.5"
                         )}
                       >
                         Project
                       </Badge>
                     )}
-
                     <Badge
                       className={clsx(
-                        "border-none transition-shadow", // keep base styles
+                        "border-none transition-shadow text-xs px-2 py-0.5",
                         projectStatusColors[project.project_status] ??
                           "bg-gray-100 text-gray-700"
                       )}
                     >
                       {project.project_status}
                     </Badge>
-
                     <Badge
                       className={clsx(
-                        "border-none transition-shadow",
+                        "border-none transition-shadow text-xs px-2 py-0.5",
                         recruitmentStatusColors[project.recruitment_status] ??
                           "bg-gray-100 text-gray-700"
                       )}
@@ -318,143 +282,135 @@ export default function ProjectPage() {
                       {project.recruitment_status}
                     </Badge>
                   </div>
-                  <CardTitle className="text-2xl">{project.title}</CardTitle>
-                  <div className="my-2 flex flex-wrap items-center gap-6 text-xs dark:text-slate-100">
-                    {/* ✅ Date */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 shrink-0 flex-col overflow-hidden rounded-sm border bg-background text-center shadow-sm">
-                        <div className="bg-muted py-[2px] text-[9px] font-medium leading-none dark:text-slate-100">
-                          {format(
-                            new Date(project.estimated_start!),
-                            "MMM"
-                          ).toUpperCase()}
-                        </div>
-                        <div className="pt-[1px] text-[13px] font-extrabold leading-none text-foreground dark:text-slate-100">
-                          {format(new Date(project.estimated_start!), "d")}
-                        </div>
-                      </div>
-                      <p className="font-medium">
-                        {format(new Date(project.estimated_start!), "MMM d")}
-                        {project.estimated_end &&
-                          ` – ${format(
-                            new Date(project.estimated_end!),
-                            "MMM d"
-                          )}`}
-                      </p>
+                  <CardTitle className="text-xl leading-snug line-clamp-2">
+                    {project.title}
+                  </CardTitle>
+                  <div className="flex flex-wrap gap-4 text-gray-700 dark:text-gray-300 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4" />
+                      <span>{project.location_type}</span>
                     </div>
-
-                    {/* ✅ Location */}
-                    {project.location_type && (
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-background">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <p className="font-medium">{project.location_type}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {owner && (
-                    <Link
-                      href={`/users/${owner.id}`}
-                      className="flex items-center gap-2 group"
-                    >
-                      {/* Avatar */}
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 400,
-                          damping: 10,
-                        }}
-                        className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
-                      >
-                        {!owner.id ? (
-                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        ) : owner.avatar ? (
-                          <Image
-                            src={owner.avatar}
-                            alt={owner.full_name}
-                            fill
-                            className="object-cover"
-                            sizes="64px"
-                            priority
+                    <div className="flex items-center gap-1.5">
+                      <Users className="w-4 h-4" />
+                      <span>Team ({project.members?.length || 0})</span>
+                      {owner && (
+                        <section className="mx-2">
+                          <AvatarGroup
+                            avatars={[
+                              // use owner state, not project.owner
+                              {
+                                id: owner.id,
+                                src: owner.avatar ?? "/placeholder.png",
+                                alt: owner.full_name,
+                                label: owner.full_name,
+                                isOwner: true,
+                                role: "Owner",
+                              },
+                              // then the rest of the members
+                              ...(project.members || [])
+                                .filter((m) => m.user.id !== owner.id)
+                                .map((m) => ({
+                                  id: m.user.id,
+                                  src: m.user.avatar ?? "/placeholder.png",
+                                  alt: m.user.full_name,
+                                  label: m.user.full_name,
+                                  role: m.role,
+                                })),
+                            ]}
+                            maxVisible={4}
+                            size={24}
+                            overlap={8}
                           />
-                        ) : (
-                          <div className="flex items-center justify-center h-full w-full bg-muted">
-                            <span className="text-xs font-medium text-[#500000]">
-                              {owner.full_name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                      </motion.div>
-                      <span className="text-sm font-semibold text-muted-foreground group-hover:underline group-hover:text-foreground">
-                        Hosted by {owner.full_name}
-                      </span>
-                    </Link>
-                  )}
+                        </section>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-2">
-                  {currentUser?.id == owner?.id && (
+                  {isOwner && (
                     <Button variant="outline" size="icon" onClick={handleEdit}>
                       <Pencil className="h-4 w-4" />
-                      <span className="sr-only">Edit project</span>
                     </Button>
                   )}
                   <Button
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
                     variant="outline"
                     size="icon"
                     onClick={handleBookmarkToggle}
-                    disabled={isBookmarkLoading || !currentUser}
                   >
-                    {isBookmarkLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Bookmark
-                        className={`h-4 w-4 ${
-                          isBookmarked ? "fill-current" : ""
-                        }`}
-                      />
-                    )}
-                    <span className="sr-only">
-                      {isBookmarked ? "Remove bookmark" : "Bookmark project"}
-                    </span>
+                    <Bookmark
+                      className={`h-4 w-4 transition-colors ${
+                        isBookmarked
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      }`}
+                    />
                   </Button>
-                  <Button variant="outline" size="icon">
-                    <Share2 className="h-4 w-4" />
-                    <span className="sr-only">Share project</span>
+
+                  <Button
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    variant="outline"
+                    size="icon"
+                  >
+                    <Share2 className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" />
                   </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+
+            <CardContent className="space-y-4">
+              {/* Description */}
               <div>
-                <h3 className="font-semibold mb-2">Description</h3>
+                <h3 className="font-semibold text-base mb-1">Description</h3>
                 <p className="text-muted-foreground whitespace-pre-line">
                   {project.description}
                 </p>
               </div>
-              {/* ✅ Subtle metadata under description */}
-              <div className="flex border-t items-center gap-2 pt-3 text-xs text-muted-foreground">
+
+              {/* Subtle date & views */}
+              <div className="flex border-t items-center gap-1 pt-2 text-xs text-muted-foreground">
                 <Calendar className="h-3 w-3" />
                 Posted on {formatDate(project.created_at)}
                 <Separator orientation="vertical" className="h-3" />
                 <Eye className="h-3 w-3" />
-                {project.views} views
+                {project.views}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <section className="space-y-4">
-                  {/* ✅ Contact Email */}
+              {/* Contact & Industry/Skills */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <section className="space-y-3">
+                  {/* ✅ Date */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 shrink-0 flex-col overflow-hidden rounded-sm border bg-background text-center shadow-sm">
+                      <div className="bg-muted py-[2px] text-[9px] font-medium leading-none dark:text-slate-100">
+                        {format(
+                          new Date(project.estimated_start!),
+                          "MMM"
+                        ).toUpperCase()}
+                      </div>
+                      <div className="pt-[1px] text-[13px] font-extrabold leading-none text-foreground dark:text-slate-100">
+                        {format(new Date(project.estimated_start!), "d")}
+                      </div>
+                    </div>
+                    <p className="font-medium">
+                      {format(new Date(project.estimated_start!), "MMM d")}
+                      {project.estimated_end &&
+                        ` – ${format(
+                          new Date(project.estimated_end!),
+                          "MMM d"
+                        )}`}
+                    </p>
+                  </div>
+
                   {project.contact_info?.email && (
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
-                        <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex items-center gap-3 ">
+                      <div className="h-8 w-8 shadow-sm flex items-center justify-center rounded-md border bg-background">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div>
                         <a
                           href={`mailto:${project.contact_info.email}`}
-                          className="text-[14px] font-medium text-primary hover:underline"
+                          className="text-sm font-medium text-primary hover:underline"
                         >
                           {project.contact_info.email}
                         </a>
@@ -462,29 +418,25 @@ export default function ProjectPage() {
                       </div>
                     </div>
                   )}
-
-                  {/* ✅ Contact Phone */}
                   {project.contact_info?.phone && (
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-background">
-                        <Phone className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 shadow-sm flex items-center justify-center rounded-md border bg-background">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div>
-                        {/* Format phone as (111) 111-1111 */}
                         {(() => {
                           const raw = project.contact_info.phone.replace(
                             /\D/g,
                             ""
-                          ); // keep only digits
+                          );
                           const formatted = raw.replace(
                             /(\d{3})(\d{3})(\d{4})/,
                             "($1) $2-$3"
                           );
-
                           return (
                             <a
-                              href={`sms:${raw}`} // ✅ Opens messaging app on mobile
-                              className="text-[14px] font-medium text-primary hover:underline"
+                              href={`sms:${raw}`}
+                              className="text-sm font-medium text-primary hover:underline"
                             >
                               {formatted}
                             </a>
@@ -496,76 +448,60 @@ export default function ProjectPage() {
                   )}
                 </section>
 
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Industry & Skills</h3>
-
-                  {/* ✅ Industry Badges with hover shadows */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {project.industry.map((ind, indIndex) => {
-                      const randomShadow =
-                        badgeShadowVariants[
-                          Math.floor(Math.random() * badgeShadowVariants.length)
-                        ];
-                      return (
-                        <Badge
-                          key={`project-${project.id}-industry-${indIndex}`}
-                          variant="secondary"
-                          className={cn(
-                            "transition-shadow duration-200",
-                            randomShadow
-                          )}
-                        >
-                          {ind}
-                        </Badge>
-                      );
-                    })}
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-base mb-1">
+                    Industry & Skills
+                  </h3>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {project.industry.map((ind, idx) => (
+                      <Badge
+                        key={idx}
+                        variant="outline"
+                        className={cn(
+                          "text-xs px-2 py-0.5",
+                          badgeShadowVariants[
+                            Math.floor(
+                              Math.random() * badgeShadowVariants.length
+                            )
+                          ]
+                        )}
+                      >
+                        {ind}
+                      </Badge>
+                    ))}
                   </div>
-
-                  <h4 className="text-sm font-medium">Required Skills</h4>
-
-                  {/* ✅ Skills Badges with hover shadows */}
-                  <div className="flex flex-wrap gap-2">
-                    {project.required_skills.map((skill, skillIndex) => {
-                      const randomShadow =
-                        badgeShadowVariants[
-                          Math.floor(Math.random() * badgeShadowVariants.length)
-                        ];
-                      return (
-                        <Badge
-                          key={`project-${project.id}-skill-${skillIndex}`}
-                          variant="outline"
-                          className={cn(
-                            "transition-shadow duration-200",
-                            randomShadow
-                          )}
-                        >
-                          {skill}
-                        </Badge>
-                      );
-                    })}
+                  <h4 className="text-sm font-medium mb-1">Required Skills</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {project.required_skills.map((skill, idx) => (
+                      <Badge
+                        key={idx}
+                        variant="outline"
+                        className={cn(
+                          "text-xs px-2 py-0.5",
+                          badgeShadowVariants[
+                            Math.floor(
+                              Math.random() * badgeShadowVariants.length
+                            )
+                          ]
+                        )}
+                      >
+                        {skill}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="border-t mt-2 pt-3 flex justify-end">
-              {/* Inquire dialog for non-owners */}
+
+            <CardFooter className="border-t mt-2 py-3 flex justify-end">
               {!isOwner && (
                 <Dialog open={isInquiryOpen} onOpenChange={setIsInquiryOpen}>
                   <DialogTrigger asChild>
-                    <Button
-                      className={clsx(
-                        "relative overflow-hidden h-10 px-4 text-white font-medium",
-                        "bg-gradient-to-r from-[#400404] to-[#bc0404]",
-                        "transition-all duration-300",
-                        "hover:from-[#5a0505] hover:to-[#d30606]",
-                        "hover:shadow-[0_0_10px_2px_rgba(188,4,4,0.5)]"
-                      )}
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
+                    <Button className="h-9 px-3 text-sm bg-gradient-to-r from-[#400404] to-[#bc0404] text-white">
+                      <MessageSquare className="h-4 w-4 mr-1" />
                       Inquire About Project
                     </Button>
                   </DialogTrigger>
-
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Inquire About {project.title}</DialogTitle>
@@ -573,11 +509,10 @@ export default function ProjectPage() {
                         Send a note to the project owner about your interest.
                       </DialogDescription>
                     </DialogHeader>
-
                     {inquirySuccess ? (
-                      <Alert className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+                      <Alert className="bg-green-50 border-green-200 text-green-800">
                         <AlertDescription>
-                          Your inquiry has been submitted successfully!
+                          Your inquiry has been submitted!
                         </AlertDescription>
                       </Alert>
                     ) : (
@@ -587,46 +522,28 @@ export default function ProjectPage() {
                             <AlertDescription>{inquiryError}</AlertDescription>
                           </Alert>
                         )}
-
                         <Textarea
-                          placeholder="Why are you interested in this project?"
+                          placeholder="Why are you interested?"
                           value={inquiryNote}
                           onChange={(e) => setInquiryNote(e.target.value)}
-                          rows={5}
-                          className="resize-none"
+                          rows={4}
+                          className="resize-none text-sm"
                         />
-
                         <DialogFooter>
                           <Button
                             variant="outline"
+                            size="sm"
                             onClick={() => setIsInquiryOpen(false)}
                             disabled={isSubmitting}
                           >
                             Cancel
                           </Button>
                           <Button
+                            size="sm"
                             onClick={handleInquirySubmit}
-                            disabled={
-                              isSubmitting ||
-                              !inquiryNote.trim() ||
-                              !currentUser
-                            }
-                            className={clsx(
-                              "relative overflow-hidden text-white font-medium",
-                              "bg-gradient-to-r from-[#400404] to-[#bc0404]",
-                              "transition-all duration-300",
-                              "hover:from-[#5a0505] hover:to-[#d30606]",
-                              "hover:shadow-[0_0_10px_2px_rgba(188,4,4,0.5)]"
-                            )}
+                            disabled={isSubmitting || !inquiryNote.trim()}
                           >
-                            {isSubmitting ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Submitting...
-                              </>
-                            ) : (
-                              "Submit Inquiry"
-                            )}
+                            {isSubmitting ? "Submitting..." : "Submit"}
                           </Button>
                         </DialogFooter>
                       </>
@@ -634,83 +551,78 @@ export default function ProjectPage() {
                   </DialogContent>
                 </Dialog>
               )}
-
-              {/* Manage inquiries for owners */}
               {isOwner && (
-                <Button asChild>
+                <Button size="sm" asChild>
                   <Link href="/profile?tab=inquiries">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Manage Project Inquiries
+                    <MessageSquare className="h-4 w-4 mr-1" />
+                    Manage Inquiries
                   </Link>
                 </Button>
               )}
             </CardFooter>
           </Card>
 
-          {/* Similar Projects - Moved below main content on mobile, right column on desktop */}
+          {/* Similar Projects - Mobile */}
           <Card className="shadow-sm md:hidden">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Similar Projects</CardTitle>
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-base">Similar Projects</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 space-y-3">
               {similarProjects.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   {similarProjects.map((p) => (
                     <div
                       key={p.id}
-                      className="border rounded-lg p-3 hover:bg-muted/30 transition-colors"
+                      className="border rounded-lg p-2 hover:bg-muted/20"
                     >
                       <Link
                         href={`/projects/${p.id}`}
-                        className="font-medium hover:underline"
+                        className="font-medium text-sm hover:underline"
                       >
                         {p.title}
                       </Link>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
                         {p.description}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-center">
-                  No similar projects found
+                <p className="text-center text-xs text-muted-foreground">
+                  No similar projects
                 </p>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Sidebar - Right Column */}
-        <div className="space-y-6">
-          {/* Similar Projects - Only visible on desktop */}
+        {/* Sidebar */}
+        <div className="space-y-4">
           <Card className="shadow-sm hidden md:block">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Similar Projects</CardTitle>
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-base">Similar Projects</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 space-y-2">
               {similarProjects.length > 0 ? (
-                <div className="space-y-3">
-                  {similarProjects.map((p) => (
-                    <div
-                      key={p.id}
-                      className="border-b pb-3 last:border-0 last:pb-0"
+                similarProjects.map((p) => (
+                  <div
+                    key={p.id}
+                    className="border-b pb-2 last:border-0 last:pb-0"
+                  >
+                    <Link
+                      href={`/projects/${p.id}`}
+                      className="font-medium text-sm hover:underline"
                     >
-                      <Link
-                        href={`/projects/${p.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {p.title}
-                      </Link>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                        {p.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                      {p.title}
+                    </Link>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                      {p.description}
+                    </p>
+                  </div>
+                ))
               ) : (
-                <p className="text-muted-foreground text-center">
-                  No similar projects found
+                <p className="text-center text-xs text-muted-foreground">
+                  No similar projects
                 </p>
               )}
             </CardContent>

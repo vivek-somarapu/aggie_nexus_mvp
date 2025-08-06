@@ -42,6 +42,12 @@ export default function AuthDebug() {
 
     const errorCapture = (...args: any[]) => {
       const message = args.join(' ');
+      // Filter out hydration warnings and other noise
+      if (message.includes('Received `false` for a non-boolean attribute') ||
+          message.includes('hydration') ||
+          message.includes('suppressHydrationWarning')) {
+        return;
+      }
       if (message.includes('[AUTH') || message.includes('[CLIENT LAYOUT') || 
           message.includes('[LOGIN PAGE') || message.includes('[SUPABASE CLIENT')) {
         // Use ref to avoid setState during render

@@ -381,45 +381,33 @@ export const skillOptions = [
 ];
 
 export const projectStatusOptions = [
-  "Idea Phase",
-  "Not Started",
-  "Planning",
-  "In Progress",
-  "Advanced Stage",
-  "Completed",
+  "Idea",
+  "Active",
+  "Closed"
 ];
 
 export const recruitmentStatusOptions = [
-  "Not Recruiting",
-  "Open to Collaboration",
+  "Seeking Investment",
   "Actively Recruiting",
   "Team Complete",
 ];
 
 export const projectStatusColors: Record<string, string> = {
-  "Idea Phase":
-    "bg-slate-100 text-slate-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]", // blue-ish
-  "Not Started":
-    "bg-gray-100 text-gray-700 hover:shadow-[0_0_6px_2px_rgba(140,10,4,0.30)]", // red-ish
-  Planning:
-    "bg-yellow-100 text-yellow-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
-  "In Progress":
-    "bg-blue-100 text-blue-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
-  "Advanced Stage":
-    "bg-purple-100 text-purple-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
-  Completed:
+  "Idea":
+    "bg-yellow-100 text-yellow-700 hover:shadow-[0_0_6px_2px_rgba(140,10,4,0.30)]", 
+  "Active":
+    "bg-blue-100 text-blue-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]", 
+  "Closed":
     "bg-green-100 text-green-700 hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]",
 };
 
 export const recruitmentStatusColors: Record<string, string> = {
-  "Not Recruiting":
-    "bg-gray-100 text-gray-700 hover:shadow-[0_0_6px_2px_rgba(140,10,4,0.30)]", // red-ish
-  "Open to Collaboration":
-    "bg-blue-100 text-blue-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
+  "Seeking Investment":
+    "bg-red-100 text-red-700 hover:shadow-[0_0_6px_2px_rgba(220,38,38,0.3)]", 
   "Actively Recruiting":
     "bg-green-100 text-green-700 hover:shadow-[0_0_6px_2px_rgba(31,160,78,0.30)]",
   "Team Complete":
-    "bg-slate-100 text-slate-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]",
+   "bg-blue-100 text-blue-700 hover:shadow-[0_0_6px_2px_rgba(37,115,250,0.30)]", 
 };
 
 export const locationTypeOptions = ["Remote", "On-site", "Hybrid", "Flexible"];

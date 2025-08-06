@@ -559,7 +559,7 @@ export default function Home() {
                 size="lg"
                 className="rounded-full text-lg uppercase bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 px-7 py-3 font-semibold tracking-wide transition-colors"
               >
-                <Link href={authUser ? "/projects/new" : "/auth/signup"}>
+                <Link href={authUser ? "/projects" : "/auth/signup"}>
                   {authUser ? "Explore Projects" : "Sign Up"}
                 </Link>
               </Button>

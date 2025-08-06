@@ -20,6 +20,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar-range";
 import { TagSelector } from "@/components/ui/search-tag-selector";
 import {
+  UserSearchSelector,
+  ProjectMember,
+} from "@/components/ui/user-search-selector";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -49,6 +53,7 @@ export default function NewProjectPage() {
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [descriptionWords, setDescriptionWords] = useState(0);
+  const [selectedMembers, setSelectedMembers] = useState<ProjectMember[]>([]);
 
   const [range, setRange] = useState<{
     start: Date | null;
@@ -200,6 +205,23 @@ export default function NewProjectPage() {
       };
 
       const newProject = await projectService.createProject(projectData);
+
+      // Add selected members to the project
+      if (selectedMembers.length > 0) {
+        try {
+          await projectService.addProjectMembers(
+            newProject.id,
+            selectedMembers.map((member) => ({
+              user_id: member.user_id,
+              role: member.role,
+            }))
+          );
+        } catch (error) {
+          console.error("Error adding project members:", error);
+          // Don't fail the project creation if member addition fails
+          toast.error("Project created but failed to add some team members");
+        }
+      }
 
       toast.success("Project created successfully!");
       router.push(`/projects/${newProject.id}`);
@@ -452,6 +474,24 @@ export default function NewProjectPage() {
                 />
                 <div className="text-sm text-muted-foreground"></div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>
+                Add team members to your project with their roles
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <UserSearchSelector
+                selectedMembers={selectedMembers}
+                onChange={setSelectedMembers}
+                maxMembers={10}
+                placeholder="Search for users to add to your team..."
+                excludeUserIds={user ? [user.id] : []}
+              />
             </CardContent>
           </Card>
 

@@ -27,94 +27,128 @@ export interface ProjectSearchParams {
   is_idea?: boolean;
 }
 
+export interface ProjectMember {
+  user_id: string;
+  user: {
+    id: string;
+    full_name: string;
+    avatar: string | null;
+  };
+  role: string;
+}
+
+export interface ProjectWithMembers extends Project {
+  owner: {
+    id: string;
+    full_name: string;
+    avatar: string | null;
+  };
+  members: ProjectMember[];
+}
+
 export const projectService = {
   // Get all projects
-  getProjects: async (params?: ProjectSearchParams): Promise<Project[]> => {
-    let url = '/api/projects';
-    
+  getProjects: async (
+    params?: ProjectSearchParams
+  ): Promise<ProjectWithMembers[]> => {
+    let url = "/api/projects";
+
     if (params) {
       const searchParams = new URLSearchParams();
-      if (params.search) searchParams.append('search', params.search);
-      if (params.skill) searchParams.append('skill', params.skill);
-      if (params.tamu !== undefined) searchParams.append('tamu', params.tamu.toString());
-      if (params.is_idea !== undefined) searchParams.append('is_idea', params.is_idea.toString());
-      
+      if (params.search) searchParams.append("search", params.search);
+      if (params.skill) searchParams.append("skill", params.skill);
+      if (params.tamu !== undefined)
+        searchParams.append("tamu", params.tamu.toString());
+      if (params.is_idea !== undefined)
+        searchParams.append("is_idea", params.is_idea.toString());
+
       if (searchParams.toString()) {
         url += `?${searchParams.toString()}`;
       }
     }
-    
+
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch projects: ${response.statusText}`);
     }
-    
+
     return response.json();
   },
 
   // Get projects by owner ID
   getProjectsByOwnerId: async (ownerId: string): Promise<Project[]> => {
     const response = await fetch(`/api/projects?owner_id=${ownerId}`);
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch user's projects: ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch user's projects: ${response.statusText}`
+      );
     }
-    
+
     return response.json();
   },
 
   // Get a single project by ID
-  getProject: async (id: string): Promise<Project | null> => {
+  getProject: async (id: string): Promise<ProjectWithMembers | null> => {
     const response = await fetch(`/api/projects/${id}`);
-    
+
     if (response.status === 404) {
       return null;
     }
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch project: ${response.statusText}`);
     }
-    
-    return response.json();
+
+    return (await response.json()) as ProjectWithMembers;
   },
 
   // Get featured projects
   getFeaturedProjects: async (): Promise<Project[]> => {
-    const response = await fetch('/api/projects/featured');
-    
+    const response = await fetch("/api/projects/featured");
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch featured projects: ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch featured projects: ${response.statusText}`
+      );
     }
-    
+
     return response.json();
   },
-  
+
   // Advanced search for projects
   searchProjects: async (query: string, skill?: string): Promise<Project[]> => {
     const searchParams = new URLSearchParams();
-    searchParams.append('q', query);
-    if (skill) searchParams.append('skill', skill);
-    
-    const response = await fetch(`/api/search/projects?${searchParams.toString()}`);
-    
+    searchParams.append("q", query);
+    if (skill) searchParams.append("skill", skill);
+
+    const response = await fetch(
+      `/api/search/projects?${searchParams.toString()}`
+    );
+
     if (!response.ok) {
       throw new Error(`Failed to search projects: ${response.statusText}`);
     }
-    
+
     return response.json();
   },
 
   // Create a new project
-  createProject: async (projectData: Omit<Project, "id" | "views" | "created_at" | "last_updated" | "deleted" | "owner_id"> & { owner_id?: string }): Promise<Project> => {
-    const response = await fetch('/api/projects', {
-      method: 'POST',
+  createProject: async (
+    projectData: Omit<
+      Project,
+      "id" | "views" | "created_at" | "last_updated" | "deleted" | "owner_id"
+    > & { owner_id?: string }
+  ): Promise<Project> => {
+    const response = await fetch("/api/projects", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(projectData),
     });
-    
+
     if (!response.ok) {
       // Try to get the detailed error message from the response
       let errorMessage;
@@ -126,37 +160,40 @@ export const projectService = {
       }
       throw new Error(`Failed to create project: ${errorMessage}`);
     }
-    
+
     return response.json();
   },
 
   // Update an existing project
-  updateProject: async (id: string, projectData: Partial<Project>): Promise<Project | null> => {
+  updateProject: async (
+    id: string,
+    projectData: Partial<Project>
+  ): Promise<Project | null> => {
     const response = await fetch(`/api/projects/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(projectData),
     });
-    
+
     if (response.status === 404) {
       return null;
     }
-    
+
     if (!response.ok) {
       throw new Error(`Failed to update project: ${response.statusText}`);
     }
-    
+
     return response.json();
   },
 
   // Delete a project
   deleteProject: async (id: string): Promise<boolean> => {
     const response = await fetch(`/api/projects/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
-    
+
     return response.ok;
   },
 
@@ -164,8 +201,10 @@ export const projectService = {
   projectToCalendarEvent: (project: Project): CalendarEvent => {
     // Create an end date 2 hours after the start date
     const startDate = new Date(project.estimated_start);
-    const endDate = project.estimated_end ? new Date(project.estimated_end) : new Date(startDate);
-    
+    const endDate = project.estimated_end
+      ? new Date(project.estimated_end)
+      : new Date(startDate);
+
     if (!project.estimated_end) {
       endDate.setHours(endDate.getHours() + 2);
     }
@@ -177,5 +216,47 @@ export const projectService = {
       end: endDate,
       color: project.is_idea ? "default" : "green",
     };
-  }
-}; 
+  },
+
+  // Get project members
+  getProjectMembers: async (projectId: string): Promise<ProjectMember[]> => {
+    const response = await fetch(`/api/projects/${projectId}/members`);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch project members: ${response.statusText}`
+      );
+    }
+
+    return response.json();
+  },
+
+  // Add members to project
+  addProjectMembers: async (
+    projectId: string,
+    members: { user_id: string; role: string }[]
+  ): Promise<ProjectMember[]> => {
+    const response = await fetch(`/api/projects/${projectId}/members`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ members }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add project members: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  // Remove member from project
+  removeProjectMember: async (projectId: string, userId: string) => {
+    const res = await fetch(
+      `/api/projects/${projectId}/members?user_id=${userId}`,
+      { method: "DELETE" }
+    );
+    return res.ok;
+  },
+};
