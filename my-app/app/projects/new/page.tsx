@@ -32,6 +32,10 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import ProjectGalleryUploader, {
+  PendingFile,
+} from "@/components/ui/project-image-gallery";
+
 import {
   industryOptions,
   industrySkillsMap,
@@ -40,7 +44,7 @@ import {
   locationTypeOptions,
   recruitmentStatusOptions,
 } from "@/lib/constants";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -73,6 +77,10 @@ export default function NewProjectPage() {
     contact_info: { email: "", phone: "" },
     project_status: "Idea Phase",
   });
+
+  const [uploading, setUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const anyUploading = pendingFiles.some((f) => f.status === "uploading");
 
   // Initialize contact email with user's email when user data is available
   useEffect(() => {
@@ -115,6 +123,13 @@ export default function NewProjectPage() {
       setSelectedSkills(validSelectedSkills);
     }
   }, [selectedIndustries]); // Only depend on selectedIndustries to avoid infinite loops
+
+  useEffect(() => {
+    return () => {
+      // on unmount revoke all previews
+      pendingFiles.forEach((f) => URL.revokeObjectURL(f.preview));
+    };
+  }, []);
 
   // Create a computed value for available skills
   const getAvailableSkills = () => {
@@ -177,59 +192,100 @@ export default function NewProjectPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) {
       setError("You must be logged in to create a project");
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setError(null);
+    setIsSubmitting(true);
+    setError(null);
+    setUploading(true);
 
-      // Validate form data
+    try {
+      // 1️⃣ VALIDATION
       if (!formData.title.trim()) {
         throw new Error("Project title is required");
       }
-
-      if (formData.description.replace(/\s/g, "") === "") {
+      if (!formData.description.trim()) {
         throw new Error("Project description is required");
       }
 
-      // Update form data with selected arrays
-      const projectData = {
+      // 2️⃣ CREATE PROJECT
+      const created = await projectService.createProject({
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
-        // owner_id is handled by the server via auth middleware
-      };
+      });
 
-      const newProject = await projectService.createProject(projectData);
-
-      // Add selected members to the project
-      if (selectedMembers.length > 0) {
+      // 3️⃣ ADD MEMBERS (OPTIONAL)
+      if (selectedMembers.length) {
         try {
           await projectService.addProjectMembers(
-            newProject.id,
-            selectedMembers.map((member) => ({
-              user_id: member.user_id,
-              role: member.role,
-            }))
+            created.id,
+            selectedMembers.map((m) => ({ user_id: m.user_id, role: m.role }))
           );
-        } catch (error) {
-          console.error("Error adding project members:", error);
-          // Don't fail the project creation if member addition fails
-          toast.error("Project created but failed to add some team members");
+        } catch {
+          toast.error("Project created but failed to add some members");
         }
       }
 
+      // 4️⃣ PARALLEL IMAGE UPLOADS
+      const uploadTasks = pendingFiles.map((pf, idx) => {
+        // mark this file “uploading”
+        setPendingFiles((prev) => {
+          const next = [...prev];
+          next[idx] = {
+            ...next[idx],
+            status: "uploading",
+            errorMessage: undefined,
+          };
+          return next;
+        });
+
+        const form = new FormData();
+        form.append("file", pf.file);
+
+        return fetch("/api/upload/project-images", {
+          method: "POST",
+          body: form,
+        })
+          .then(async (res) => {
+            if (!res.ok) throw await res.json();
+            return res.json();
+          })
+          .then(({ publicUrl }) =>
+            projectService.addProjectImage(created.id, publicUrl, idx + 1)
+          )
+          .then(() => {
+            // mark success
+            setPendingFiles((prev) => {
+              const next = [...prev];
+              next[idx] = { ...next[idx], status: "uploaded" };
+              return next;
+            });
+          })
+          .catch((err: any) => {
+            // mark error on this tile
+            const msg = err.error || err.message || "Upload failed";
+            setPendingFiles((prev) => {
+              const next = [...prev];
+              next[idx] = { ...next[idx], status: "error", errorMessage: msg };
+              return next;
+            });
+          });
+      });
+
+      // wait for all to settle (no re-throw)
+      await Promise.allSettled(uploadTasks);
+
       toast.success("Project created successfully!");
-      router.push(`/projects/${newProject.id}`);
+      router.push(`/projects/${created.id}`);
     } catch (err: any) {
-      console.error("Error creating project:", err);
-      setError(err.message || "Failed to create project. Please try again.");
+      console.error(err);
+      setError(err.message || "Something went wrong");
       toast.error("Failed to create project");
     } finally {
+      setUploading(false);
       setIsSubmitting(false);
     }
   };
@@ -491,6 +547,21 @@ export default function NewProjectPage() {
                 maxMembers={10}
                 placeholder="Search for users to add to your team..."
                 excludeUserIds={user ? [user.id] : []}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Project Gallery</CardTitle>
+              <CardDescription>
+                Upload images to showcase your project
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProjectGalleryUploader
+                pendingFiles={pendingFiles}
+                setPendingFiles={setPendingFiles}
               />
             </CardContent>
           </Card>

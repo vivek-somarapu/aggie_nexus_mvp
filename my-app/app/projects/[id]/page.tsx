@@ -5,16 +5,16 @@ import { useParams, notFound, redirect, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
 import AvatarGroup from "@/components/profile/profile-avatar";
 
 import { format } from "date-fns";
 import clsx from "clsx";
 import { ProjectWithMembers } from "@/lib/services/project-service";
+import { ProjectImageGallery } from "@/components/ui/project-image-gallery";
+
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -74,7 +74,9 @@ export default function ProjectPage() {
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [similarProjects, setSimilarProjects] = useState<Project[]>([]);
-
+  const [images, setImages] = useState<
+    { id: string; url: string; position: number }[]
+  >([]);
   const [inquiryNote, setInquiryNote] = useState("");
   const [isInquiryOpen, setIsInquiryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,6 +94,14 @@ export default function ProjectPage() {
         )) as ProjectWithMembers;
         if (!fetchedProject) return notFound();
         setProject(fetchedProject);
+        // ─── NEW: load gallery images ───
+        try {
+          const imgs = await projectService.getProjectImages(id);
+          setImages(imgs.sort((a, b) => a.position - b.position));
+        } catch (err) {
+          console.error("Failed to load gallery images", err);
+        }
+        // ───────────────────────────────────
 
         if (fetchedProject.owner_id) {
           const fetchedOwner = await userService.getUser(
@@ -247,7 +257,7 @@ export default function ProjectPage() {
         {/* Main Content */}
         <div className="md:col-span-3 space-y-4">
           <Card className="shadow-sm gap-0 pb-0">
-            <CardHeader className="p-3 pb-2">
+            <CardHeader className="py-3 px-5 pb-2">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
@@ -328,8 +338,13 @@ export default function ProjectPage() {
                 </div>
                 <div className="flex gap-2">
                   {isOwner && (
-                    <Button variant="outline" size="icon" onClick={handleEdit}>
-                      <Pencil className="h-4 w-4" />
+                    <Button
+                      className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleEdit}
+                    >
+                      <Pencil className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" />
                     </Button>
                   )}
                   <Button
@@ -341,7 +356,7 @@ export default function ProjectPage() {
                     <Bookmark
                       className={`h-4 w-4 transition-colors ${
                         isBookmarked
-                          ? "fill-yellow-400 text-yellow-400"
+                          ? "fill-[#500000] text-[#500000]"
                           : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       }`}
                     />
@@ -358,7 +373,7 @@ export default function ProjectPage() {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-5">
               {/* Description */}
               <div>
                 <h3 className="font-semibold text-base mb-1">Description</h3>
@@ -366,6 +381,8 @@ export default function ProjectPage() {
                   {project.description}
                 </p>
               </div>
+              {/* Gallery */}
+              <ProjectImageGallery images={images} />
 
               {/* Subtle date & views */}
               <div className="flex border-t items-center gap-1 pt-2 text-xs text-muted-foreground">
@@ -552,7 +569,11 @@ export default function ProjectPage() {
                 </Dialog>
               )}
               {isOwner && (
-                <Button size="sm" asChild>
+                <Button
+                  size="sm"
+                  className="h-9 px-3 text-sm bg-gradient-to-r from-[#400404] to-[#bc0404] text-white"
+                  asChild
+                >
                   <Link href="/profile?tab=inquiries">
                     <MessageSquare className="h-4 w-4 mr-1" />
                     Manage Inquiries

@@ -164,6 +164,7 @@ export function UserSearchSelector({
                   </div>
                   {!excludeUserIds.includes(member.user_id) && (
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveMember(member.user_id)}

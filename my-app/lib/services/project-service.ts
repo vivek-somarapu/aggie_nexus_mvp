@@ -259,4 +259,38 @@ export const projectService = {
     );
     return res.ok;
   },
+
+  // 📸 new gallery methods
+  getProjectImages: async (projectId: string) => {
+    const res = await fetch(`/api/projects/${projectId}/images`);
+    if (!res.ok) throw new Error("Couldn’t load images");
+    return (await res.json()) as {
+      id: string;
+      url: string;
+      position: number;
+    }[];
+  },
+
+  addProjectImage: async (projectId: string, url: string, position: number) => {
+    const res = await fetch(`/api/projects/${projectId}/images`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, position }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      console.error('AddProjectImage error:', { status: res.status, error: err });
+      throw new Error(err.error || "Failed to add image");
+    }
+    return (await res.json()) as { id: string; url: string; position: number };
+  },
+
+  deleteProjectImage: async (projectId: string, imageId: string) => {
+    const res = await fetch(`/api/projects/${projectId}/images`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageId }),
+    });
+    if (!res.ok) throw new Error("Failed to delete image");
+  },
 };

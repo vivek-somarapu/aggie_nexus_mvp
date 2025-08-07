@@ -3,13 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AvatarGroup from "@/components/profile/profile-avatar";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,19 +17,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bookmark, Calendar, MapPin, Users, Eye, Loader2 } from "lucide-react";
+import { Bookmark, Calendar, MapPin, Eye, Loader2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import {
   projectService,
   ProjectWithMembers,
-  Project,
   ProjectSearchParams,
 } from "@/lib/services/project-service";
 import { bookmarkService } from "@/lib/services/bookmark-service";
 import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
 import clsx from "clsx";
 import {
   pageVariants,

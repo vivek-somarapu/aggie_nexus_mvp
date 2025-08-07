@@ -39,6 +39,10 @@ import {
   skillOptions,
 } from "@/lib/constants";
 import { projectService } from "@/lib/services/project-service";
+import ProjectGalleryUploader, {
+  PendingFile,
+} from "@/components/ui/project-image-gallery";
+import { useParams } from "next/navigation";
 
 import { format } from "date-fns";
 import Link from "next/link";
@@ -48,12 +52,8 @@ import { toast } from "sonner";
 
 type Range = { start: Date | null; end: Date | null };
 
-export default function EditProjectPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const projectId = params.id;
+export default function EditProjectPage() {
+  const { id: projectId } = useParams<{ id: string }>();
 
   /* -------------- auth + routing -------------- */
   const { authUser: user, isLoading: authLoading } = useAuth();
@@ -88,8 +88,19 @@ export default function EditProjectPage({
   const [selectedMembers, setSelectedMembers] = useState<ProjectMember[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    return () => {
+      pendingFiles.forEach((f) => URL.revokeObjectURL(f.preview));
+    };
+  }, [pendingFiles]);
+
   /* ---------- fetch existing project ---------- */
   useEffect(() => {
+    if (authLoading) return;
+    
     const load = async () => {
       try {
         const project = await projectService.getProject(projectId);
@@ -128,6 +139,21 @@ export default function EditProjectPage({
         setDescriptionWords(
           (project.description ?? "").trim().split(/\s+/).filter(Boolean).length
         );
+
+        // ─────────────── NEW: fetch existing images ───────────────
+        const existingImages = await projectService.getProjectImages(projectId);
+        setPendingFiles(
+          existingImages
+            .sort((a, b) => a.position - b.position)
+            .map((img) => ({
+              id: img.id,
+              file: null,
+              preview: img.url,
+              status: "uploaded" as const,
+            }))
+        );
+
+        // ────────────────────────────────────────────────────────────
       } catch (e) {
         setError("Failed to load project. Please try again.");
       } finally {
@@ -139,7 +165,9 @@ export default function EditProjectPage({
       setSelectedMembers(members);
     };
 
-    if (!authLoading) load();
+    (async () => {
+      await load();
+    })();
   }, [authLoading, projectId, user]);
 
   /* ---------- derived helpers ---------- */
@@ -184,10 +212,13 @@ export default function EditProjectPage({
   /* ---------- submit ---------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return setError("You must be logged in");
+    if (!user) {
+      setError("You must be logged in");
+      return;
+    }
 
+    // 1) VALIDATION
     const errors: Record<string, string> = {};
-
     if (!formData.title.trim()) {
       errors.title = "Project title is required";
     }
@@ -196,13 +227,11 @@ export default function EditProjectPage({
     } else if (descriptionWords > 400) {
       errors.description = "Must be 400 words or fewer";
     }
-
     if (!range?.start || !range?.end) {
       errors.timeline = "Both start & end dates are required";
     } else if (range.start > range.end) {
       errors.timeline = "End date can’t be before start";
     }
-
     if (selectedIndustries.length === 0) {
       errors.industry = "Select at least one industry";
     }
@@ -215,72 +244,141 @@ export default function EditProjectPage({
         break;
       }
     }
-
-    if (Object.keys(errors).length) {
+    if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
     }
 
-    // clear any old errors
     setFieldErrors({});
     setError(null);
     setIsSubmitting(true);
 
-    // All validations passed
     try {
-      setIsSubmitting(true);
-      setError(null);
-
+      // 2) UPDATE PROJECT CORE
       await projectService.updateProject(projectId, {
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
-        estimated_start: range.start.toISOString(),
-        estimated_end: range.end.toISOString(),
+        estimated_start: range.start!.toISOString(),
+        estimated_end: range.end!.toISOString(),
       });
 
-      toast.success("Project updated successfully!");
+      // 3) SYNC TEAM MEMBERS
+      const removedIds = originalMembers
+        .map((m) => m.user_id)
+        .filter((id) => !selectedMembers.some((m) => m.user_id === id));
+      const added = selectedMembers.filter(
+        (m) => !originalMembers.some((om) => om.user_id === m.user_id)
+      );
+      await Promise.all([
+        ...removedIds.map((uid) =>
+          projectService.removeProjectMember(projectId, uid)
+        ),
+        added.length
+          ? projectService.addProjectMembers(
+              projectId,
+              added.map((m) => ({ user_id: m.user_id, role: m.role }))
+            )
+          : Promise.resolve(),
+      ]);
+
+      // 4) DELETE REMOVED IMAGES (only now, on submit!)
+      for (const imageId of removedImageIds) {
+        try {
+          await projectService.deleteProjectImage(projectId, imageId);
+        } catch (err) {
+          console.error("Failed to delete image:", err);
+          toast.error("Could not delete one of the removed images");
+          // Decide whether to continue or abort—here we continue
+        }
+      }
+
+      // 5) UPLOAD NEW FILES (only those with a File object)
+      const newFiles = pendingFiles
+        .map((pf, idx) => ({ pf, idx }))
+        .filter(({ pf }) => pf.file !== null);
+
+      // Calculate next available positions for new images
+      const existingPositions = pendingFiles
+        .filter(pf => pf.id) // Only existing images have IDs
+        .map((_, idx) => idx + 1);
+      
+      let nextPosition = 1;
+      const positionMap = new Map();
+      
+      for (const { pf, idx } of newFiles) {
+        // Find the next available position
+        while (existingPositions.includes(nextPosition)) {
+          nextPosition++;
+        }
+        positionMap.set(idx, nextPosition);
+        nextPosition++;
+      }
+
+      const uploadTasks = newFiles.map(({ pf, idx }) => {
+        const position = positionMap.get(idx);
+        
+        // mark this slot as uploading
+        setPendingFiles((prev) => {
+          const next = [...prev];
+          next[idx] = {
+            ...next[idx],
+            status: "uploading",
+            errorMessage: undefined,
+          };
+          return next;
+        });
+        const form = new FormData();
+        form.append("file", pf.file!);
+        return fetch("/api/upload/project-images", {
+          method: "POST",
+          body: form,
+        })
+          .then(async (res) => {
+            if (!res.ok) throw await res.json();
+            return res.json();
+          })
+          .then(({ publicUrl }) =>
+            projectService.addProjectImage(projectId, publicUrl, position)
+          )
+          .then(() => {
+            setPendingFiles((prev) => {
+              const next = [...prev];
+              next[idx] = { ...next[idx], status: "uploaded" };
+              return next;
+            });
+          })
+          .catch((err: any) => {
+            const msg = err.error || err.message || "Upload failed";
+            setPendingFiles((prev) => {
+              const next = [...prev];
+              next[idx] = { ...next[idx], status: "error", errorMessage: msg };
+              return next;
+            });
+          });
+      });
+
+      await Promise.allSettled(uploadTasks);
+
+      // 6) FINALIZE
+      setOriginalMembers(selectedMembers);
+      toast.success("Project and gallery updated!");
       router.push(`/projects/${projectId}`);
     } catch (err: any) {
+      console.error(err);
       setError(err.message ?? "Update failed. Try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleMembersChange = async (newList: ProjectMember[]) => {
-    // who was removed?
-    const removedIds = originalMembers
-      .map((m) => m.user_id)
-      .filter((id) => !newList.some((m) => m.user_id === id));
-
-    // who was added?
-    const added = newList.filter(
-      (m) => !originalMembers.some((om) => om.user_id === m.user_id)
-    );
-
-    try {
-      // 1) delete removals
-      for (const uid of removedIds) {
-        await projectService.removeProjectMember(projectId, uid);
-      }
-
-      // 2) add additions
-      if (added.length) {
-        await projectService.addProjectMembers(
-          projectId,
-          added.map((m) => ({ user_id: m.user_id, role: m.role }))
-        );
-      }
-
-      // 3) on success, update both lists
-      setOriginalMembers(newList);
-      setSelectedMembers(newList);
-      toast.success("Team updated");
-    } catch (err) {
-      console.error("Team update error:", err);
-      toast.error("Failed to update team");
+  const handleRemoveImage = (file: PendingFile) => {
+    // If it’s an existing image (has an ID), mark it for deletion later
+    if (file.id) {
+      setRemovedImageIds((prev) => [...prev, file.id!]);
     }
+    // Remove it from the gallery UI immediately
+    setPendingFiles((prev) => prev.filter((f) => f !== file));
   };
 
   /* ---------- render ---------- */
@@ -560,9 +658,25 @@ export default function EditProjectPage({
             <UserSearchSelector
               selectedMembers={selectedMembers}
               excludeUserIds={user ? [user.id] : []}
-              onChange={handleMembersChange}
+              onChange={setSelectedMembers}
               maxMembers={10}
               placeholder="Search users to add…"
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Project Gallery</CardTitle>
+            <CardDescription>
+              Upload images to showcase your project
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProjectGalleryUploader
+              pendingFiles={pendingFiles}
+              setPendingFiles={setPendingFiles}
+              onRemoveImage={handleRemoveImage}
             />
           </CardContent>
         </Card>
