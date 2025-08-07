@@ -80,7 +80,21 @@ export default function NewProjectPage() {
 
   const [uploading, setUploading] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
-  const anyUploading = pendingFiles.some((f) => f.status === "uploading");
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
+  const handleRemoveImage = (file: PendingFile) => {
+    // 1️⃣ If it’s an already-uploaded image (edit mode), remember to delete it on save
+    if (file.id) {
+      setRemovedImageIds((prev) => [...prev, file.id!]);
+    }
+
+    // 2️⃣ Always remove it from the UI immediately
+    setPendingFiles((prev) => prev.filter((f) => f !== file));
+
+    // 3️⃣ And if it was a freshly‐selected File, revoke its objectURL
+    if (file.file) {
+      URL.revokeObjectURL(file.preview);
+    }
+  };
 
   // Initialize contact email with user's email when user data is available
   useEffect(() => {
@@ -562,6 +576,7 @@ export default function NewProjectPage() {
               <ProjectGalleryUploader
                 pendingFiles={pendingFiles}
                 setPendingFiles={setPendingFiles}
+                onRemoveImage={handleRemoveImage}
               />
             </CardContent>
           </Card>
