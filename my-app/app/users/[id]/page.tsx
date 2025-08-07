@@ -22,12 +22,15 @@ import {
   Home,
   Pencil,
   Phone,
+  MapPin,
+  User,
+  Calendar,
 } from "lucide-react"
 import { userService } from "@/lib/services/user-service"
 import { projectService } from "@/lib/services/project-service"
 import { bookmarkService } from "@/lib/services/bookmark-service"
 import { useAuth } from "@/lib"
-import { User } from "@/lib/models/users"
+import { User as UserType } from "@/lib/models/users"
 import { Project } from "@/lib/services/project-service"
 import { createClient } from "@/lib/supabase/client"
 import { Textarea } from "@/components/ui/textarea"
@@ -56,12 +59,21 @@ function AlertDescription({ children }: { children: React.ReactNode }) {
   return <div className="text-sm">{children}</div>;
 }
 
+// Helper function to format dates
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
 export default function UserPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
   const { authUser: currentUser, isLoading: authLoading } = useAuth()
   
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<UserType | null>(null)
   const [userProjects, setUserProjects] = useState<Project[]>([])
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isLoadingUser, setIsLoadingUser] = useState(true)
@@ -121,18 +133,35 @@ export default function UserPage() {
     fetchUser();
   }, [id]);
   
-  // Fetch user's projects
+  // Fetch user's projects (both owned and participated in)
   useEffect(() => {
     const fetchUserProjects = async () => {
       if (!user) return;
       
       try {
         setIsLoadingProjects(true);
-        // Ideally, there would be an API endpoint like /api/users/{id}/projects
-        // For now, we'll filter all projects by owner_id
-        const projects = await projectService.getProjects();
-        const filteredProjects = projects.filter(p => p.owner_id === user.id);
-        setUserProjects(filteredProjects);
+        const [ownedProjects, memberProjects] = await Promise.all([
+          projectService.getProjectsByOwnerId(user.id),
+          projectService.getProjectsByMemberId(user.id)
+        ]);
+        
+        // Combine and deduplicate projects, marking user's role
+        const allProjects = [...ownedProjects, ...memberProjects];
+        const uniqueProjects = allProjects.filter((project, index, self) => 
+          index === self.findIndex(p => p.id === project.id)
+        );
+        
+        // Add role information to each project
+        const projectsWithRoles = uniqueProjects.map(project => {
+          const isOwner = project.owner_id === user.id;
+          const memberInfo = (project as any).members?.find((m: any) => m.user_id === user.id);
+          return {
+            ...project,
+            userRole: isOwner ? 'Owner' : memberInfo?.role || 'Member'
+          };
+        });
+        
+        setUserProjects(projectsWithRoles);
       } catch (err) {
         console.error("Error fetching user projects:", err);
         // Don't set the main error as this is not critical
@@ -677,7 +706,7 @@ export default function UserPage() {
           <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle>User's Projects</CardTitle>
-              <CardDescription>Projects created or owned by {user.full_name}</CardDescription>
+              <CardDescription>Projects created by or involving {user.full_name}</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingProjects ? (
@@ -688,30 +717,113 @@ export default function UserPage() {
               ) : userProjects.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {userProjects.map((project) => (
-                    <div key={project.id} className="border rounded-md p-4 hover:bg-muted/30 transition-colors">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <Link href={`/projects/${project.id}`} className="font-medium hover:underline">
-                            {project.title}
-                          </Link>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {project.is_idea ? (
-                              <Badge variant="outline">
-                                Idea
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">
-                                Project
+                    <div key={project.id} className="group py-4 h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 rounded-lg">
+                      <Link href={`/projects/${project.id}`} className="flex-1 flex flex-col">
+                        <div className="p-4 pt-0 pb-3 flex flex-col" style={{ minHeight: 140 }}>
+                          {/* Title & role row */}
+                          <div className="flex justify-between items-start gap-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug">
+                              {project.title}
+                            </h3>
+                            {/* Show user's role in the project */}
+                            {(project as any).userRole && (
+                              <Badge 
+                                variant="secondary" 
+                                className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 shrink-0"
+                              >
+                                {(project as any).userRole}
                               </Badge>
                             )}
-                            <Badge variant="outline">{project.project_status}</Badge>
+                          </div>
+
+                          {/* Status Badges */}
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {project.is_idea ? (
+                              <Badge variant="outline">Idea</Badge>
+                            ) : (
+                              <Badge variant="outline">Project</Badge>
+                            )}
+                            <Badge
+                              variant="secondary"
+                              className="border-0"
+                            >
+                              {project.project_status}
+                            </Badge>
+                            <Badge
+                              variant="secondary"
+                              className="border-0"
+                            >
+                              {project.recruitment_status}
+                            </Badge>
+                          </div>
+
+                          {/* Prominent metadata: location & involvement */}
+                          <div className="flex flex-wrap gap-4 text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-4 h-4" />
+                              <span>{project.location_type}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-4 h-4" />
+                              <span>
+                                {project.owner_id === user.id ? (
+                                  "Created this project"
+                                ) : (
+                                  "Member of this project"
+                                )}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/projects/${project.id}`}>View</Link>
-                        </Button>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-2">{project.description}</p>
+
+                        <div className="px-4 flex-1 flex flex-col">
+                          <div className="flex-1 flex flex-col justify-end">
+                            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed mb-4">
+                              {(() => {
+                                const words = project.description.split(" ");
+                                return words.length > 25
+                                  ? words.slice(0, 25).join(" ") + "..."
+                                  : project.description;
+                              })()}
+                            </p>
+                          </div>
+
+                          <div className="flex border-t border-gray-100 items-center gap-1 pt-2 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            {project.owner_id === user.id ? (
+                              `Created on ${formatDate(project.created_at)}`
+                            ) : (
+                              `Joined on ${formatDate(project.created_at)}`
+                            )}
+                          </div>
+
+                          {project.industry.length > 0 && (
+                            <div className="pt-4 dark:border-gray-700">
+                              <div className="flex flex-wrap gap-2">
+                                {project.industry
+                                  .slice(0, 3)
+                                  .map((industry: string, index: number) => (
+                                    <Badge
+                                      key={index}
+                                      variant="outline"
+                                      className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    >
+                                      {industry}
+                                    </Badge>
+                                  ))}
+                                {project.industry.length > 3 && (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                  >
+                                    +{project.industry.length - 3} more
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </Link>
                     </div>
                   ))}
                 </div>
@@ -730,7 +842,7 @@ export default function UserPage() {
 
 // Component to fetch and display similar users
 function SimilarUsers({ userId, industries }: { userId: string, industries: string[] }) {
-  const [similarUsers, setSimilarUsers] = useState<User[]>([])
+  const [similarUsers, setSimilarUsers] = useState<UserType[]>([])
   const [isLoading, setIsLoading] = useState(true)
   
   useEffect(() => {

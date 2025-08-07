@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import AvatarGroup from "@/components/profile/profile-avatar";
+import { motion } from "framer-motion";
 
 import { format } from "date-fns";
 import clsx from "clsx";
@@ -214,18 +215,28 @@ export default function ProjectPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-16">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex justify-center items-center py-16"
+      >
         <Loader2 className="h-6 w-6 text-primary animate-spin" />
         <span className="ml-2 text-sm">Loading project details...</span>
-      </div>
+      </motion.div>
     );
   }
 
   if (error) {
     return (
-      <Alert variant="destructive" className="my-4">
-        <AlertDescription className="text-sm">{error}</AlertDescription>
-      </Alert>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Alert variant="destructive" className="my-4">
+          <AlertDescription className="text-sm">{error}</AlertDescription>
+        </Alert>
+      </motion.div>
     );
   }
 
@@ -233,9 +244,19 @@ export default function ProjectPage() {
   const isOwner = currentUser?.id === project.owner_id;
 
   return (
-    <div className="space-y-4 text-sm">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-4 text-sm"
+    >
       {/* Back button */}
-      <div className="flex items-center gap-2">
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex items-center gap-2"
+      >
         <Button variant="ghost" size="sm" asChild>
           <button
             onClick={() => {
@@ -251,11 +272,15 @@ export default function ProjectPage() {
             Back
           </button>
         </Button>
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="max-w-4xl mx-auto space-y-4">
         {/* Main Content */}
-        <div className="md:col-span-3 space-y-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
           <Card className="shadow-sm gap-0 pb-0">
             <CardHeader className="py-3 px-5 pb-2">
               <div className="flex justify-between items-start">
@@ -375,26 +400,47 @@ export default function ProjectPage() {
 
             <CardContent className="space-y-4 px-5">
               {/* Description */}
-              <div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+              >
                 <h3 className="font-semibold text-base mb-1">Description</h3>
                 <p className="text-muted-foreground whitespace-pre-line">
                   {project.description}
                 </p>
-              </div>
+              </motion.div>
+              
               {/* Gallery */}
-              <ProjectImageGallery images={images} />
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <ProjectImageGallery images={images} />
+              </motion.div>
 
               {/* Subtle date & views */}
-              <div className="flex border-t items-center gap-1 pt-2 text-xs text-muted-foreground">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
+                className="flex border-t items-center gap-1 pt-2 text-xs text-muted-foreground"
+              >
                 <Calendar className="h-3 w-3" />
                 Posted on {formatDate(project.created_at)}
                 <Separator orientation="vertical" className="h-3" />
                 <Eye className="h-3 w-3" />
                 {project.views}
-              </div>
+              </motion.div>
 
               {/* Contact & Industry/Skills */}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.5 }}
+                className="grid gap-3 sm:grid-cols-2"
+              >
                 <section className="space-y-3">
                   {/* ✅ Date */}
                   <div className="flex items-center gap-2">
@@ -507,7 +553,7 @@ export default function ProjectPage() {
                     ))}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </CardContent>
 
             <CardFooter className="border-t mt-2 py-3 flex justify-end">
@@ -582,18 +628,27 @@ export default function ProjectPage() {
               )}
             </CardFooter>
           </Card>
+        </motion.div>
 
-          {/* Similar Projects - Mobile */}
-          <Card className="shadow-sm md:hidden">
+        {/* Similar Projects - Now shown on all screen sizes */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.6 }}
+        >
+          <Card className="shadow-sm">
             <CardHeader className="p-3 pb-2">
               <CardTitle className="text-base">Similar Projects</CardTitle>
             </CardHeader>
             <CardContent className="p-3 space-y-3">
               {similarProjects.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {similarProjects.map((p) => (
-                    <div
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {similarProjects.map((p, index) => (
+                    <motion.div
                       key={p.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.7 + index * 0.1 }}
                       className="border rounded-lg p-2 hover:bg-muted/20"
                     >
                       <Link
@@ -605,7 +660,7 @@ export default function ProjectPage() {
                       <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
                         {p.description}
                       </p>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               ) : (
@@ -615,41 +670,8 @@ export default function ProjectPage() {
               )}
             </CardContent>
           </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-4">
-          <Card className="shadow-sm hidden md:block">
-            <CardHeader className="p-3 pb-2">
-              <CardTitle className="text-base">Similar Projects</CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 space-y-2">
-              {similarProjects.length > 0 ? (
-                similarProjects.map((p) => (
-                  <div
-                    key={p.id}
-                    className="border-b pb-2 last:border-0 last:pb-0"
-                  >
-                    <Link
-                      href={`/projects/${p.id}`}
-                      className="font-medium text-sm hover:underline"
-                    >
-                      {p.title}
-                    </Link>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                      {p.description}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-xs text-muted-foreground">
-                  No similar projects
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

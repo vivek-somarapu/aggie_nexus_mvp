@@ -89,6 +89,25 @@ export const projectService = {
     return response.json();
   },
 
+  // Get projects where user is a member (not owner)
+  getProjectsByMemberId: async (memberId: string): Promise<ProjectWithMembers[]> => {
+    const response = await fetch(`/api/projects`);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch projects: ${response.statusText}`
+      );
+    }
+
+    const allProjects = await response.json() as ProjectWithMembers[];
+    
+    // Filter projects where the user is a member but not the owner
+    return allProjects.filter(project => 
+      project.owner_id !== memberId && 
+      project.members?.some(member => member.user_id === memberId)
+    );
+  },
+
   // Get a single project by ID
   getProject: async (id: string): Promise<ProjectWithMembers | null> => {
     const response = await fetch(`/api/projects/${id}`);

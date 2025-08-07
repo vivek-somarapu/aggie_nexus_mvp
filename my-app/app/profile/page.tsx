@@ -219,15 +219,35 @@ export default function ProfilePage() {
     setIsLoading(false);
   }, [profile]);
 
-  // Load user's projects
+  // Load user's projects (both owned and participated in)
   useEffect(() => {
     const fetchUserProjects = async () => {
       if (!profile) return;
 
       try {
         setProjectsLoading(true);
-        const projects = await projectService.getProjectsByOwnerId(profile.id);
-        setUserProjects(projects);
+        const [ownedProjects, memberProjects] = await Promise.all([
+          projectService.getProjectsByOwnerId(profile.id),
+          projectService.getProjectsByMemberId(profile.id)
+        ]);
+        
+        // Combine and deduplicate projects, marking user's role
+        const allProjects = [...ownedProjects, ...memberProjects];
+        const uniqueProjects = allProjects.filter((project, index, self) => 
+          index === self.findIndex(p => p.id === project.id)
+        );
+        
+        // Add role information to each project
+        const projectsWithRoles = uniqueProjects.map(project => {
+          const isOwner = project.owner_id === profile.id;
+          const memberInfo = project.members?.find(m => m.user_id === profile.id);
+          return {
+            ...project,
+            userRole: isOwner ? 'Owner' : memberInfo?.role || 'Member'
+          };
+        });
+        
+        setUserProjects(projectsWithRoles);
       } catch (err) {
         console.error("Error fetching user projects:", err);
         setError("Failed to load your projects. Please try again later.");
@@ -736,7 +756,7 @@ export default function ProfilePage() {
                       </h3>
                       <p className="text-muted-foreground mb-4">
                         {
-                          "You haven't created any projects yet. Get started by creating your first project."
+                          "You haven't created or joined any projects yet. Get started by creating your first project or joining existing ones."
                         }
                       </p>
                       <motion.div
@@ -767,65 +787,119 @@ export default function ProfilePage() {
                       variants={cardVariants}
                       whileHover={{ y: -5, transition: { duration: 0.2 } }}
                     >
-                      <Card className="shadow-sm h-full flex flex-col">
-                        <CardHeader className="-mb-2">
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {project.is_idea ? (
-                              <Badge variant="outline">Idea</Badge>
-                            ) : (
-                              <Badge variant="outline">Project</Badge>
-                            )}
-                            <Badge variant="outline">
-                              {project.project_status}
-                            </Badge>
-                            <Badge variant="outline">
-                              {project.recruitment_status}
-                            </Badge>
-                          </div>
-                          <CardTitle className="text-lg">
-                            {project.title}
-                          </CardTitle>
-                          <CardDescription>
-                            Created on {formatDate(project.created_at)}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex-1">
-                          <p className="text-sm text-muted-foreground line-clamp-3">
-                            {project.description}
-                          </p>
-                        </CardContent>
-                        <CardFooter className="flex flex-col">
-                          <div className="flex flex-wrap gap-2 mb-4 self-start">
-                            {project.industry.slice(0, 3).map((ind) => (
+                      <Link href={`/projects/${project.id}`}>
+                        <Card className="group h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600">
+                          <CardHeader
+                            className="p-4 pt-0 pb-3 flex flex-col"
+                            style={{
+                              minHeight: 140 /* adjust as needed to fit title + badges + metadata */,
+                            }}
+                          >
+                            {/* Title & role row */}
+                            <div className="flex justify-between items-start gap-3 mb-2">
+                              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 leading-snug">
+                                {project.title}
+                              </CardTitle>
+                              {/* Show user's role in the project */}
+                              {(project as any).userRole && (
+                                <Badge 
+                                  variant="secondary" 
+                                  className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800 shrink-0"
+                                >
+                                  {(project as any).userRole}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Status Badges */}
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {project.is_idea ? (
+                                <Badge variant="outline">Idea</Badge>
+                              ) : (
+                                <Badge variant="outline">Project</Badge>
+                              )}
                               <Badge
-                                key={ind}
                                 variant="secondary"
-                                className="text-xs"
+                                className="border-0"
                               >
-                                {ind}
+                                {project.project_status}
                               </Badge>
-                            ))}
-                            {project.industry.length > 3 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{project.industry.length - 3} more
+                              <Badge
+                                variant="secondary"
+                                className="border-0"
+                              >
+                                {project.recruitment_status}
                               </Badge>
+                            </div>
+
+                            {/* Prominent metadata: location & team size */}
+                            <div className="flex flex-wrap gap-4 text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-4 h-4" />
+                                <span>{project.location_type}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <User className="w-4 h-4" />
+                                <span>
+                                  {project.owner_id === profile.id ? (
+                                    "You created this"
+                                  ) : (
+                                    "You're a member"
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </CardHeader>
+
+                          <CardContent className="px-4 flex-1 flex flex-col">
+                            <div className="flex-1 flex flex-col justify-end">
+                              <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed mb-4">
+                                {(() => {
+                                  const words = project.description.split(" ");
+                                  return words.length > 25
+                                    ? words.slice(0, 25).join(" ") + "..."
+                                    : project.description;
+                                })()}
+                              </p>
+                            </div>
+
+                            <div className="flex border-t border-gray-100 items-center gap-1 pt-2 text-xs text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              {project.owner_id === profile.id ? (
+                                `Created on ${formatDate(project.created_at)}`
+                              ) : (
+                                `Joined on ${formatDate(project.created_at)}`
+                              )}
+                            </div>
+
+                            {project.industry.length > 0 && (
+                              <div className="pt-4 dark:border-gray-700">
+                                <div className="flex flex-wrap gap-2">
+                                  {project.industry
+                                    .slice(0, 3)
+                                    .map((industry: string, index: number) => (
+                                      <Badge
+                                        key={index}
+                                        variant="outline"
+                                        className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                      >
+                                        {industry}
+                                      </Badge>
+                                    ))}
+                                  {project.industry.length > 3 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    >
+                                      +{project.industry.length - 3} more
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
                             )}
-                          </div>
-                          <div className="flex justify-between w-full">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/projects/${project.id}`}>
-                                View Details
-                              </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/projects/edit/${project.id}`}>
-                                <PenLine className="h-3 w-3 mr-1" />
-                                Edit
-                              </Link>
-                            </Button>
-                          </div>
-                        </CardFooter>
-                      </Card>
+                          </CardContent>
+                        </Card>
+                      </Link>
                     </motion.div>
                   ))}
                 </motion.div>

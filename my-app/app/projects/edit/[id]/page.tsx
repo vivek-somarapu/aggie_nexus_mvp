@@ -28,6 +28,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar-range";
 import { TagSelector } from "@/components/ui/search-tag-selector";
 import { ChevronLeft, Loader2, X } from "lucide-react";
+import { motion } from "framer-motion";
 
 import { useAuth } from "@/lib/auth";
 import {
@@ -208,6 +209,55 @@ export default function EditProjectPage() {
       is_idea: checked,
       project_status: checked ? "Idea Phase" : p.project_status,
     }));
+
+  /* ---------- validation helpers ---------- */
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    
+    // Title validation
+    if (!formData.title.trim()) {
+      errors.title = "Project title is required";
+    }
+    
+    // Description validation
+    if (!formData.description.trim()) {
+      errors.description = "Project description is required";
+    } else if (descriptionWords > 400) {
+      errors.description = "Must be 400 words or fewer";
+    }
+    
+    // Timeline validation
+    if (!range?.start || !range?.end) {
+      errors.timeline = "Both start & end dates are required";
+    } else if (range.start > range.end) {
+      errors.timeline = "End date can't be before start";
+    }
+    
+    // Industry validation
+    if (selectedIndustries.length === 0) {
+      errors.industry = "Select at least one industry";
+    }
+    
+    // Skills validation
+    if (selectedSkills.length === 0) {
+      errors.skills = "Select at least one skill";
+    }
+    
+    // Team members validation
+    for (const m of selectedMembers) {
+      if (!m.role.trim()) {
+        errors.members = `Role is required for ${m.user.full_name}`;
+        break;
+      }
+    }
+    
+    return errors;
+  };
+
+  const isFormValid = () => {
+    const errors = validateForm();
+    return Object.keys(errors).length === 0;
+  };
 
   /* ---------- submit ---------- */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -414,26 +464,48 @@ export default function EditProjectPage() {
     );
 
   return (
-    <div className="container py-8">
-      <div className="flex flex-col items-center mb-8">
-        <div className="w-full flex justify-start mb-2">
-          <Button variant="ghost" asChild>
-            <Link href="/projects">
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Projects
-            </Link>
-          </Button>
-        </div>
-        <h1 className="text-3xl font-bold text-center">Edit Project</h1>
-      </div>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="container py-8"
+    >
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex items-center justify-between mb-8"
+      >
+        <Button variant="ghost" asChild>
+          <Link href="/projects">
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Back to Projects
+          </Link>
+        </Button>
+        <h1 className="text-3xl font-bold">Edit Project</h1>
+        <div className="w-32"></div> 
+      </motion.div>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </motion.div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <motion.form 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        onSubmit={handleSubmit}
+      >
+
+
         {/* ---------- BASIC ---------- */}
         <Card className="mb-6">
           <CardHeader>
@@ -713,11 +785,20 @@ export default function EditProjectPage() {
         </Card>
 
         {/* ---------- ACTIONS ---------- */}
-        <div className="flex justify-end gap-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.6 }}
+          className="flex justify-end gap-4"
+        >
           <Button variant="outline" asChild>
             <Link href={`/projects/${projectId}`}>Cancel</Link>
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button 
+            type="submit" 
+            disabled={isSubmitting || !isFormValid()}
+            className={!isFormValid() ? "opacity-50 cursor-not-allowed" : ""}
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating…
@@ -726,8 +807,29 @@ export default function EditProjectPage() {
               "Update Project"
             )}
           </Button>
-        </div>
-      </form>
-    </div>
+        </motion.div>
+        
+        {/* Validation Status */}
+        {!isFormValid() && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.7 }}
+            className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md"
+          >
+            <p className="text-sm text-yellow-800">
+              <strong>Please complete the following required fields:</strong>
+            </p>
+            <ul className="mt-2 text-sm text-yellow-700 space-y-1">
+              {!formData.title.trim() && <li>• Project title</li>}
+              {!formData.description.trim() && <li>• Project description</li>}
+              {(!range?.start || !range?.end) && <li>• Timeline (start and end dates)</li>}
+              {selectedIndustries.length === 0 && <li>• At least one industry</li>}
+              {selectedSkills.length === 0 && <li>• At least one skill</li>}
+            </ul>
+          </motion.div>
+        )}
+      </motion.form>
+    </motion.div>
   );
 }
