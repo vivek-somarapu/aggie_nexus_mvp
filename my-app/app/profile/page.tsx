@@ -812,25 +812,25 @@ export default function ProfilePage() {
                             </div>
 
                             {/* Status Badges */}
-                            <div className="flex flex-wrap gap-2 mb-2">
-                              {project.is_idea ? (
-                                <Badge variant="outline">Idea</Badge>
-                              ) : (
-                                <Badge variant="outline">Project</Badge>
-                              )}
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {project.is_idea ? (
+                              <Badge variant="outline">Idea</Badge>
+                            ) : (
+                              <Badge variant="outline">Project</Badge>
+                            )}
                               <Badge
                                 variant="secondary"
                                 className="border-0"
                               >
-                                {project.project_status}
-                              </Badge>
+                              {project.project_status}
+                            </Badge>
                               <Badge
                                 variant="secondary"
                                 className="border-0"
                               >
-                                {project.recruitment_status}
-                              </Badge>
-                            </div>
+                              {project.recruitment_status}
+                            </Badge>
+                          </div>
 
                             {/* Prominent metadata: location & team size */}
                             <div className="flex flex-wrap gap-4 text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">
@@ -849,7 +849,7 @@ export default function ProfilePage() {
                                 </span>
                               </div>
                             </div>
-                          </CardHeader>
+                        </CardHeader>
 
                           <CardContent className="px-4 flex-1 flex flex-col">
                             <div className="flex-1 flex flex-col justify-end">
@@ -860,7 +860,7 @@ export default function ProfilePage() {
                                     ? words.slice(0, 25).join(" ") + "..."
                                     : project.description;
                                 })()}
-                              </p>
+                          </p>
                             </div>
 
                             <div className="flex border-t border-gray-100 items-center gap-1 pt-2 text-xs text-muted-foreground">
@@ -878,27 +878,27 @@ export default function ProfilePage() {
                                   {project.industry
                                     .slice(0, 3)
                                     .map((industry: string, index: number) => (
-                                      <Badge
+                              <Badge
                                         key={index}
                                         variant="outline"
                                         className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                      >
+                              >
                                         {industry}
-                                      </Badge>
-                                    ))}
-                                  {project.industry.length > 3 && (
+                              </Badge>
+                            ))}
+                            {project.industry.length > 3 && (
                                     <Badge
                                       variant="outline"
                                       className="bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                     >
-                                      +{project.industry.length - 3} more
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
+                                +{project.industry.length - 3} more
+                              </Badge>
+                            )}
+                          </div>
+                          </div>
                             )}
                           </CardContent>
-                        </Card>
+                      </Card>
                       </Link>
                     </motion.div>
                   ))}

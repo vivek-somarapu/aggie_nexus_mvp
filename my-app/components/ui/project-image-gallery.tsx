@@ -197,12 +197,14 @@ interface Props {
   pendingFiles: PendingFile[];
   setPendingFiles: React.Dispatch<React.SetStateAction<PendingFile[]>>;
   onRemoveImage: (file: PendingFile) => void;
+  disableFullScreenPreview?: boolean;
 }
 
 export default function ProjectGalleryUploader({
   pendingFiles,
   setPendingFiles,
   onRemoveImage,
+  disableFullScreenPreview = false,
 }: Props) {
   const [anyUploading, setAnyUploading] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
@@ -229,25 +231,39 @@ export default function ProjectGalleryUploader({
 
       setPendingFiles((prev) => [...prev, ...filesToAdd]);
       setAnyUploading(true);
-
-      filesToAdd.forEach((file) => {
-        setTimeout(() => {
-          setPendingFiles((prev) => {
-            const updated = [...prev];
-            const index = updated.findIndex((f) => f === file);
-            if (index !== -1) {
-              updated[index] = { ...updated[index], status: "uploaded" };
-            }
-            if (!updated.some((f) => f.status === "uploading")) {
-              setAnyUploading(false);
-            }
-            return updated;
-          });
-        }, 2000 + Math.random() * 1000);
-      });
     },
     [pendingFiles.length]
   );
+
+  // Handle the simulated upload process in a separate effect
+  useEffect(() => {
+    const uploadingFiles = pendingFiles.filter(f => f.status === "uploading");
+    if (uploadingFiles.length === 0) return;
+
+    const timeouts: NodeJS.Timeout[] = [];
+
+    uploadingFiles.forEach((file) => {
+      const timeout = setTimeout(() => {
+        setPendingFiles((prev) => {
+          const updated = [...prev];
+          const index = updated.findIndex((f) => f === file);
+          if (index !== -1) {
+            updated[index] = { ...updated[index], status: "uploaded" };
+          }
+          if (!updated.some((f) => f.status === "uploading")) {
+            setAnyUploading(false);
+          }
+          return updated;
+        });
+      }, 2000 + Math.random() * 1000);
+      
+      timeouts.push(timeout);
+    });
+
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, [pendingFiles]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) =>
     processFiles(e.target.files);
@@ -283,8 +299,12 @@ export default function ProjectGalleryUploader({
   );
 
   const openImagePreview = useCallback(
-    (index: number) => setSelectedImageIndex(index),
-    []
+    (index: number) => {
+      if (!disableFullScreenPreview) {
+        setSelectedImageIndex(index);
+      }
+    },
+    [disableFullScreenPreview]
   );
   const closeImagePreview = useCallback(() => setSelectedImageIndex(null), []);
   const goToNextImage = useCallback(() => {
@@ -319,9 +339,15 @@ export default function ProjectGalleryUploader({
 
   const handleDragStart = useCallback(
     (e: React.DragEvent<HTMLDivElement>, index: number) => {
+      // tell React not to pool this event
+      e.persist();
+
       dragItem.current = index;
       e.dataTransfer.effectAllowed = "move";
-      setTimeout(() => e.currentTarget.classList.add("opacity-50"), 0);
+
+      setTimeout(() => {
+        e.currentTarget!.classList.add("opacity-50");
+      }, 0);
     },
     []
   );
@@ -369,20 +395,22 @@ export default function ProjectGalleryUploader({
 
       setPendingFiles((prevFiles) => {
         const newFiles = [...prevFiles];
-        const [draggedFile] = newFiles.splice(dragItem.current!, 1);
+        const dragIndex = dragItem.current;
+        if (dragIndex === null) return prevFiles;
+
+        const [draggedFile] = newFiles.splice(dragIndex, 1);
         newFiles.splice(dropIndex, 0, draggedFile);
 
         if (selectedImageIndex !== null) {
           let newSelectedIndex = selectedImageIndex;
-          if (selectedImageIndex === dragItem.current)
-            newSelectedIndex = dropIndex;
+          if (selectedImageIndex === dragIndex) newSelectedIndex = dropIndex;
           else if (
-            selectedImageIndex > dragItem.current &&
+            selectedImageIndex > dragIndex &&
             selectedImageIndex <= dropIndex
           )
             newSelectedIndex--;
           else if (
-            selectedImageIndex < dragItem.current &&
+            selectedImageIndex < dragIndex &&
             selectedImageIndex >= dropIndex
           )
             newSelectedIndex++;
@@ -423,12 +451,23 @@ export default function ProjectGalleryUploader({
               className="relative h-full w-full rounded-lg overflow-hidden"
               onClick={() => openImagePreview(i)}
             >
-              <Image
-                src={f.preview || "/placeholder.svg"}
-                alt={`Project image ${i + 1}`}
-                fill
-                className="object-cover rounded-lg"
-              />
+              {f.file ? (
+                // client-side blob → use a native <img>
+                <img
+                  src={f.preview || "/placeholder.svg"}
+                  alt={`Project image ${i + 1}`}
+                  className="object-cover w-full h-full rounded-lg"
+                />
+              ) : (
+                // existing server URL still OK in Next/Image
+                <Image
+                  src={f.preview || "/placeholder.svg"}
+                  alt={`Project image ${i + 1}`}
+                  fill
+                  unoptimized
+                  className="object-cover rounded-lg"
+                />
+              )}
             </div>
 
             {f.status === "uploading" && (
@@ -485,7 +524,7 @@ export default function ProjectGalleryUploader({
       <div className="mt-4 text-sm text-muted-foreground">
         {pendingFiles.length} / 10 photos uploaded
       </div>
-      {selectedImageIndex !== null && currentPreviewImage && (
+      {!disableFullScreenPreview && selectedImageIndex !== null && (
         <div
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
           onClick={closeImagePreview}
@@ -500,13 +539,23 @@ export default function ProjectGalleryUploader({
           >
             {/* Inner container with buttons positioned relative to image */}
             <div className="relative w-full h-full">
-              <Image
-                src={currentPreviewImage.preview || "/placeholder.svg"}
-                alt={`Preview of project image ${selectedImageIndex + 1}`}
-                fill
-                className="object-contain w-full h-full rounded-lg shadow-lg"
-              />
-
+              {currentPreviewImage?.file ? (
+                // client-side blob → use a native <img>
+                <img
+                  src={currentPreviewImage.preview}
+                  alt={`Preview of project image ${selectedImageIndex + 1}`}
+                  className="object-contain w-full h-full rounded-lg shadow-lg"
+                />
+              ) : (
+                // existing server URL still OK in Next/Image
+                <Image
+                  src={currentPreviewImage?.preview || ""}
+                  alt={`Preview of project image ${selectedImageIndex + 1}`}
+                  fill
+                  unoptimized
+                  className="object-contain w-full h-full rounded-lg shadow-lg"
+                />
+              )}
               {/* Close Button */}
               <Button
                 type="button"

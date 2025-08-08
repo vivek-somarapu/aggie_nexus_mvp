@@ -101,11 +101,14 @@ export default function EditProjectPage() {
   /* ---------- fetch existing project ---------- */
   useEffect(() => {
     if (authLoading) return;
-    
+
+    let mounted = true;
+
     const load = async () => {
       try {
         const project = await projectService.getProject(projectId);
 
+        if (!mounted) return;
         if (!project) return setNotFound(true);
         if (user && project.owner_id !== user.id) return setNotAuthorized(true);
 
@@ -141,35 +144,63 @@ export default function EditProjectPage() {
           (project.description ?? "").trim().split(/\s+/).filter(Boolean).length
         );
 
-        // ─────────────── NEW: fetch existing images ───────────────
-        const existingImages = await projectService.getProjectImages(projectId);
-        setPendingFiles(
-          existingImages
-            .sort((a, b) => a.position - b.position)
-            .map((img) => ({
-              id: img.id,
-              file: null,
-              preview: img.url,
-              status: "uploaded" as const,
-            }))
-        );
-
         // ────────────────────────────────────────────────────────────
       } catch (e) {
+        if (!mounted) return;
         setError("Failed to load project. Please try again.");
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
 
       const members = await projectService.getProjectMembers(projectId);
+      if (!mounted) return;
       setOriginalMembers(members);
       setSelectedMembers(members);
     };
 
-    (async () => {
-      await load();
-    })();
+    load();
+
+    return () => {
+      mounted = false;
+    };
   }, [authLoading, projectId, user]);
+
+  /* ---------- fetch existing images ---------- */
+  useEffect(() => {
+    if (authLoading) return;
+
+    let mounted = true;
+
+    const loadImages = async () => {
+      try {
+        const existingImages = await projectService.getProjectImages(projectId);
+        if (!mounted) return;
+
+        const pendingFilesData = existingImages
+          .sort((a, b) => a.position - b.position)
+          .map((img) => ({
+            id: img.id,
+            file: null,
+            preview: img.url,
+            status: "uploaded" as const,
+          }));
+
+        setPendingFiles(pendingFilesData);
+      } catch (e) {
+        if (!mounted) return;
+        console.error("Failed to load project images:", e);
+        // Don't set error here as it's not critical for the main form
+      }
+    };
+
+    loadImages();
+
+    return () => {
+      mounted = false;
+    };
+  }, [authLoading, projectId]);
 
   /* ---------- derived helpers ---------- */
   const availableSkills = selectedIndustries.length
@@ -213,36 +244,36 @@ export default function EditProjectPage() {
   /* ---------- validation helpers ---------- */
   const validateForm = () => {
     const errors: Record<string, string> = {};
-    
+
     // Title validation
     if (!formData.title.trim()) {
       errors.title = "Project title is required";
     }
-    
+
     // Description validation
     if (!formData.description.trim()) {
       errors.description = "Project description is required";
     } else if (descriptionWords > 400) {
       errors.description = "Must be 400 words or fewer";
     }
-    
+
     // Timeline validation
     if (!range?.start || !range?.end) {
       errors.timeline = "Both start & end dates are required";
     } else if (range.start > range.end) {
       errors.timeline = "End date can't be before start";
     }
-    
+
     // Industry validation
     if (selectedIndustries.length === 0) {
       errors.industry = "Select at least one industry";
     }
-    
+
     // Skills validation
     if (selectedSkills.length === 0) {
       errors.skills = "Select at least one skill";
     }
-    
+
     // Team members validation
     for (const m of selectedMembers) {
       if (!m.role.trim()) {
@@ -250,7 +281,7 @@ export default function EditProjectPage() {
         break;
       }
     }
-    
+
     return errors;
   };
 
@@ -350,12 +381,12 @@ export default function EditProjectPage() {
 
       // Calculate next available positions for new images
       const existingPositions = pendingFiles
-        .filter(pf => pf.id) // Only existing images have IDs
+        .filter((pf) => pf.id) // Only existing images have IDs
         .map((_, idx) => idx + 1);
-      
+
       let nextPosition = 1;
       const positionMap = new Map();
-      
+
       for (const { pf, idx } of newFiles) {
         // Find the next available position
         while (existingPositions.includes(nextPosition)) {
@@ -367,7 +398,7 @@ export default function EditProjectPage() {
 
       const uploadTasks = newFiles.map(({ pf, idx }) => {
         const position = positionMap.get(idx);
-        
+
         // mark this slot as uploading
         setPendingFiles((prev) => {
           const next = [...prev];
@@ -464,13 +495,13 @@ export default function EditProjectPage() {
     );
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
       className="container py-8"
     >
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.3 }}
@@ -483,7 +514,7 @@ export default function EditProjectPage() {
           </Link>
         </Button>
         <h1 className="text-3xl font-bold">Edit Project</h1>
-        <div className="w-32"></div> 
+        <div className="w-32"></div>
       </motion.div>
 
       {error && (
@@ -498,14 +529,12 @@ export default function EditProjectPage() {
         </motion.div>
       )}
 
-      <motion.form 
+      <motion.form
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
         onSubmit={handleSubmit}
       >
-
-
         {/* ---------- BASIC ---------- */}
         <Card className="mb-6">
           <CardHeader>
@@ -749,6 +778,7 @@ export default function EditProjectPage() {
               pendingFiles={pendingFiles}
               setPendingFiles={setPendingFiles}
               onRemoveImage={handleRemoveImage}
+              disableFullScreenPreview={true}
             />
           </CardContent>
         </Card>
@@ -785,7 +815,7 @@ export default function EditProjectPage() {
         </Card>
 
         {/* ---------- ACTIONS ---------- */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.6 }}
@@ -794,8 +824,8 @@ export default function EditProjectPage() {
           <Button variant="outline" asChild>
             <Link href={`/projects/${projectId}`}>Cancel</Link>
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={isSubmitting || !isFormValid()}
             className={!isFormValid() ? "opacity-50 cursor-not-allowed" : ""}
           >
@@ -808,10 +838,10 @@ export default function EditProjectPage() {
             )}
           </Button>
         </motion.div>
-        
+
         {/* Validation Status */}
         {!isFormValid() && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.7 }}
@@ -823,8 +853,12 @@ export default function EditProjectPage() {
             <ul className="mt-2 text-sm text-yellow-700 space-y-1">
               {!formData.title.trim() && <li>• Project title</li>}
               {!formData.description.trim() && <li>• Project description</li>}
-              {(!range?.start || !range?.end) && <li>• Timeline (start and end dates)</li>}
-              {selectedIndustries.length === 0 && <li>• At least one industry</li>}
+              {(!range?.start || !range?.end) && (
+                <li>• Timeline (start and end dates)</li>
+              )}
+              {selectedIndustries.length === 0 && (
+                <li>• At least one industry</li>
+              )}
               {selectedSkills.length === 0 && <li>• At least one skill</li>}
             </ul>
           </motion.div>

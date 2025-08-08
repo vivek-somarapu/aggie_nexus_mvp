@@ -323,7 +323,7 @@ export default function NewProjectPage() {
 
         const form = new FormData();
         if (pf.file) {
-          form.append("file", pf.file);
+        form.append("file", pf.file);
         }
 
         return fetch("/api/upload/project-images", {
@@ -408,12 +408,12 @@ export default function NewProjectPage() {
         transition={{ duration: 0.3 }}
         className="flex items-center justify-between mb-8"
       >
-        <Button variant="ghost" asChild>
-          <Link href="/projects">
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Projects
-          </Link>
-        </Button>
+          <Button variant="ghost" asChild>
+            <Link href="/projects">
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Back to Projects
+            </Link>
+          </Button>
         <h1 className="text-3xl font-bold">Create New Project</h1>
         <div className="w-32"></div> {/* Spacer to balance the layout */}
       </motion.div>
@@ -424,9 +424,9 @@ export default function NewProjectPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
         </motion.div>
       )}
 
@@ -443,13 +443,13 @@ export default function NewProjectPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.3 }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-                <CardDescription>
-                  Enter the core details about your project or idea
-                </CardDescription>
-              </CardHeader>
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+              <CardDescription>
+                Enter the core details about your project or idea
+              </CardDescription>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Project Title *</Label>

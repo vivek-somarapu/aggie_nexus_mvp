@@ -233,9 +233,9 @@ export default function ProjectPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <Alert variant="destructive" className="my-4">
-          <AlertDescription className="text-sm">{error}</AlertDescription>
-        </Alert>
+      <Alert variant="destructive" className="my-4">
+        <AlertDescription className="text-sm">{error}</AlertDescription>
+      </Alert>
       </motion.div>
     );
   }
@@ -417,7 +417,7 @@ export default function ProjectPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.3 }}
               >
-                <ProjectImageGallery images={images} />
+              <ProjectImageGallery images={images} />
               </motion.div>
 
               {/* Subtle date & views */}
