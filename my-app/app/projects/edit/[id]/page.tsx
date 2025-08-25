@@ -30,6 +30,8 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
+import { TagSelector } from "@/components/ui/search-tag-selector";
+import { getAvailableProgramsForUser, userOrganizationOptions } from "@/lib/constants";
 import React from "react";
 
 // Industry options
@@ -100,7 +102,7 @@ export default function EditProjectPage({
   // Just access params directly
   const projectId = params.id;
 
-  const { authUser: user, isLoading: authLoading } = useAuth();
+  const { authUser: user, profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
@@ -108,6 +110,8 @@ export default function EditProjectPage({
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedIncubatorAccelerator, setSelectedIncubatorAccelerator] = useState<string[]>([]);
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
   );
@@ -129,6 +133,7 @@ export default function EditProjectPage({
     estimated_end: "",
     contact_info: { email: "", phone: "" },
     project_status: "Idea Phase",
+    funding_received: 0,
   });
 
   // Fetch project data when component mounts
@@ -172,11 +177,14 @@ export default function EditProjectPage({
             phone: projectData.contact_info?.phone || "",
           },
           project_status: projectData.project_status || "Not Started",
+          funding_received: projectData.funding_received || 0,
         });
 
         // Initialize selected values
         setSelectedIndustries(projectData.industry || []);
         setSelectedSkills(projectData.required_skills || []);
+        setSelectedIncubatorAccelerator(projectData.incubator_accelerator || []);
+        setSelectedOrganizations(projectData.organizations || []);
 
         // Initialize date pickers
         if (projectData.estimated_start) {
@@ -320,6 +328,12 @@ export default function EditProjectPage({
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
+        incubator_accelerator: selectedIncubatorAccelerator,
+        organizations: selectedOrganizations,
+        funding_received: formData.funding_received,
+        // Handle empty date strings - convert to undefined for database
+        estimated_start: formData.estimated_start || undefined,
+        estimated_end: formData.estimated_end || undefined,
       };
 
       await projectService.updateProject(projectId, projectData);
@@ -568,6 +582,82 @@ export default function EditProjectPage({
                       </Label>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Program Affiliations */}
+              <div className="space-y-2">
+                <TagSelector
+                  label="Program Affiliations"
+                  options={getAvailableProgramsForUser(profile?.organizations || [])}
+                  selected={selectedIncubatorAccelerator}
+                  onChange={(newPrograms) => {
+                    // Check if adding this program would create a conflict
+                    const hasIncubator = newPrograms.includes('Aggies Create Incubator');
+                    const hasAccelerator = newPrograms.includes('AggieX Accelerator');
+                    
+                    if (hasIncubator && hasAccelerator) {
+                      // If both are selected, keep only the most recently added one
+                      const currentHasIncubator = selectedIncubatorAccelerator.includes('Aggies Create Incubator');
+                      const currentHasAccelerator = selectedIncubatorAccelerator.includes('AggieX Accelerator');
+                      
+                      let filteredPrograms;
+                      if (currentHasIncubator && !currentHasAccelerator && hasAccelerator) {
+                        // User just added accelerator, remove incubator
+                        filteredPrograms = newPrograms.filter(program => program !== 'Aggies Create Incubator');
+                      } else if (currentHasAccelerator && !currentHasIncubator && hasIncubator) {
+                        // User just added incubator, remove accelerator
+                        filteredPrograms = newPrograms.filter(program => program !== 'AggieX Accelerator');
+                      } else {
+                        // Fallback: keep the last one in the array
+                        filteredPrograms = [newPrograms[newPrograms.length - 1]];
+                      }
+                      
+                      setSelectedIncubatorAccelerator(filteredPrograms);
+                    } else {
+                      setSelectedIncubatorAccelerator(newPrograms);
+                    }
+                  }}
+                  maxTags={5}
+                  placeholder="Select special programs your project is part of"
+                />
+                <div className="text-sm text-muted-foreground">
+                  Based on your organization affiliations, you can claim these special programs for your project.
+                  <br />
+                  <span className="text-orange-600">Note: A project cannot be part of both an incubator and accelerator program.</span>
+                </div>
+              </div>
+
+              {/* Organization Affiliations */}
+              <div className="space-y-2">
+                <TagSelector
+                  label="Organization Affiliations"
+                  options={userOrganizationOptions}
+                  selected={selectedOrganizations}
+                  onChange={setSelectedOrganizations}
+                  maxTags={10}
+                  placeholder="Select organizations your project is affiliated with"
+                />
+                <div className="text-sm text-muted-foreground">
+                  Add any organizations your project is associated with.
+                </div>
+              </div>
+
+              {/* Funding Information */}
+              <div className="space-y-2">
+                <Label htmlFor="funding_received">Funding Received (USD)</Label>
+                <Input
+                  id="funding_received"
+                  name="funding_received"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.funding_received}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                />
+                <div className="text-sm text-muted-foreground">
+                  Enter the total funding amount your project has received.
                 </div>
               </div>
             </div>

@@ -15,6 +15,7 @@ import {
   containerVariants,
   itemVariants,
   industryOptions,
+  userOrganizationOptions,
 } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -246,6 +247,7 @@ interface ProfileCardProps<T extends MinimalFormData = MinimalFormData> {
   setFormData: React.Dispatch<React.SetStateAction<T>>;
 
   setSelectedIndustries: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedOrganizations: React.Dispatch<React.SetStateAction<string[]>>;
 
   handleAvatarChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleDeleteAvatar: () => void;
@@ -259,6 +261,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
   formData,
   setFormData,
   setSelectedIndustries,
+  setSelectedOrganizations,
   handleAvatarChange,
   handleDeleteAvatar,
   handleSaveProfile,
@@ -365,7 +368,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                     </div>
 
                     {/* Industry edit */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 pr-1">
                       <Label>Industries (select up to 10)</Label>
                       <TagSelector
                         label="Industries"
@@ -373,6 +376,20 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                         selected={user?.industry || []}
                         onChange={setSelectedIndustries}
                       />
+                    </div>
+
+                    {/* Organizations edit */}
+                    <div className="space-y-2">
+                      <Label>Organizations (select up to 10)</Label>
+                      <TagSelector
+                        label="Organizations"
+                        options={userOrganizationOptions}
+                        selected={user?.organizations || []}
+                        onChange={setSelectedOrganizations}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Select organizations you're affiliated with. Some organizations require verification.
+                      </p>
                     </div>
                   </div>
 

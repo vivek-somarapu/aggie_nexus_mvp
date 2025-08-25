@@ -169,6 +169,9 @@ export const skillOptions = [
   "Creativity",
 ];
 
+// TODO: export const Techincal Skills
+// TODO: export const Soft Skills
+
 // ---------- Calendar event options ----------
 
 export type EventType =
@@ -240,3 +243,82 @@ export const customScrollStyles = `
     background-color: hsl(var(--foreground));
   }
 `;
+
+// ---------- Organization and Program Mapping ----------
+
+// Mapping of user organizations to eligible incubator/accelerator programs
+export const organizationToProgramMapping: Record<string, string[]> = {
+  "Aggies Create": ["Aggies Create Incubator"],
+  "AggieX": ["AggieX Accelerator"]
+};
+
+// Available incubator/accelerator programs (only the special ones that get badges)
+// Project cannot be both an incubator and accelerator
+export const incubatorAcceleratorOptions = [
+  "Aggies Create Incubator",
+  "AggieX Accelerator"
+];
+
+// User profile organizations (these are just tags, not special programs)
+export const userOrganizationOptions = [
+  "Aggies Create",
+  "AggieX",
+  "Aggie Entrepreneurs",
+  "Meloy Engineering Innovation and Entrepreneurship Program (MEIEP)", 
+  "McFerrin Experience Team (MET)",
+  "Aggie Venture Fund (AVF)",
+  "Student Government Association",
+  "Greek Life",
+  "Honors Program",
+  "Research Lab",
+];
+
+/**
+ * Check if a user can claim a specific program based on their organization affiliations
+ */
+export const canUserClaimProgram = (userOrganizations: string[], program: string): boolean => {
+  for (const org of userOrganizations) {
+    const allowedPrograms = organizationToProgramMapping[org];
+    if (allowedPrograms && allowedPrograms.includes(program)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * Get all programs a user is eligible for based on their organization affiliations
+ */
+export const getAvailableProgramsForUser = (userOrganizations: string[]): string[] => {
+  const availablePrograms: string[] = [];
+  for (const org of userOrganizations) {
+    const allowedPrograms = organizationToProgramMapping[org];
+    if (allowedPrograms) {
+      availablePrograms.push(...allowedPrograms);
+    }
+  }
+  return [...new Set(availablePrograms)]; // Remove duplicates
+};
+
+/**
+ * Check if a project can have both incubator and accelerator programs
+ * Returns false if both are selected, true otherwise
+ */
+export const canHaveBothPrograms = (selectedPrograms: string[]): boolean => {
+  const hasIncubator = selectedPrograms.includes('Aggies Create Incubator');
+  const hasAccelerator = selectedPrograms.includes('AggieX Accelerator');
+  return !(hasIncubator && hasAccelerator);
+};
+
+/**
+ * Get the conflicting program if both incubator and accelerator are selected
+ */
+export const getConflictingProgram = (selectedPrograms: string[]): string | null => {
+  const hasIncubator = selectedPrograms.includes('Aggies Create Incubator');
+  const hasAccelerator = selectedPrograms.includes('AggieX Accelerator');
+  
+  if (hasIncubator && hasAccelerator) {
+    return 'AggieX Accelerator'; // Return the second one selected as conflicting
+  }
+  return null;
+};

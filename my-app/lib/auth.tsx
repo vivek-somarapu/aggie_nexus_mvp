@@ -59,6 +59,21 @@ export type Profile = {
   website_url?: string;
   industry?: string[];
   skills?: string[];
+  organizations?: string[];
+// New fields for orgnanization affiliations and verifications
+  organization_claims?: Array<{
+    organization: string;
+    claimed_at: string;
+    verification_method?: string;
+    status: 'pending' | 'verified' | 'rejected';
+  }>;
+  organization_verifications?: Record<string, {
+    verified_at: string;
+    verified_by: string;
+    verification_method: string;
+    notes?: string;
+  }>;
+
   graduation_year?: number;
   is_texas_am_affiliate?: boolean;
   contact?: {

@@ -81,7 +81,7 @@ export function TagSelector({
 
   return (
     <div className={cn("space-y-4", className)}>
-      <div className="flex gap-2 items-end mt-4">
+      <div className="flex gap-2 items-end mt-4 ml-1">
         <div
           className="flex flex-wrap items-center gap-2 p-2 border rounded-md min-h-[48px] focus-within:ring-2 focus-within:ring-ring"
           onClick={() => inputRef.current?.focus()}

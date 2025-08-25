@@ -33,6 +33,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
+import { validateProjectPrograms } from "@/lib/utils/project-validation";
+import { incubatorAcceleratorOptions, getAvailableProgramsForUser, userOrganizationOptions, canHaveBothPrograms, getConflictingProgram } from "@/lib/constants";
 
 
 // Industry options
@@ -312,12 +314,14 @@ const recruitmentStatusOptions = [
 const locationTypeOptions = ["Remote", "On-site", "Hybrid", "Flexible"];
 
 export default function NewProjectPage() {
-  const { authUser: user, isLoading: authLoading } = useAuth();
+  const { authUser: user, profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedIncubatorAccelerator, setSelectedIncubatorAccelerator] = useState<string[]>([]);
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
   );
@@ -337,6 +341,7 @@ export default function NewProjectPage() {
     estimated_end: "",
     contact_info: { email: "", phone: "" },
     project_status: "Idea Phase",
+    funding_received: 0,
   });
 
   // Initialize contact email with user's email when user data is available
@@ -393,6 +398,9 @@ const getAvailableSkills = () => {
   // Remove duplicates and sort
   return [...new Set(industrySkills)].sort();
 };
+
+// Get available incubator/accelerator programs for the user
+const availablePrograms = profile?.organizations ? getAvailableProgramsForUser(profile.organizations) : [];
 
 
   const handleChange = (
@@ -490,6 +498,9 @@ const getAvailableSkills = () => {
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
+        incubator_accelerator: selectedIncubatorAccelerator,
+        organizations: selectedOrganizations,
+        funding_received: formData.funding_received,
         // owner_id is handled by the server via auth middleware
       };
 
@@ -706,6 +717,87 @@ const getAvailableSkills = () => {
                 <div className="text-sm text-muted-foreground">
                 
                   
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Program Affiliations */}
+              <div className="space-y-2">
+                <TagSelector
+                  label="Program Affiliations"
+                  options={availablePrograms}
+                  selected={selectedIncubatorAccelerator}
+                  onChange={(newPrograms) => {
+                    // Check if adding this program would create a conflict
+                    const hasIncubator = newPrograms.includes('Aggies Create Incubator');
+                    const hasAccelerator = newPrograms.includes('AggieX Accelerator');
+                    
+                    if (hasIncubator && hasAccelerator) {
+                      // If both are selected, keep only the most recently added one
+                      // Determine which one was just added by comparing with current selection
+                      const currentHasIncubator = selectedIncubatorAccelerator.includes('Aggies Create Incubator');
+                      const currentHasAccelerator = selectedIncubatorAccelerator.includes('AggieX Accelerator');
+                      
+                      let filteredPrograms;
+                      if (currentHasIncubator && !currentHasAccelerator && hasAccelerator) {
+                        // User just added accelerator, remove incubator
+                        filteredPrograms = newPrograms.filter(program => program !== 'Aggies Create Incubator');
+                      } else if (currentHasAccelerator && !currentHasIncubator && hasIncubator) {
+                        // User just added incubator, remove accelerator
+                        filteredPrograms = newPrograms.filter(program => program !== 'AggieX Accelerator');
+                      } else {
+                        // Fallback: keep the last one in the array
+                        filteredPrograms = [newPrograms[newPrograms.length - 1]];
+                      }
+                      
+                      setSelectedIncubatorAccelerator(filteredPrograms);
+                    } else {
+                      setSelectedIncubatorAccelerator(newPrograms);
+                    }
+                  }}
+                  maxTags={5}
+                  placeholder="Select special programs your project is part of"
+                />
+                <div className="text-sm text-muted-foreground">
+                  Based on your organization affiliations, you can claim these special programs for your project.
+                  <br />
+                  <span className="text-orange-600">Note: A project cannot be part of both an incubator and accelerator program.</span>
+                </div>
+              </div>
+
+              {/* Organization Affiliations */}
+              <div className="space-y-2">
+                <TagSelector
+                  label="Organization Affiliations"
+                  options={userOrganizationOptions}
+                  selected={selectedOrganizations}
+                  onChange={setSelectedOrganizations}
+                  maxTags={10}
+                  placeholder="Select organizations your project is affiliated with"
+                />
+                <div className="text-sm text-muted-foreground">
+                  Add any organizations your project is associated with.
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Funding Information */}
+              <div className="space-y-2">
+                <Label htmlFor="funding_received">Funding Received (USD)</Label>
+                <Input
+                  id="funding_received"
+                  name="funding_received"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.funding_received}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                />
+                <div className="text-sm text-muted-foreground">
+                  Enter the total funding amount your project has received.
                 </div>
               </div>
             </CardContent>
