@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Bookmark, Calendar, MapPin, Users, Eye, Loader2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { IncubatorAcceleratorBadges } from "@/components/ui/incubator-accelerator-badge";
 import {
   projectService,
   Project,
@@ -513,7 +514,26 @@ export default function ProjectsPage() {
                             <Badge variant="outline">
                               {project.project_status}
                             </Badge>
+                            {/* Incubator/Accelerator Badges */}
+                            {project.incubator_accelerator && project.incubator_accelerator.length > 0 && (
+                              <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="sm" maxDisplay={2}/>
+                            )}
                           </div>
+                          {/* Organization Tags */}
+                          {project.organizations && project.organizations.slice(0, 2).map((org: string, orgIndex: number) => (
+                            <Badge
+                              key={`${project.id}-org-${orgIndex}`}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {org}
+                            </Badge>
+                          ))}
+                          {project.organizations && project.organizations.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{project.organizations.length - 2}
+                            </Badge>
+                          )}
                         </CardHeader>
                         <CardContent>
                           <p className="text-muted-foreground line-clamp-3 mb-4">
@@ -537,6 +557,14 @@ export default function ProjectsPage() {
                               <span>{project.views} views</span>
                             </div>
                           </div>
+                          
+                          {/* Funding Information */}
+                          {project.funding_received !== null && project.funding_received !== undefined && project.funding_received > 0 && (
+                            <div className="flex items-center gap-1 text-green-600 font-medium col-span-2">
+                              <span className="text-xs">💰</span>
+                              <span className="text-xs">${project.funding_received.toLocaleString()} funding</span>
+                            </div>
+                          )}
                         </CardContent>
                         <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
                           {project.industry.slice(0, 3).map((ind: string, indIndex: number) => (
@@ -553,6 +581,7 @@ export default function ProjectsPage() {
                               +{project.industry.length - 3}
                             </Badge>
                           )}
+                          
                         </CardFooter>
                       </Card>
                     </Link>

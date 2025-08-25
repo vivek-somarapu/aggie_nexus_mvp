@@ -130,6 +130,7 @@ export default function ProfilePage() {
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
 
   const [pendingResumeFile, setPendingResumeFile] = useState<File | null>(null);
   const [resumeFileInfo, setResumeFileInfo] = useState<{
@@ -212,7 +213,8 @@ export default function ProfilePage() {
     });
 
     setSelectedSkills(profile.skills || []);
-    setSelectedIndustries(profile.industry || []);
+            setSelectedIndustries(profile.industry || []);
+        setSelectedOrganizations(profile.organizations || []);
 
     const { shouldSetupProfile } = profileSetupStatus(profile, true);
     setShowCompletionBanner(shouldSetupProfile);
@@ -465,6 +467,7 @@ export default function ProfilePage() {
         avatar: avatarUrl || null,
         resume_url: resumeUrl || null,
         industry: selectedIndustries,
+        organizations: selectedOrganizations,
         skills: selectedSkills,
         contact: formData.contact,
         additional_links: cleanedLinks,
@@ -643,6 +646,7 @@ export default function ProfilePage() {
           formData={formData}
           setFormData={setFormData}
           setSelectedIndustries={setSelectedIndustries}
+          setSelectedOrganizations={setSelectedOrganizations}
           handleAvatarChange={handleAvatarChange}
           handleDeleteAvatar={handleDeleteAvatar}
           handleSaveProfile={handleSaveProfile}

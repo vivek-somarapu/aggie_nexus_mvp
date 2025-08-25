@@ -24,6 +24,14 @@ import {
   stepVariants,
 } from "@/lib/constants";
 import { userService } from "@/lib/services/user-service";
+import { 
+  requiresVerification, 
+  canAutoVerify, 
+  createOrganizationClaim,
+  autoVerifyOrganization 
+} from "@/lib/utils/organization-verification";
+import { VerificationBadge } from "@/components/ui/verification-badge";
+import { userOrganizationOptions } from "@/lib/constants";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -42,6 +50,7 @@ export default function ProfileSetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
@@ -65,6 +74,7 @@ export default function ProfileSetupPage() {
     avatar: "",
     skills: [] as string[],
     industry: [] as string[],
+    organizations: [] as string[],
     resume_url: "",
     contact: { email: "", phone: "" } as { email: string; phone: string },
   });
@@ -81,6 +91,7 @@ export default function ProfileSetupPage() {
       bio: profile.bio || "",
       industry: profile.industry || [],
       skills: profile.skills || [],
+      organizations: profile.organizations || [],
       linkedin_url: profile.linkedin_url || "",
       website_url: profile.website_url || "",
       is_texas_am_affiliate: profile.is_texas_am_affiliate || false,
@@ -95,6 +106,7 @@ export default function ProfileSetupPage() {
 
     setSelectedSkills(profile.skills || []);
     setSelectedIndustries(profile.industry || []);
+    setSelectedOrganizations(profile.organizations || []);
 
     setIsLoading(false);
   }, [profile]);
@@ -142,7 +154,27 @@ export default function ProfileSetupPage() {
       if (pendingResumeFile) {
         resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
       }
-      // 3) collect form data
+      // 3) collect form data with organization verification
+      const organizationClaims = selectedOrganizations.map(org => {
+        if (requiresVerification(org)) {
+          if (canAutoVerify(org, formData.email)) {
+            return { ...createOrganizationClaim(org, 'email_domain'), status: 'verified' as const };
+          }
+          return createOrganizationClaim(org, 'manual');
+        }
+        return createOrganizationClaim(org, 'none');
+      });
+
+      const organizationVerifications = selectedOrganizations.reduce((acc, org) => {
+        if (requiresVerification(org) && canAutoVerify(org, formData.email)) {
+          const verification = autoVerifyOrganization(org, formData.email);
+          if (verification) {
+            acc[org] = verification;
+          }
+        }
+        return acc;
+      }, {} as Record<string, any>);
+
       const payload = {
         full_name: formData.full_name.trim(),
         bio: formData.bio.trim(),
@@ -154,6 +186,9 @@ export default function ProfileSetupPage() {
         resume_url: resumeUrl || null,
         industry: selectedIndustries,
         skills: selectedSkills,
+        organizations: selectedOrganizations,
+        organization_claims: organizationClaims,
+        organization_verifications: organizationVerifications,
         contact: formData.contact,
         profile_setup_completed: true,
         profile_setup_skipped: false,
@@ -536,6 +571,20 @@ export default function ProfileSetupPage() {
                             />
                           </div>
                         </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Organizations</Label>
+                          <TagSelector
+                            label="Organizations"
+                            options={userOrganizationOptions}
+                            selected={selectedOrganizations}
+                            onChange={setSelectedOrganizations}
+                            maxTags={10}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Select organizations you're affiliated with. Some organizations require verification.
+                          </p>
+                        </div>
                       </CardContent>
                     </Card>
 
@@ -677,6 +726,38 @@ export default function ProfileSetupPage() {
                             </div>
                           )}
                         </div>
+
+                        {/* Organizations */}
+                        {selectedOrganizations.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Organizations</p>
+                            <motion.div
+                              className="flex flex-wrap gap-2 mt-2"
+                              variants={containerVariants}
+                            >
+                              {selectedOrganizations.map((org) => (
+                                <motion.div key={org} variants={itemVariants}>
+                                  <div className="flex items-center gap-1">
+                                    <Badge variant="outline" className="px-2 py-1">{org}</Badge>
+                                    {requiresVerification(org) && (
+                                      <VerificationBadge 
+                                        organization={org} 
+                                        profile={profile} 
+                                        size="sm" 
+                                        showText={false} 
+                                      />
+                                    )}
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                            {selectedOrganizations.some(org => requiresVerification(org)) && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                ⚠️ Some organizations require verification. Claims will be reviewed.
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         {/* Bio */}
                         {formData.bio && (

@@ -49,6 +49,7 @@ import { bookmarkService } from "@/lib/services/bookmark-service";
 import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createClient } from "@/lib/supabase/client";
+import { IncubatorAcceleratorBadges } from "@/components/ui/incubator-accelerator-badge";
 
 export default function ProjectPage() {
   const { id } = useParams() as { id: string };
@@ -277,6 +278,10 @@ export default function ProjectPage() {
                     <Badge variant="outline">
                       {project.recruitment_status}
                     </Badge>
+                    {/* Incubator/Accelerator Badges */}
+                    {project.incubator_accelerator && project.incubator_accelerator.length > 0 && (
+                      <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="sm"/>
+                    )}
                   </div>
                   <CardTitle className="text-2xl">{project.title}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-2">
@@ -377,6 +382,41 @@ export default function ProjectPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Program Affiliations */}
+              {(project.incubator_accelerator && project.incubator_accelerator.length > 0) && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold">Program Affiliations</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="md"/>
+                  </div>
+                </div>
+              )}
+
+              {/* Organization Affiliations */}
+              {project.organizations && project.organizations.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold">Organization Affiliations</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {project.organizations.map((org) => (
+                      <Badge key={org} variant="outline">
+                        {org}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Funding Information */}
+              {project.funding_received !== null && project.funding_received !== undefined && project.funding_received > 0 && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold">Funding</h3>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Funding Received:</span>
+                    <span className="font-semibold text-green-600">${project.funding_received.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="border-t pt-6 flex justify-between">
               {owner && (
