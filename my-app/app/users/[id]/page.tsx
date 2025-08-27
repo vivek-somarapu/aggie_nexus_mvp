@@ -469,10 +469,6 @@ export default function UserPage() {
                     )}
                     <span className="sr-only">{isBookmarked ? "Remove bookmark" : "Bookmark user"}</span>
                   </Button>
-                  <Button variant="outline" size="icon">
-                    <Share2 className="h-4 w-4" />
-                    <span className="sr-only">Share profile</span>
-                  </Button>
                 </div>
               </div>
             </CardHeader>
