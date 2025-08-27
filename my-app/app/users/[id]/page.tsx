@@ -508,7 +508,7 @@ export default function UserPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
+                  {/* <div>
                     <h3 className="font-semibold mb-2">Contact</h3>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -522,7 +522,7 @@ export default function UserPage() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </div> */}
 
                   <div>
                     <h3 className="font-semibold mb-2">Links</h3>
@@ -648,14 +648,10 @@ export default function UserPage() {
                   <span>Graduation Year: {user.graduation_year}</span>
                 </div>
               )}
-              <Button className="w-full mt-2" onClick={() => setIsMessageOpen(true)} disabled={!currentUser}>
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Send Message
-              </Button>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          {/* <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Similar Users</CardTitle>
             </CardHeader>
@@ -669,7 +665,7 @@ export default function UserPage() {
                 <SimilarUsers userId={user.id} industries={user.industry} />
               )}
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
 
         {/* Projects section - Full width in mobile, spans columns in desktop */}
