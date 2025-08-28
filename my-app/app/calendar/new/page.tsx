@@ -47,7 +47,12 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { pageVariants, calendarVariants, categories, industryOptions } from "@/lib/constants";
+import {
+  pageVariants,
+  calendarVariants,
+  categories,
+  industryOptions,
+} from "@/lib/constants";
 import {
   Select,
   SelectTrigger,
@@ -358,7 +363,7 @@ export default function NewEventPage() {
 
         <Card
           className="border-0 shadow-none md:border md:shadow-lg
-            bg-card/80  sm:dark:bg-slate-900/80
+            bg-card/80 dark:bg-black/80
             md:border-slate-200 dark:md:border-slate-700
             backdrop-blur-sm"
         >
@@ -436,7 +441,8 @@ export default function NewEventPage() {
                               <SelectTrigger
                                 className={cn(
                                   "h-10 dark:bg-slate-900/80 dark:text-slate-200",
-                                  !field.value && "border-red-300 focus:border-red-500"
+                                  !field.value &&
+                                    "border-red-300 focus:border-red-500"
                                 )}
                               >
                                 <SelectValue placeholder="Select an industry..." />
@@ -444,10 +450,7 @@ export default function NewEventPage() {
                             </FormControl>
                             <SelectContent>
                               {industryOptions.map((industry) => (
-                                <SelectItem
-                                  key={industry}
-                                  value={industry}
-                                >
+                                <SelectItem key={industry} value={industry}>
                                   {industry}
                                 </SelectItem>
                               ))}
@@ -467,7 +470,8 @@ export default function NewEventPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Event Category <span className="text-red-500">*</span>
+                            Event Category{" "}
+                            <span className="text-red-500">*</span>
                           </FormLabel>
                           <Select
                             value={field.value}
@@ -477,7 +481,8 @@ export default function NewEventPage() {
                               <SelectTrigger
                                 className={cn(
                                   "h-10 dark:bg-slate-900/80 dark:text-slate-200",
-                                  !field.value && "border-red-300 focus:border-red-500"
+                                  !field.value &&
+                                    "border-red-300 focus:border-red-500"
                                 )}
                               >
                                 <SelectValue placeholder="Select a category..." />
@@ -485,10 +490,7 @@ export default function NewEventPage() {
                             </FormControl>
                             <SelectContent>
                               {eventTypes.map((t) => (
-                                <SelectItem
-                                  key={t.value}
-                                  value={t.value}
-                                >
+                                <SelectItem key={t.value} value={t.value}>
                                   {t.label}
                                 </SelectItem>
                               ))}
