@@ -19,13 +19,13 @@ export type Project = {
   project_status: string;
   deleted: boolean;
   // Gamification fields
+  organizations: string[];
   funding_received?: number;
-  incubator_accelerator?: string[];
-  organizations?: string[];
   technical_requirements?: string[];
   soft_requirements?: string[];
   
 };
+
 
 export interface ProjectSearchParams {
   search?: string;

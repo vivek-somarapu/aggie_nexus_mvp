@@ -384,27 +384,41 @@ export default function ProjectPage() {
               </div>
 
               {/* Program Affiliations */}
-              {(project.incubator_accelerator && project.incubator_accelerator.length > 0) && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Program Affiliations</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="md"/>
-                  </div>
-                </div>
+              {(project.organizations && project.organizations.length > 0) && (
+                (() => {
+                  const incubatorOrgs = project.organizations.filter(org => 
+                    org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                  );
+                  return incubatorOrgs.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Program Affiliations</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <IncubatorAcceleratorBadges organizations={incubatorOrgs} size="md"/>
+                      </div>
+                    </div>
+                  );
+                })()
               )}
 
               {/* Organization Affiliations */}
               {project.organizations && project.organizations.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Organization Affiliations</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {project.organizations.map((org) => (
-                      <Badge key={org} variant="outline">
-                        {org}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                (() => {
+                  const nonProgramOrgs = project.organizations.filter(org => 
+                    org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+                  );
+                  return nonProgramOrgs.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Organization Affiliations</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {nonProgramOrgs.map((org) => (
+                          <Badge key={org} variant="outline">
+                            {org}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()
               )}
 
               {/* Funding Information */}

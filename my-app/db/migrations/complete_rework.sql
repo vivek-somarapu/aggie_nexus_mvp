@@ -25,6 +25,7 @@ create table if not exists public.organization_managers (
   org_id uuid not null references public.organizations(id) on delete cascade,
   user_id uuid not null references public.users(id) on delete cascade,
   created_at timestamptz default now(),
+  updated_at timestamptz default now(),
   primary key (org_id, user_id)
 );
 create index if not exists idx_org_managers_user on public.organization_managers(user_id);
@@ -44,7 +45,6 @@ create table if not exists public.organization_affiliation_claims (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.organizations(id) on delete cascade,
   user_id uuid not null references public.users(id) on delete cascade,
-  evidence jsonb not null default '{}'::jsonb,
   status text not null default 'pending'
     check (status in ('pending','approved','rejected')),
   created_at timestamptz default now(),
@@ -66,7 +66,6 @@ create table if not exists public.project_organization_claims (
   project_id uuid not null references public.projects(id) on delete cascade,
   org_id uuid not null references public.organizations(id) on delete cascade,
   submitted_by uuid not null references public.users(id),
-  evidence jsonb not null default '{}'::jsonb,
   status text not null default 'pending'
     check (status in ('pending','approved','rejected')),
   created_at timestamptz default now(),
@@ -282,3 +281,9 @@ end$$;
 -- Pending claims for my orgs (projects):
 --   select c.* from public.project_organization_claims c
 --   where public.is_org_manager(c.org_id) and c.status = 'pending';
+
+-- All organizations a user is a member of
+-- SELECT o.* 
+-- FROM public.organizations o
+-- JOIN public.organization_members m ON m.org_id = o.id
+-- WHERE m.user_id = auth.uid();

@@ -514,9 +514,12 @@ export default function ProjectsPage() {
                             <Badge variant="outline">
                               {project.project_status}
                             </Badge>
-                            {/* Incubator/Accelerator Badges */}
-                            {project.incubator_accelerator && project.incubator_accelerator.length > 0 && (
-                              <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="sm" maxDisplay={2}/>
+                            {project.organizations && project.organizations.length > 0 && (
+                              project.organizations.some(org => 
+                                org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                              ) && (
+                                <IncubatorAcceleratorBadges organizations={project.organizations} size="sm" maxDisplay={2}/>
+                              )
                             )}
                           </div>
                           {/* Organization Tags */}
