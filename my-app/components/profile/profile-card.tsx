@@ -49,6 +49,7 @@ import {
 import { TagSelector } from "@/components/profile/tag-selector";
 import { Textarea } from "../ui/textarea";
 import { createClient } from "@/lib/supabase/client";
+import { userService } from "@/lib/services/user-service";
 
 type MinimalFormData = {
   full_name: string;
@@ -271,7 +272,18 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
 }: ProfileCardProps<T>) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [availableOrganizations, setAvailableOrganizations] = useState<string[]>([]);
+  const [selectedOrganizations, setSelectedOrganizationsLocal] = useState<string[]>([]);
+  const [selectedIndustries, setSelectedIndustriesLocal] = useState<string[]>([]);
+  const [isSavingLocal, setIsSavingLocal] = useState(false);
   
+  // Initialize local state with current values
+  useEffect(() => {
+    if (user) {
+      setSelectedIndustries(user.industry || []);
+      setSelectedOrganizations(user.organizations || []);
+    }
+  }, [user]);
+
   // Fetch available organizations from database
   useEffect(() => {
     const fetchOrganizations = async () => {
@@ -394,8 +406,8 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                       <TagSelector
                         label="Industries"
                         options={industryOptions}
-                        selected={user?.industry || []}
-                        onChange={setSelectedIndustries}
+                        selected={selectedIndustries}
+                        onChange={setSelectedIndustriesLocal}
                       />
                     </div>
 
@@ -405,11 +417,11 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                       <TagSelector
                         label="Organizations"
                         options={availableOrganizations}
-                        selected={user?.organizations || []}
-                        onChange={setSelectedOrganizations}
+                        selected={selectedOrganizations}
+                        onChange={setSelectedOrganizationsLocal}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Select organizations you're affiliated with. Some organizations require verification.
+                        Select organizations you're affiliated with. Organizations require verification.
                       </p>
                     </div>
                   </div>
@@ -417,13 +429,51 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                   <DialogFooter>
                     <div className="w-full flex justify-end">
                       <Button
-                        disabled={isSaving}
+                        disabled={isSavingLocal}
                         onClick={async () => {
-                          await handleSaveProfile();
-                          setIsEditOpen(false);
+                          if (!user) return;
+                          
+                          try {
+                            setIsSavingLocal(true);
+                            
+                            // Prepare the user data for saving
+                            const userData = {
+                              full_name: formData.full_name,
+                              bio: formData.bio || '',
+                              linkedin_url: formData.linkedin_url || '',
+                              website_url: formData.website_url || '',
+                              is_texas_am_affiliate: formData.is_texas_am_affiliate,
+                              graduation_year: formData.graduation_year,
+                              industry: selectedIndustries,
+                              skills: user.skills || [],
+                              contact: {
+                                email: formData.contact?.email || '',
+                                phone: formData.contact?.phone || ''
+                              },
+                              additional_links: formData.additional_links || [],
+                            };
+
+                            // Use userService to update user with affiliations
+                            if (selectedOrganizations.length > 0) {
+                              await userService.updateUserWithAffiliations(
+                                user.id, 
+                                userData, 
+                                selectedOrganizations
+                              );
+                            } else {await userService.updateUser(user.id, userData); }
+
+                            // Call the original handleSaveProfile to refresh the profile
+                            await handleSaveProfile();
+                            setIsEditOpen(false);
+                          } catch (error) {
+                            console.error('Error saving profile:', error);
+                            // You might want to show a toast error here
+                          } finally {
+                            setIsSavingLocal(false);
+                          }
                         }}
                       >
-                        {isSaving ? (
+                        {isSavingLocal ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Saving

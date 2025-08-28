@@ -533,7 +533,11 @@ const getAvailableSkills = () => {
         // owner_id is handled by the server via auth middleware
       };
 
-      const newProject = await projectService.createProject(projectData);
+      if (selectedOrganizations.length > 0) {
+        await projectService.createProjectWithAffiliations(projectData, selectedOrganizations);
+      } else {
+        await projectService.createProject(projectData);
+      }
 
       toast.success("Project created successfully!");
       router.push(`/projects/${newProject.id}`);

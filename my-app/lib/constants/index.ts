@@ -243,18 +243,3 @@ export const customScrollStyles = `
     background-color: hsl(var(--foreground));
   }
 `;
-
-
-// User profile organizations (these are just tags, not special programs)
-export const userOrganizationOptions = [
-  "Aggies Create",
-  "AggieX",
-  "Aggie Entrepreneurs",
-  "Meloy Engineering Innovation and Entrepreneurship Program (MEIEP)", 
-  "McFerrin Experience Team (MET)",
-  "Aggie Venture Fund (AVF)",
-  "Student Government Association",
-  "Greek Life",
-  "Honors Program",
-  "Research Lab",
-];

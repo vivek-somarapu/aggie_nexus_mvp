@@ -359,7 +359,11 @@ export default function EditProjectPage({
         estimated_end: formData.estimated_end || undefined,
       };
 
-      await projectService.updateProject(projectId, projectData);
+      if (selectedOrganizations.length > 0) {
+        await projectService.updateProjectWithAffiliations(projectId, projectData, selectedOrganizations);
+      } else {
+        await projectService.updateProject(projectId, projectData);
+      }
 
       toast.success("Project updated successfully!");
       router.push(`/projects/${projectId}`);

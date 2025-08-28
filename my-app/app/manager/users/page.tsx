@@ -190,7 +190,7 @@ export default function UserManagementPage() {
     
     switch (confirmAction) {
       case "promote":
-        updateUserRole(userToManage.id, "manager");
+        updateUserRole(userToManage.id, "Admin");
         break;
       case "demote":
         updateUserRole(userToManage.id, "user");

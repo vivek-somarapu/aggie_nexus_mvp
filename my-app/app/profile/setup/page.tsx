@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 import {
   containerVariants,
   industryOptions,
@@ -24,12 +25,7 @@ import {
   stepVariants,
 } from "@/lib/constants";
 import { userService } from "@/lib/services/user-service";
-import { 
-  requiresVerification, 
-  canAutoVerify, 
-  createOrganizationClaim,
-  autoVerifyOrganization 
-} from "@/lib/utils/organization-verification";
+
 import { VerificationBadge } from "@/components/ui/verification-badge";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -173,27 +169,6 @@ export default function ProfileSetupPage() {
       if (pendingResumeFile) {
         resumeUrl = await uploadToBucket("resumes", pendingResumeFile);
       }
-      // 3) collect form data with organization verification
-      const organizationClaims = selectedOrganizations.map(org => {
-        if (requiresVerification(org)) {
-          if (canAutoVerify(org, formData.email)) {
-            return { ...createOrganizationClaim(org, 'email_domain'), status: 'verified' as const };
-          }
-          return createOrganizationClaim(org, 'manual');
-        }
-        return createOrganizationClaim(org, 'none');
-      });
-
-      const organizationVerifications = selectedOrganizations.reduce((acc, org) => {
-        if (requiresVerification(org) && canAutoVerify(org, formData.email)) {
-          const verification = autoVerifyOrganization(org, formData.email);
-          if (verification) {
-            acc[org] = verification;
-          }
-        }
-        return acc;
-      }, {} as Record<string, any>);
-
       const payload = {
         full_name: formData.full_name.trim(),
         bio: formData.bio.trim(),
@@ -205,16 +180,18 @@ export default function ProfileSetupPage() {
         resume_url: resumeUrl || null,
         industry: selectedIndustries,
         skills: selectedSkills,
-        organizations: selectedOrganizations,
-        organization_claims: organizationClaims,
-        organization_verifications: organizationVerifications,
         contact: formData.contact,
         profile_setup_completed: true,
         profile_setup_skipped: false,
       };
 
-      // 4) update user profile
-      await userService.updateUser(profile.id, payload);
+      /// 4) update user profile 
+      if (selectedOrganizations.length > 0) {
+        await userService.updateUserWithAffiliations(profile.id, payload, selectedOrganizations);
+      } else {
+        await userService.updateUser(profile.id, payload);
+      }
+
       await refreshProfile();
 
       // 5) reset form state
@@ -601,7 +578,7 @@ export default function ProfileSetupPage() {
                             maxTags={10}
                           />
                           <p className="text-xs text-muted-foreground">
-                            Select organizations you're affiliated with. Some organizations require verification.
+                            Select organizations you're affiliated with. Organizations require verification.
                           </p>
                         </div>
                       </CardContent>
@@ -758,7 +735,7 @@ export default function ProfileSetupPage() {
                                 <motion.div key={org} variants={itemVariants}>
                                   <div className="flex items-center gap-1">
                                     <Badge variant="outline" className="px-2 py-1">{org}</Badge>
-                                    {requiresVerification(org) && (
+                                    {org && (
                                       <VerificationBadge 
                                         organization={org} 
                                         profile={profile} 
@@ -770,9 +747,9 @@ export default function ProfileSetupPage() {
                                 </motion.div>
                               ))}
                             </motion.div>
-                            {selectedOrganizations.some(org => requiresVerification(org)) && (
+                            {selectedOrganizations && (
                               <p className="text-xs text-muted-foreground mt-1">
-                                ⚠️ Some organizations require verification. Claims will be reviewed.
+                                ⚠️ Organizations require verification. Claims will be reviewed.
                               </p>
                             )}
                           </div>
