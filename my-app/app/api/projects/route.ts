@@ -180,6 +180,32 @@ export async function POST(request: NextRequest) {
         console.error('Error creating project in Supabase:', error);
         return NextResponse.json({ error: 'Failed to create project: ' + error.message }, { status: 500 });
       }
+
+      // Handle organization relationships
+      if (body.organizations && body.organizations.length > 0) {
+        // Get organization IDs
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .in('name', body.organizations);
+        
+        if (orgData && orgData.length > 0) {
+          // Insert project-organization relationships
+          const projectOrgs = orgData.map(org => ({
+            project_id: data.id,
+            organization_id: org.id
+          }));
+          
+          const { error: orgError } = await supabase
+            .from('project_organizations')
+            .insert(projectOrgs);
+          
+          if (orgError) {
+            console.error('Error creating project-organization relationships:', orgError);
+            // Don't fail the entire request, just log the error
+          }
+        }
+      }
       
       return NextResponse.json(data, { status: 201 });
     } catch (error: any) {

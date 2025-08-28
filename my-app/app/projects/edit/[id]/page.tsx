@@ -31,8 +31,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
-import { getAvailableProgramsForUser, userOrganizationOptions } from "@/lib/constants";
+import { userOrganizationOptions } from "@/lib/constants";
 import React from "react";
+import { createClient } from "@/lib/supabase/client";
 
 // Industry options
 const industryOptions = [
@@ -102,7 +103,7 @@ export default function EditProjectPage({
   // Just access params directly
   const projectId = params.id;
 
-  const { authUser: user, profile, isLoading: authLoading } = useAuth();
+  const { authUser: user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
@@ -111,6 +112,7 @@ export default function EditProjectPage({
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
+  const [availablePrograms, setAvailablePrograms] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
   );
@@ -183,6 +185,20 @@ export default function EditProjectPage({
         setSelectedIndustries(projectData.industry || []);
         setSelectedSkills(projectData.required_skills || []);
         setSelectedOrganizations(projectData.organizations || []);
+
+        // Fetch available programs for user
+        if (user) {
+          const supabase = createClient();
+          const { data: orgMemberships } = await supabase
+            .from('organization_members')
+            .select(`
+              organizations(name)
+            `)
+            .eq('user_id', user.id);
+          
+          const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
+          setAvailablePrograms(userOrgs);
+        }
 
         // Initialize date pickers
         if (projectData.estimated_start) {
@@ -586,7 +602,7 @@ export default function EditProjectPage({
               <div className="space-y-2">
                 <TagSelector
                   label="Program Affiliations"
-                  options={getAvailableProgramsForUser(profile?.organizations || [])}
+                  options={availablePrograms}
                   selected={selectedOrganizations.filter(org => 
                     org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
                   )}

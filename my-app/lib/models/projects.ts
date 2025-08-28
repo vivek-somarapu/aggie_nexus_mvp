@@ -18,6 +18,10 @@ export type Project = {
   last_updated: string;
   project_status: string;
   deleted: boolean;
+  organizations: string[];
+  funding_received?: number;
+  technical_requirements?: string[];
+  soft_requirements?: string[];
 };
 
 // Helper function to get Supabase client
@@ -74,7 +78,12 @@ export async function getAllProjects(): Promise<Project[]> {
   
   const { data, error } = await supabase
     .from('projects')
-    .select('*')
+    .select(`
+      *,
+      project_organizations(
+        organizations(name)
+      )
+    `)
     .eq('deleted', false)
     .order('created_at', { ascending: false });
   
@@ -82,6 +91,7 @@ export async function getAllProjects(): Promise<Project[]> {
   
   return data.map(row => ({
     ...row,
+    organizations: row.project_organizations?.map((po: { organizations?: { name: string } }) => po.organizations?.name).filter(Boolean) || [],
     contact_info: row.contact_info || {}
   }));
 }
@@ -91,7 +101,12 @@ export async function getProjectById(id: string): Promise<Project | null> {
   
   const { data, error } = await supabase
     .from('projects')
-    .select('*')
+    .select(`
+      *,
+      project_organizations(
+        organizations(name)
+      )
+    `)
     .eq('id', id)
     .eq('deleted', false)
     .single();
@@ -103,6 +118,7 @@ export async function getProjectById(id: string): Promise<Project | null> {
   
   return {
     ...data,
+    organizations: data.project_organizations?.map((po: { organizations?: { name: string } }) => po.organizations?.name).filter(Boolean) || [],
     contact_info: data.contact_info || {}
   };
 }
@@ -166,13 +182,16 @@ export async function filterProjectsBySkill(skill: string): Promise<Project[]> {
 export async function updateProject(id: string, projectData: Partial<Project>): Promise<Project | null> {
   const supabase = await getSupabase();
   
+  // Extract organizations to handle separately
+  const { organizations, ...updateData } = projectData;
+  
   // Filter out fields we don't want to update directly
-  const { id: _, views, created_at, last_updated, ...updateData } = projectData as any;
+  const { id: _, views, created_at, last_updated, ...projectUpdateData } = updateData as any;
   
   const { data, error } = await supabase
     .from('projects')
     .update({
-      ...updateData,
+      ...projectUpdateData,
       last_updated: new Date().toISOString()
     })
     .eq('id', id)
@@ -185,10 +204,35 @@ export async function updateProject(id: string, projectData: Partial<Project>): 
     throw error;
   }
   
-  return {
-    ...data,
-    contact_info: data.contact_info || {}
-  };
+  // Handle organization relationships
+  if (organizations !== undefined) {
+    // Delete existing relationships
+    await supabase.from('project_organizations').delete().eq('project_id', id);
+    
+    // Insert new relationships if organizations are provided
+    if (organizations && organizations.length > 0) {
+      // Get organization IDs
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .in('name', organizations);
+      
+      if (orgData && orgData.length > 0) {
+        // Insert project-organization relationships
+        const projectOrgs = orgData.map(org => ({
+          project_id: id,
+          organization_id: org.id
+        }));
+        
+        await supabase
+          .from('project_organizations')
+          .insert(projectOrgs);
+      }
+    }
+  }
+  
+  // Return updated project with organizations
+  return getProjectById(id);
 }
 
 export async function incrementProjectViews(id: string): Promise<void> {

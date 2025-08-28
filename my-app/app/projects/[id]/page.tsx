@@ -279,9 +279,24 @@ export default function ProjectPage() {
                       {project.recruitment_status}
                     </Badge>
                     {/* Incubator/Accelerator Badges */}
-                    {project.incubator_accelerator && project.incubator_accelerator.length > 0 && (
-                      <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="sm"/>
-                    )}
+                    {project.organizations &&
+                      (() => {
+                        // Filter for only the specific incubator/accelerator programs
+                        const incubatorOrgs = project.organizations.filter(
+                          (org) =>
+                            org === "Aggies Create Incubator" ||
+                            org === "AggieX Accelerator"
+                        );
+                        // Only render the component if any were found
+                        return (
+                          incubatorOrgs.length > 0 && (
+                            <IncubatorAcceleratorBadges
+                              organizations={incubatorOrgs}
+                              size="sm"
+                            />
+                          )
+                        );
+                      })()}
                   </div>
                   <CardTitle className="text-2xl">{project.title}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-2">

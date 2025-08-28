@@ -33,8 +33,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
-import { validateProjectPrograms } from "@/lib/utils/project-validation";
-import { incubatorAcceleratorOptions, getAvailableProgramsForUser, userOrganizationOptions, canHaveBothPrograms, getConflictingProgram } from "@/lib/constants";
+import { userOrganizationOptions } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/client";
 
 
 // Industry options
@@ -314,14 +314,14 @@ const recruitmentStatusOptions = [
 const locationTypeOptions = ["Remote", "On-site", "Hybrid", "Flexible"];
 
 export default function NewProjectPage() {
-  const { authUser: user, profile, isLoading: authLoading } = useAuth();
+  const { authUser: user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedIncubatorAccelerator, setSelectedIncubatorAccelerator] = useState<string[]>([]);
   const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
+  const [availablePrograms, setAvailablePrograms] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
   );
@@ -355,6 +355,26 @@ export default function NewProjectPage() {
         },
       }));
     }
+  }, [user]);
+
+  // Fetch available programs for user
+  useEffect(() => {
+    const fetchAvailablePrograms = async () => {
+      if (user) {
+        const supabase = createClient();
+        const { data: orgMemberships } = await supabase
+          .from('organization_members')
+          .select(`
+            organizations(name)
+          `)
+          .eq('user_id', user.id);
+        
+        const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
+        setAvailablePrograms(userOrgs);
+      }
+    };
+
+    fetchAvailablePrograms();
   }, [user]);
 
   useEffect(() => {
@@ -400,7 +420,7 @@ const getAvailableSkills = () => {
 };
 
 // Get available incubator/accelerator programs for the user
-const availablePrograms = profile?.organizations ? getAvailableProgramsForUser(profile.organizations) : [];
+// Now handled by the availablePrograms state variable
 
 
   const handleChange = (
@@ -498,7 +518,6 @@ const availablePrograms = profile?.organizations ? getAvailableProgramsForUser(p
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
-        incubator_accelerator: selectedIncubatorAccelerator,
         organizations: selectedOrganizations,
         funding_received: formData.funding_received,
         // owner_id is handled by the server via auth middleware
@@ -727,34 +746,27 @@ const availablePrograms = profile?.organizations ? getAvailableProgramsForUser(p
                 <TagSelector
                   label="Program Affiliations"
                   options={availablePrograms}
-                  selected={selectedIncubatorAccelerator}
+                  selected={selectedOrganizations.filter(org => 
+                    org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                  )}
                   onChange={(newPrograms) => {
+                    // Remove existing incubator/accelerator programs
+                    const nonProgramOrgs = selectedOrganizations.filter(org => 
+                      org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+                    );
+                    
                     // Check if adding this program would create a conflict
                     const hasIncubator = newPrograms.includes('Aggies Create Incubator');
                     const hasAccelerator = newPrograms.includes('AggieX Accelerator');
                     
+                    let finalPrograms = newPrograms;
                     if (hasIncubator && hasAccelerator) {
-                      // If both are selected, keep only the most recently added one
-                      // Determine which one was just added by comparing with current selection
-                      const currentHasIncubator = selectedIncubatorAccelerator.includes('Aggies Create Incubator');
-                      const currentHasAccelerator = selectedIncubatorAccelerator.includes('AggieX Accelerator');
-                      
-                      let filteredPrograms;
-                      if (currentHasIncubator && !currentHasAccelerator && hasAccelerator) {
-                        // User just added accelerator, remove incubator
-                        filteredPrograms = newPrograms.filter(program => program !== 'Aggies Create Incubator');
-                      } else if (currentHasAccelerator && !currentHasIncubator && hasIncubator) {
-                        // User just added incubator, remove accelerator
-                        filteredPrograms = newPrograms.filter(program => program !== 'AggieX Accelerator');
-                      } else {
-                        // Fallback: keep the last one in the array
-                        filteredPrograms = [newPrograms[newPrograms.length - 1]];
-                      }
-                      
-                      setSelectedIncubatorAccelerator(filteredPrograms);
-                    } else {
-                      setSelectedIncubatorAccelerator(newPrograms);
+                      // Keep only the most recently added one
+                      finalPrograms = [newPrograms[newPrograms.length - 1]];
                     }
+                    
+                    // Combine non-program orgs with selected programs
+                    setSelectedOrganizations([...nonProgramOrgs, ...finalPrograms]);
                   }}
                   maxTags={5}
                   placeholder="Select special programs your project is part of"
