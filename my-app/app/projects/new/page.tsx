@@ -33,7 +33,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
-import { userOrganizationOptions } from "@/lib/constants";
+
 import { createClient } from "@/lib/supabase/client";
 
 
@@ -322,6 +322,7 @@ export default function NewProjectPage() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
   const [availablePrograms, setAvailablePrograms] = useState<string[]>([]);
+  const [availableOrganizations, setAvailableOrganizations] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
   );
@@ -370,7 +371,16 @@ export default function NewProjectPage() {
           .eq('user_id', user.id);
         
         const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
-        setAvailablePrograms(userOrgs);
+        // Filter to only include special programs (incubator/accelerator)
+        const specialPrograms = userOrgs.filter((org: string) => 
+          org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+        );
+        // Filter to only include regular organizations (non-special programs)
+        const regularOrganizations = userOrgs.filter((org: string) => 
+          org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+        );
+        setAvailablePrograms(specialPrograms);
+        setAvailableOrganizations(regularOrganizations);
       }
     };
 
@@ -782,9 +792,19 @@ const getAvailableSkills = () => {
               <div className="space-y-2">
                 <TagSelector
                   label="Organization Affiliations"
-                  options={userOrganizationOptions}
-                  selected={selectedOrganizations}
-                  onChange={setSelectedOrganizations}
+                  options={availableOrganizations}
+                  selected={selectedOrganizations.filter(org => 
+                    org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+                  )}
+                  onChange={(newOrgs) => {
+                    // Get current incubator/accelerator programs
+                    const currentPrograms = selectedOrganizations.filter(org => 
+                      org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                    );
+                    
+                    // Combine regular orgs with programs
+                    setSelectedOrganizations([...newOrgs, ...currentPrograms]);
+                  }}
                   maxTags={10}
                   placeholder="Select organizations your project is affiliated with"
                 />

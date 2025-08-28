@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -15,7 +15,7 @@ import {
   containerVariants,
   itemVariants,
   industryOptions,
-  userOrganizationOptions,
+
 } from "@/lib/constants";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -48,6 +48,7 @@ import {
 
 import { TagSelector } from "@/components/profile/tag-selector";
 import { Textarea } from "../ui/textarea";
+import { createClient } from "@/lib/supabase/client";
 
 type MinimalFormData = {
   full_name: string;
@@ -269,6 +270,26 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
   isSaving,
 }: ProfileCardProps<T>) {
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [availableOrganizations, setAvailableOrganizations] = useState<string[]>([]);
+  
+  // Fetch available organizations from database
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      if (user) {
+        const supabase = createClient();
+        const { data: orgs } = await supabase
+          .from('organizations')
+          .select('name')
+          .order('name');
+        
+        const orgNames = orgs?.map((org: { name: string }) => org.name) || [];
+        setAvailableOrganizations(orgNames);
+      }
+    };
+
+    fetchOrganizations();
+  }, [user]);
+  
   const handleAffiliationChange = (data: TexasAMAffiliationData) => {
     setFormData({
       ...formData,
@@ -383,7 +404,7 @@ export function ProfileCard<T extends MinimalFormData = MinimalFormData>({
                       <Label>Organizations (select up to 10)</Label>
                       <TagSelector
                         label="Organizations"
-                        options={userOrganizationOptions}
+                        options={availableOrganizations}
                         selected={user?.organizations || []}
                         onChange={setSelectedOrganizations}
                       />

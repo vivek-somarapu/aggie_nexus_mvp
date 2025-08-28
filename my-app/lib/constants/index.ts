@@ -244,20 +244,6 @@ export const customScrollStyles = `
   }
 `;
 
-// ---------- Organization and Program Mapping ----------
-
-// Mapping of user organizations to eligible incubator/accelerator programs
-export const organizationToProgramMapping: Record<string, string[]> = {
-  "Aggies Create": ["Aggies Create Incubator"],
-  "AggieX": ["AggieX Accelerator"]
-};
-
-// Available incubator/accelerator programs (only the special ones that get badges)
-// Project cannot be both an incubator and accelerator
-export const incubatorAcceleratorOptions = [
-  "Aggies Create Incubator",
-  "AggieX Accelerator"
-];
 
 // User profile organizations (these are just tags, not special programs)
 export const userOrganizationOptions = [

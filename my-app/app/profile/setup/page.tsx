@@ -31,7 +31,7 @@ import {
   autoVerifyOrganization 
 } from "@/lib/utils/organization-verification";
 import { VerificationBadge } from "@/components/ui/verification-badge";
-import { userOrganizationOptions } from "@/lib/constants";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -51,6 +51,7 @@ export default function ProfileSetupPage() {
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
+  const [availableOrganizations, setAvailableOrganizations] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
@@ -110,6 +111,24 @@ export default function ProfileSetupPage() {
 
     setIsLoading(false);
   }, [profile]);
+
+  // Fetch available organizations from database
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      if (authUser) {
+        const supabase = createClient();
+        const { data: orgs } = await supabase
+          .from('organizations')
+          .select('name')
+          .order('name');
+        
+        const orgNames = orgs?.map((org: { name: string }) => org.name) || [];
+        setAvailableOrganizations(orgNames);
+      }
+    };
+
+    fetchOrganizations();
+  }, [authUser]);
 
   const prevStep = () => {
     setCurrentStep((prev) => prev - 1);
@@ -576,7 +595,7 @@ export default function ProfileSetupPage() {
                           <Label>Organizations</Label>
                           <TagSelector
                             label="Organizations"
-                            options={userOrganizationOptions}
+                            options={availableOrganizations}
                             selected={selectedOrganizations}
                             onChange={setSelectedOrganizations}
                             maxTags={10}

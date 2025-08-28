@@ -31,7 +31,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
-import { userOrganizationOptions } from "@/lib/constants";
+
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -113,6 +113,7 @@ export default function EditProjectPage({
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
   const [availablePrograms, setAvailablePrograms] = useState<string[]>([]);
+  const [availableOrganizations, setAvailableOrganizations] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
   );
@@ -196,8 +197,17 @@ export default function EditProjectPage({
             `)
             .eq('user_id', user.id);
           
-          const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
-          setAvailablePrograms(userOrgs);
+        const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
+        // Filter to only include special programs (incubator/accelerator)
+        const specialPrograms = userOrgs.filter((org: string) => 
+          org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+        );
+        // Filter to only include regular organizations (non-special programs)
+        const regularOrganizations = userOrgs.filter((org: string) => 
+          org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+        );
+        setAvailablePrograms(specialPrograms);
+        setAvailableOrganizations(regularOrganizations);
         }
 
         // Initialize date pickers
@@ -639,7 +649,7 @@ export default function EditProjectPage({
               <div className="space-y-2">
                 <TagSelector
                   label="Organization Affiliations"
-                  options={userOrganizationOptions}
+                  options={availableOrganizations}
                   selected={selectedOrganizations}
                   onChange={setSelectedOrganizations}
                   maxTags={10}
