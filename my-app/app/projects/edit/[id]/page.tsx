@@ -110,7 +110,6 @@ export default function EditProjectPage({
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedIncubatorAccelerator, setSelectedIncubatorAccelerator] = useState<string[]>([]);
   const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
@@ -183,7 +182,6 @@ export default function EditProjectPage({
         // Initialize selected values
         setSelectedIndustries(projectData.industry || []);
         setSelectedSkills(projectData.required_skills || []);
-        setSelectedIncubatorAccelerator(projectData.incubator_accelerator || []);
         setSelectedOrganizations(projectData.organizations || []);
 
         // Initialize date pickers
@@ -328,7 +326,6 @@ export default function EditProjectPage({
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
-        incubator_accelerator: selectedIncubatorAccelerator,
         organizations: selectedOrganizations,
         funding_received: formData.funding_received,
         // Handle empty date strings - convert to undefined for database
@@ -590,33 +587,27 @@ export default function EditProjectPage({
                 <TagSelector
                   label="Program Affiliations"
                   options={getAvailableProgramsForUser(profile?.organizations || [])}
-                  selected={selectedIncubatorAccelerator}
+                  selected={selectedOrganizations.filter(org => 
+                    org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                  )}
                   onChange={(newPrograms) => {
+                    // Remove existing incubator/accelerator programs
+                    const nonProgramOrgs = selectedOrganizations.filter(org => 
+                      org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+                    );
+                    
                     // Check if adding this program would create a conflict
                     const hasIncubator = newPrograms.includes('Aggies Create Incubator');
                     const hasAccelerator = newPrograms.includes('AggieX Accelerator');
                     
+                    let finalPrograms = newPrograms;
                     if (hasIncubator && hasAccelerator) {
-                      // If both are selected, keep only the most recently added one
-                      const currentHasIncubator = selectedIncubatorAccelerator.includes('Aggies Create Incubator');
-                      const currentHasAccelerator = selectedIncubatorAccelerator.includes('AggieX Accelerator');
-                      
-                      let filteredPrograms;
-                      if (currentHasIncubator && !currentHasAccelerator && hasAccelerator) {
-                        // User just added accelerator, remove incubator
-                        filteredPrograms = newPrograms.filter(program => program !== 'Aggies Create Incubator');
-                      } else if (currentHasAccelerator && !currentHasIncubator && hasIncubator) {
-                        // User just added incubator, remove accelerator
-                        filteredPrograms = newPrograms.filter(program => program !== 'AggieX Accelerator');
-                      } else {
-                        // Fallback: keep the last one in the array
-                        filteredPrograms = [newPrograms[newPrograms.length - 1]];
-                      }
-                      
-                      setSelectedIncubatorAccelerator(filteredPrograms);
-                    } else {
-                      setSelectedIncubatorAccelerator(newPrograms);
+                      // Keep only the most recently added one
+                      finalPrograms = [newPrograms[newPrograms.length - 1]];
                     }
+                    
+                    // Combine non-program orgs with selected programs
+                    setSelectedOrganizations([...nonProgramOrgs, ...finalPrograms]);
                   }}
                   maxTags={5}
                   placeholder="Select special programs your project is part of"

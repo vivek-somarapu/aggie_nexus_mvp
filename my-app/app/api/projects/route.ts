@@ -16,7 +16,16 @@ export async function GET(request: NextRequest) {
     const ownerIdParam = searchParams.get('owner_id');
     
     // Create a query builder
-    let query = supabase.from('projects').select('*').eq('deleted', false);
+    let query = supabase
+    .from('projects')
+    .select(`
+      *,
+      project_organizations!inner(
+        organization_id,
+        organizations(name)
+      )
+    `)
+    .eq('deleted', false);
     
     // Apply filters if provided
     if (searchTerm) {
@@ -72,8 +81,7 @@ export async function GET(request: NextRequest) {
       required_skills: project.required_skills || [],
       contact_info: project.contact_info || {},
       funding_received: project.funding_received || 0,
-      incubator_accelerator: project.incubator_accelerator || [],
-      organizations: project.organizations || [],
+      organizations: project.project_organizations?.map(po => po.organizations?.name) || [],
       technical_requirements: project.technical_requirements || [],
       soft_requirements: project.soft_requirements || []
     }));
@@ -102,9 +110,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate that project is not in both incubator and accelerator
-      if (body.incubator_accelerator && body.incubator_accelerator.length > 0) {
-        const hasIncubator = body.incubator_accelerator.includes('Aggies Create Incubator');
-        const hasAccelerator = body.incubator_accelerator.includes('AggieX Accelerator');
+      if (body.organizations && body.organizations.length > 0) {
+        const hasIncubator = body.organizations.includes('Aggies Create Incubator');
+        const hasAccelerator = body.organizations.includes('AggieX Accelerator');
         
         if (hasIncubator && hasAccelerator) {
           return NextResponse.json(
@@ -160,8 +168,6 @@ export async function POST(request: NextRequest) {
           contact_info: contact_info,
           project_status: projectData.project_status || "Not Started",
           funding_received: projectData.funding_received || 0,
-          incubator_accelerator: projectData.incubator_accelerator || [],
-          organizations: projectData.organizations || [],
           technical_requirements: projectData.technical_requirements || [],
           soft_requirements: projectData.soft_requirements || [],
           views: 0,
