@@ -23,11 +23,11 @@ export async function GET(request: NextRequest) {
       // lookup profile row
       const { data: profile, error: profErr } = await supabase
         .from("profiles")
-        .select("is_manager")
+        .select("role")
         .eq("id", userId)
         .single();
 
-      if (profErr || !profile?.is_manager) {
+      if (profErr || profile?.role !== 'admin') {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
 

@@ -149,7 +149,7 @@ export default function AuthDebug() {
                 <div>Name: {profile.full_name || "N/A"}</div>
                 <div>Bio: {profile.bio ? "Yes" : "No"}</div>
                 <div>Skills: {profile.skills?.length || 0}</div>
-                <div>Manager: {profile.is_manager ? "Yes" : "No"}</div>
+                <div>Manager: {profile.role === 'admin' ? "Yes" : "No"}</div>
               </div>
             </div>
           )}

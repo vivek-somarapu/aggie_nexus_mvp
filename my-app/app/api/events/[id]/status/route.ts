@@ -23,7 +23,7 @@ export async function PATCH(
       // Check if user is a manager
       const { data: profile, error: profileError } = await supabase
         .from('users')
-        .select('is_manager')
+        .select('role')
         .eq('id', user.id)
         .single();
 
@@ -34,7 +34,7 @@ export async function PATCH(
         );
       }
 
-      if (!profile.is_manager) {
+      if (profile.role !== 'admin') {
         return NextResponse.json(
           { error: "Only managers can approve or reject events" },
           { status: 403 }
