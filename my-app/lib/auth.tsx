@@ -84,7 +84,7 @@ export type Profile = {
   profile_setup_completed?: boolean;
   profile_setup_skipped_at?: string;
   last_login_at?: string;
-  is_manager?: boolean;
+  role?: string;
   additional_links?: { url: string; title: string }[];
 };
 
@@ -742,7 +742,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requestPasswordReset,
     resetPassword,
     refreshProfile,
-    isManager: profile?.is_manager === true,
+    isManager: profile?.role === 'admin',
   };
 
   authLog("AuthProvider: Rendering with state", {
