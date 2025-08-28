@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "mcp installer": {
+      "command": "npx",
+      "args": [
+        "cursor-mcp-installer-free@latest"
+      ]
+    },
+    "Browser Tools": {
+      "command": "npx",
+      "args": [
+        "@agentdeskai/browser-tools-mcp@latest"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres@latest",
+        "postgresql://postgres:nexus442@db.gkzwxaiflfimhfikwfol.supabase.co:5432/postgres"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-filesystem@latest"
+      ]
+    },
+    "tavily-search": {
+      "command": "npx",
+      "args": [
+        "tavily-mcp@latest"
+      ]
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": [
+        "firecrawl-mcp@latest"
+      ]
+    }
+  }
+} 
