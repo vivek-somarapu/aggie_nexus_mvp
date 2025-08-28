@@ -728,10 +728,6 @@ export default function Home() {
                       <Zap className="w-3 h-3 mr-1" />
                       Actively Recruiting
                     </Badge>
-                    <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs px-2 py-1">
-                      <Recycle className="w-3 h-3 mr-1" />
-                      Clean Tech
-                    </Badge>
                   </div>
 
                   <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
