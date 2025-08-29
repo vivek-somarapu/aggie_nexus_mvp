@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/auth-middleware";
-import { cookies } from "next/headers";
 
 export async function PATCH(
   request: NextRequest,
@@ -51,37 +50,36 @@ export async function PATCH(
         );
       }
 
-      // Call RPC function for updating event status
-      const { data, error } = await supabase.rpc('update_event_status', {
-        event_id: id,
-        new_status: body.status,
-        manager_id: user.id
-      });
+      // Try to update event status directly
+      const { data, error } = await supabase
+        .from('events')
+        .update({ 
+          status: body.status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
 
       if (error) {
         console.error("Error updating event status:", error);
+        
+        // If the error is about missing status column, we need to add it first
+        if (error.message.includes('column "status" does not exist')) {
+          // For now, return a helpful error message
+          return NextResponse.json(
+            { error: "Event status functionality requires database schema update. Please contact an administrator." },
+            { status: 500 }
+          );
+        }
+        
         return NextResponse.json(
           { error: error.message },
           { status: 500 }
         );
       }
 
-      // Get updated event
-      const { data: updatedEvent, error: eventError } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (eventError) {
-        console.error("Error fetching updated event:", eventError);
-        return NextResponse.json(
-          { error: "Event status updated, but failed to fetch the updated event" },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json(updatedEvent);
+      return NextResponse.json(data);
     } catch (error) {
       console.error("Unexpected error:", error);
       return NextResponse.json(
