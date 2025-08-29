@@ -114,7 +114,7 @@ export default function ProjectManagementPage() {
         try {
           // Fetch all profiles at once
           const { data: profiles } = await supabase
-            .from('profiles')
+            .from('users')
             .select('id, full_name');
             
           if (profiles && Array.isArray(profiles)) {

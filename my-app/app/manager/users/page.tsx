@@ -325,7 +325,7 @@ export default function UserManagementPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openConfirmDialog(userData, "demote")}
-                                disabled={userData.id === user?.id}
+                                disabled={userData.id === authUser?.id}
                               >
                                 <UserX className="mr-1 h-3.5 w-3.5" />
                                 Remove Manager
@@ -344,7 +344,7 @@ export default function UserManagementPage() {
                               variant="destructive"
                               size="sm"
                               onClick={() => openConfirmDialog(userData, "delete")}
-                              disabled={userData.id === user?.id}
+                              disabled={userData.id === authUser?.id}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               <span className="sr-only">Delete</span>

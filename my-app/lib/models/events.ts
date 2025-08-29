@@ -122,7 +122,7 @@ export async function updateEventStatus(
 ): Promise<Event | null> {
   const supabase = await getSupabase();
   
-  let updateData: any = { status };
+  const updateData: Partial<Event> = { status };
   
   if (status === 'approved' && managerId) {
     // For approved events, set the approver and timestamp
