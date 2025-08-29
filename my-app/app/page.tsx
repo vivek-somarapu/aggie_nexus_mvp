@@ -15,12 +15,16 @@ import {
 /* ────── Constants ────── */
 import { colorPalette } from "@/lib/constants";
 import Autoplay from "embla-carousel-autoplay";
+import { SquarePoster } from "@/components/ui/SquarePoster";
 import {
   Users,
   MapPin,
   ChevronRight,
   ChevronLeft,
   Calendar as CalendarIcon,
+  Zap,
+  Atom,
+  Recycle,
 } from "lucide-react";
 import { useMediaQuery } from "@uidotdev/usehooks";
 import { useAuth } from "@/lib/auth";
@@ -42,6 +46,9 @@ import {
 import { cn } from "@/lib/utils";
 import { format, isSameDay, isSameMonth, isToday } from "date-fns";
 import { cva } from "class-variance-authority";
+import clsx from "clsx";
+import { CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 // Calendar utilities
 const monthEventVariants = cva("size-2 rounded-full", {
@@ -99,7 +106,7 @@ const generateWeekdays = (locale: any) => {
 
 const getEventBackgroundColor = (color: any) => {
   if (!color) return "bg-primary/20";
-  
+
   const colorMap: Record<string, string> = {
     blue: "bg-blue-500/20",
     green: "bg-green-500/20",
@@ -117,7 +124,7 @@ const getEventBackgroundColor = (color: any) => {
     lime: "bg-lime-500/20",
     sky: "bg-sky-500/20",
   };
-  
+
   return colorMap[color] || "bg-primary/20";
 };
 
@@ -559,7 +566,7 @@ export default function Home() {
                 size="lg"
                 className="rounded-full text-lg uppercase bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 px-7 py-3 font-semibold tracking-wide transition-colors"
               >
-                <Link href={authUser ? "/projects/new" : "/auth/signup"}>
+                <Link href={authUser ? "/projects" : "/auth/signup"}>
                   {authUser ? "Explore Projects" : "Sign Up"}
                 </Link>
               </Button>
@@ -694,17 +701,11 @@ export default function Home() {
           whileInView="visible"
           viewport={{ once: true, amount: 0.3 }}
           variants={scaleIn}
-          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
+          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden dark:bg-zinc-900"
         >
           <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
             {/* ── TEXT COLUMN ─────────────────────────────────────── */}
-            <div
-              className="
-                flex-1
-                grid grid-rows-[auto_1fr_auto]  
-                text-center lg:text-left
-              "
-            >
+            <div className="flex-1 grid grid-rows-[auto_1fr_auto] text-center lg:text-left">
               {/* row-1 : title (stays top-left) */}
               <motion.h2
                 variants={fadeIn}
@@ -716,87 +717,103 @@ export default function Home() {
               </motion.h2>
 
               {/* row-3 : subtitle + copy (sticks bottom-right) */}
-              <div
-                className="
-                  row-start-3
-                  place-self-center
-                  lg:place-self-end  
-                  text-center lg:text-right
-                  max-w-2xl mx-auto lg:mx-0 
-                  space-y-4
-                "
-              >
-                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
-                  Event Name, Host, Location, Speaker
-                </h3>
+              <div className="row-start-3 place-self-center lg:place-self-start text-center lg:text-left max-w-2xl mx-auto lg:mx-0 space-y-4">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap justify-center lg:justify-start gap-2 mb-3">
+                    <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-1">
+                      <Atom className="w-3 h-3 mr-1" />
+                      Active Project
+                    </Badge>
+                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs px-2 py-1">
+                      <Zap className="w-3 h-3 mr-1" />
+                      Actively Recruiting
+                    </Badge>
+                  </div>
 
-                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
-                  Lorem Ipsum is simply dummy text of the printing and
-                  typesetting industry. Lorem Ipsum has been the industry
-                  standard dummy text ever since the 1500s, when an unknown
-                  printer took a galley of type and scrambled it to make a type
-                  specimen book. It has survived not only five centuries, but
-                  also the leap into electronic typesetting, remaining
-                  essentially unchanged. It was popularised in the 1960s with
-                  the release of Letraset sheets containing Lorem Ipsum
-                  passages, and more recently with desktop publishing software
-                  like Aldus PageMaker including versions of Lorem Ipsum
+                  <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
+                    PETRA: Plasma Metallurgy Revolution
+                  </h3>
+
+                  <div className="flex flex-wrap justify-center lg:justify-start gap-4 text-sm text-gray-600 dark:text-zinc-400 mb-4">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>Jan 2025 - May 2026</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      <span>Flexible Location</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-4 h-4" />
+                      <span>175 views</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mx-auto lg:mr-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
+                  PETRA aims to revolutionize titanium production by replacing
+                  the outdated Kroll Process with a cleaner, faster, and more
+                  scalable microwave plasma-based method. Our goal is to design
+                  a fully custom system that enables continuous metal oxide
+                  reduction through high-temperature plasma, dramatically
+                  lowering environmental impact and cost.
                 </p>
+
+                <div className="space-y-2 text-left">
+                  <h4 className="font-medium text-gray-800 dark:text-zinc-200 text-sm">
+                    Key Focus Areas:
+                  </h4>
+                  <ul className="text-sm text-gray-600 dark:text-zinc-400 space-y-1">
+                    <li>• Custom microwave plasma torch for TiO₂ reduction</li>
+                    <li>• Full-system CFD simulations and optimization</li>
+                    <li>• High-performance materials for extreme conditions</li>
+                    <li>
+                      • Impact across aerospace, medical, and clean-tech sectors
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="flex flex-wrap justify-center lg:justify-start gap-1 mt-4">
+                  {[
+                    "Aerospace",
+                    "Material Science",
+                    "Metallurgy",
+                    "CFD",
+                    "CAD",
+                    "Research",
+                  ].map((skill, idx) => (
+                    <Badge
+                      key={idx}
+                      variant="outline"
+                      className="text-xs px-2 py-0.5 bg-white/50 dark:bg-zinc-800/50"
+                    >
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
+
             {/* ── IMAGE COLUMN ────────────────────────────────────── */}
-            <div
-              className="
-              flex-shrink-0
-              flex flex-col
-              md:flex-row md:justify-center
-              lg:flex-col lg:justify-start
-              gap-4
-              w-full lg:w-80
-            "
-            >
-              {/* square #1 */}
-              <div
-                className="
-                  aspect-square
-                  h-48 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
+            <div className="flex-shrink-0 flex flex-col md:flex-row md:justify-center lg:flex-col lg:justify-start gap-4 w-full lg:w-80">
+              {/* Image placeholder 1 - Plasma torch visualization */}
+              <div className="aspect-square h-48 md:h-60 rounded-lg overflow-hidden shadow-sm">
+                <img
+                  src="/images/PETRA_First_Ignition.png"
+                  alt="PETRA First Ignition - Laboratory setup showing plasma torch with bright purple plasma flame"
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
-              {/* square #2 */}
-              <div
-                className="
-                  aspect-square
-                  h-64 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
+              {/* Image placeholder 2 - Titanium production process */}
+              <div className="aspect-square h-64 md:h-60 rounded-lg overflow-hidden shadow-sm bg-gray-50 dark:bg-zinc-800 flex items-center justify-center p-4">
+                <img
+                  src="/images/PETRA_Reaction_Chamber.png"
+                  alt="PETRA Reaction Chamber - 3D technical rendering of plasma torch component"
+                  className="w-full h-full object-contain"
+                />
+              </div>
             </div>
-
-            {/* <Image
-              src=""
-              alt="Project highlight preview 1"
-              width={640}
-              height={640}
-              priority
-              className="
-                aspect-square h-48 md:h-64 w-full
-                object-cover       
-                rounded-lg shadow-sm
-              "
-            />
-            <Image
-              src=""
-              alt="Project highlight preview 2"
-              width={640}
-              height={640}
-              className="
-                aspect-square h-64 md:h-64 w-full
-                object-cover
-                rounded-lg shadow-sm
-              "
-            /> */}
           </div>
         </motion.section>
 
@@ -880,7 +897,10 @@ export default function Home() {
                             {/* prev / today / next controls */}
                             <div className="flex gap-1">
                               <CalendarPrevTrigger className="p-1 sm:p-2">
-                                <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
+                                <ChevronLeft
+                                  size={14}
+                                  className="sm:w-4 sm:h-4"
+                                />
                                 <span className="sr-only">Previous</span>
                               </CalendarPrevTrigger>
 
@@ -889,7 +909,10 @@ export default function Home() {
                               </CalendarTodayTrigger>
 
                               <CalendarNextTrigger className="p-1 sm:p-2">
-                                <ChevronRight size={14} className="sm:w-4 sm:h-4" />
+                                <ChevronRight
+                                  size={14}
+                                  className="sm:w-4 sm:h-4"
+                                />
                                 <span className="sr-only">Next</span>
                               </CalendarNextTrigger>
                             </div>
@@ -909,118 +932,6 @@ export default function Home() {
                 </Card>
               </motion.div>
             </div>
-          </div>
-        </motion.section>
-
-        {/* Event Highlights section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.3 }}
-          variants={slideRight}
-          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
-        >
-          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
-            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
-            <div
-              className="
-                flex-1
-                grid grid-rows-[auto_1fr_auto]  
-                text-center lg:text-left
-              "
-            >
-              {/* row-1 : title (stays top-left) */}
-              <motion.h2
-                variants={scaleIn}
-                initial="hidden"
-                whileInView="visible"
-                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
-              >
-                Event Highlight
-              </motion.h2>
-
-              {/* row-3 : subtitle + copy (sticks bottom-right) */}
-              <div
-                className="
-                  row-start-3
-                  place-self-center
-                  lg:place-self-end  
-                  text-center lg:text-right
-                  max-w-2xl mx-auto lg:mx-0 
-                  space-y-4
-                "
-              >
-                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
-                  Event Name, Host, Location, Speaker
-                </h3>
-
-                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
-                  Lorem Ipsum is simply dummy text of the printing and
-                  typesetting industry. Lorem Ipsum has been the industry
-                  standard dummy text ever since the 1500s, when an unknown
-                  printer took a galley of type and scrambled it to make a type
-                  specimen book. It has survived not only five centuries, but
-                  also the leap into electronic typesetting, remaining
-                  essentially unchanged. It was popularised in the 1960s with
-                  the release of Letraset sheets containing Lorem Ipsum
-                  passages, and more recently with desktop publishing software
-                  like Aldus PageMaker including versions of Lorem Ipsum
-                </p>
-              </div>
-            </div>
-            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
-            <div
-              className="
-              flex-shrink-0
-              flex flex-col
-              md:flex-row md:justify-center
-              lg:flex-col lg:justify-start
-              gap-4
-              w-full lg:w-80
-            "
-            >
-              {/* square #1 */}
-              <div
-                className="
-                  aspect-square
-                  h-48 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
-
-              {/* square #2 */}
-              <div
-                className="
-                  aspect-square
-                  h-64 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
-            </div>
-
-            {/* <Image
-              src=""
-              alt="Project highlight preview 1"
-              width={640}
-              height={640}
-              priority
-              className="
-                aspect-square h-48 md:h-64 w-full
-                object-cover       
-                rounded-lg shadow-sm
-              "
-            />
-            <Image
-              src=""
-              alt="Project highlight preview 2"
-              width={640}
-              height={640}
-              className="
-                aspect-square h-64 md:h-64 w-full
-                object-cover
-                rounded-lg shadow-sm
-              "
-            /> */}
           </div>
         </motion.section>
 

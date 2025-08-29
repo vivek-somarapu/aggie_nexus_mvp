@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Image from "next/image";
 import Link from "next/link";
 import { SquarePoster } from "@/components/ui/SquarePoster";
-
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -140,6 +140,7 @@ export default function CalendarPage() {
   );
   const effectiveView = isDesktop ? view : "list";
   const allEvents = events;
+  const [includeOld, setIncludeOld] = useState(false);
 
   const cutoff = startOfDay(subDays(new Date(), 1));
 
@@ -179,20 +180,22 @@ export default function CalendarPage() {
   }, [profile]); // Only re-fetch when user state changes
 
   // Filter events based on category and industry
-  const filteredEvents = allEvents.filter(
-    (event) => {
-      const categoryMatch = categoryFilter === "all" ||
-        (event.event_type || event.color) === categoryFilter;
-      
-      const industryMatch = industryFilter === "all" ||
-        (event.industry && event.industry.includes(industryFilter));
-      
-      return categoryMatch && industryMatch;
-    }
-  );
+  const filteredEvents = allEvents.filter((event) => {
+    const categoryMatch =
+      categoryFilter === "all" ||
+      (event.event_type || event.color) === categoryFilter;
+
+    const industryMatch =
+      industryFilter === "all" ||
+      (event.industry && event.industry.includes(industryFilter));
+
+    return categoryMatch && industryMatch;
+  });
+
   const upcomingOrRecent = filteredEvents.filter(
     (ev) => new Date(ev.start) >= cutoff
   );
+  const listEvents = includeOld ? filteredEvents : upcomingOrRecent;
 
   // Map of event IDs to consistent colors (so same event always has same color)
   const eventColorMap = useMemo(() => {
@@ -271,18 +274,16 @@ export default function CalendarPage() {
   };
 
   const groupedEvents = useMemo(() => {
-    const sorted = [...upcomingOrRecent].sort(
+    const sorted = [...listEvents].sort(
       (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
     );
-
     const map = new Map<string, Event[]>();
     sorted.forEach((ev) => {
       const key = dayLabel(parseISO(ev.start));
       map.set(key, [...(map.get(key) ?? []), ev]);
     });
-
     return Array.from(map.entries());
-  }, [upcomingOrRecent]);
+  }, [listEvents]);
 
   return (
     <>
@@ -368,6 +369,16 @@ export default function CalendarPage() {
                   <Plus className="h-4 w-4 mr-1" /> Add Event
                 </Button>
               )}
+
+              {/* {isDesktop && effectiveView === "list" && (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={includeOld}
+                    onCheckedChange={setIncludeOld}
+                  />
+                  <span className="text-sm">Old events</span>
+                </div>
+              )} */}
             </div>
 
             {/* Mobile: compact header with Add & Filter */}
@@ -415,10 +426,7 @@ export default function CalendarPage() {
               >
                 Industry
               </Label>
-              <Select
-                value={industryFilter}
-                onValueChange={setIndustryFilter}
-              >
+              <Select value={industryFilter} onValueChange={setIndustryFilter}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="All Industries" />
                 </SelectTrigger>
@@ -441,10 +449,7 @@ export default function CalendarPage() {
               >
                 Event Type
               </Label>
-              <Select
-                value={categoryFilter}
-                onValueChange={setCategoryFilter}
-              >
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="All Events" />
                 </SelectTrigger>
@@ -457,6 +462,16 @@ export default function CalendarPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm py-2 font-medium">Old events</Label>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-sm text-muted-foreground">
+                  Show past events
+                </span>
+                <Switch checked={includeOld} onCheckedChange={setIncludeOld} />
+              </div>
             </div>
           </div>
         </motion.div>
@@ -520,7 +535,7 @@ export default function CalendarPage() {
                     className="flex-1 flex flex-col"
                   >
                     <Calendar
-                      key={categoryFilter} 
+                      key={categoryFilter}
                       events={calendarEvents}
                       /** keep the calendar locked to “month” view */
                       view="month"
@@ -574,11 +589,11 @@ export default function CalendarPage() {
                   >
                     <div className="min-h-0">
                       <CardContent className="px-0 md:px-6 space-y-8 pb-8">
-                        {filteredEvents.length === 0 ? (
+                        {listEvents.length === 0 ? (
                           <div className="text-center py-12">
                             <CalendarIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
                             <p className="text-muted-foreground">
-                              No events found.
+                              No events so far
                             </p>
                           </div>
                         ) : (
@@ -587,8 +602,8 @@ export default function CalendarPage() {
                             <span
                               aria-hidden
                               className="pointer-events-none absolute left-2 sm:left-5 top-1 bottom-0
-                                border-l border-dashed border-muted-foreground/30
-                                dark:border-muted-foreground/40"
+              border-l border-dashed border-muted-foreground/30
+              dark:border-muted-foreground/40"
                             />
 
                             {/* all the dated sections */}
@@ -600,12 +615,12 @@ export default function CalendarPage() {
                                 {/* Timeline dot */}
                                 <div
                                   className="absolute left-2 sm:left-5 top-1 -translate-x-1/2
-                                    w-3 h-3 bg-gray-500 dark:bg-gray-400
-                                    rounded-full border-2 border-white dark:border-gray-900
-                                    shadow-lg z-10"
+                  w-3 h-3 bg-gray-500 dark:bg-zinc-400
+                  rounded-full border-2 border-white dark:border-zinc-900
+                  shadow-lg z-10"
                                 />
                                 {/* date heading */}
-                                <h3 className="sm:pl-10 pl-7 text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                                <h3 className="sm:pl-10 pl-7 text-sm font-semibold text-slate-600 dark:text-zinc-300 uppercase tracking-wider">
                                   {label}
                                 </h3>
 
@@ -619,10 +634,8 @@ export default function CalendarPage() {
                                       transition={{ delay: index * 0.1 }}
                                       onClick={() => {
                                         if (isDesktop) {
-                                          // desktop: open the Dialog
                                           handleEventClick({ id: e.id } as any);
                                         } else {
-                                          // mobile: go straight to /calendar/[id]
                                           router.push(`/calendar/${e.id}`);
                                         }
                                       }}
@@ -631,27 +644,27 @@ export default function CalendarPage() {
                                       {/* Event card */}
                                       <div
                                         className="sm:ml-10 ml-6 my-5
-                                          bg-white/80 dark:bg-slate-800/70 backdrop-blur
-                                          rounded-xl border border-slate-200 dark:border-slate-700
-                                          transition-all duration-200
-                                          group-hover:ring-2 group-hover:ring-gray-300 dark:group-hover:ring-gray-600"
+                        bg-white/80 dark:bg-zinc-800/70 backdrop-blur
+                        rounded-xl border border-slate-200 dark:border-zinc-700
+                        transition-all duration-200
+                        group-hover:ring-2 group-hover:ring-gray-300 dark:group-hover:ring-zinc-600"
                                       >
                                         <div className="flex items-start gap-6 p-6">
                                           <div className="flex-1 min-w-0">
                                             {/* Time badge */}
-                                            <div className="inline-flex items-center text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                                            <div className="inline-flex items-center text-xs sm:text-sm font-medium text-gray-500 dark:text-zinc-400 mb-3">
                                               {format(e.start, "h:mm a")} -{" "}
                                               {format(e.end, "h:mm a")} •{" "}
                                               {format(e.end, "MMM d")}
                                             </div>
 
                                             {/* Title */}
-                                            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                                            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-zinc-100 mb-3">
                                               {e.title}
                                             </h3>
 
                                             {/* Location */}
-                                            <div className="flex items-center gap-2 text-xs sm:text-sm dark:text-slate-300 text-slate-600">
+                                            <div className="flex items-center gap-2 text-xs sm:text-sm dark:text-zinc-300 text-slate-600">
                                               {/^(https?:\/\/)/i.test(
                                                 e.location
                                               ) ? (
@@ -672,7 +685,7 @@ export default function CalendarPage() {
                                             </div>
 
                                             {/* Description */}
-                                            <p className="text-xs sm:text-sm text-gray-500 mt-2 dark:text-gray-400 line-clamp-2">
+                                            <p className="text-xs sm:text-sm text-gray-500 mt-2 dark:text-zinc-400 line-clamp-2">
                                               {e.description}
                                             </p>
                                           </div>
@@ -684,7 +697,7 @@ export default function CalendarPage() {
                                                 <SquarePoster
                                                   src={e.poster_url}
                                                   alt={`${e.title} poster`}
-                                                  className="sm:w-36 sm:h-36 w-28 h-28 ring-2 ring-white dark:ring-gray-900 shadow-lg"
+                                                  className="sm:w-36 sm:h-36 w-28 h-28 ring-2 ring-white dark:ring-zinc-900 shadow-lg"
                                                 />
                                               </div>
                                             </div>
@@ -711,7 +724,8 @@ export default function CalendarPage() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent
             className="w-full max-h-[100dvh] p-0 overflow-hidden overflow-y-auto scrollbar-hidden 
-            sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:bg-slate-900/80"
+               sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg
+               dark:bg-zinc-900/80 dark:text-zinc-100 dark:border dark:border-zinc-700"
           >
             <motion.div
               variants={dialogVariants}
@@ -732,7 +746,7 @@ export default function CalendarPage() {
                       />
                     )}
                     <div className="pb-2">
-                      <DialogTitle className="text-2xl font-bold dark:text-slate-100">
+                      <DialogTitle className="text-2xl font-bold dark:text-zinc-100">
                         {selectedEvent.title}
                       </DialogTitle>
                       <div className="flex items-center gap-2 pt-2 group">
@@ -748,7 +762,8 @@ export default function CalendarPage() {
                               stiffness: 400,
                               damping: 10,
                             }}
-                            className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border flex items-center justify-center transition-transform duration-200"
+                            className="h-8 w-8 relative rounded-full border overflow-hidden bg-muted border-border
+                               flex items-center justify-center transition-transform duration-200"
                           >
                             {!selectedEvent.creator ? (
                               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -785,21 +800,20 @@ export default function CalendarPage() {
                     <div className="space-y-3">
                       <div className="flex items-center gap-4 flex-wrap">
                         {/* Calendar Icon */}
-
                         <div
                           className="w-10 h-10 rounded-sm border bg-background text-center
-                            overflow-hidden shadow-sm shrink-0"
+                                overflow-hidden shadow-sm shrink-0"
                         >
-                          <div className="bg-muted text-[10px] dark:text-slate-100 font-medium py-[3px] leading-none">
+                          <div className="bg-muted text-[10px] font-medium py-[3px] leading-none dark:text-zinc-100">
                             {format(selectedEvent.start, "MMM").toUpperCase()}
                           </div>
-                          <div className="text-[15px] dark:text-slate-100 font-extrabold text-foreground leading-none pt-[3px]">
+                          <div className="text-[15px] font-extrabold text-foreground leading-none pt-[3px] dark:text-zinc-100">
                             {format(selectedEvent.start, "d")}
                           </div>
                         </div>
 
                         {/* Date & Time */}
-                        <div className="text-sm dark:text-slate-100">
+                        <div className="text-sm dark:text-zinc-100">
                           <p className="font-semibold text-[14px]">
                             {format(selectedEvent.start, "EEEE, MMMM d")}
                           </p>
@@ -810,12 +824,12 @@ export default function CalendarPage() {
                         </div>
 
                         {/* Divider */}
-                        <div className="w-px h-6 bg-border" />
+                        <div className="w-px h-6 bg-border dark:bg-zinc-700" />
 
                         {/* Location Info */}
                         {selectedEvent.location && (
-                          <div className="flex items-center gap-2 text-sm dark:text-slate-100">
-                            <div className="w-10 h-10 border rounded-md bg-background flex items-center justify-center">
+                          <div className="flex items-center gap-2 text-sm dark:text-zinc-100">
+                            <div className="w-10 h-10 border rounded-md bg-background flex items-center justify-center dark:border-zinc-700">
                               <MapPin className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
@@ -838,13 +852,13 @@ export default function CalendarPage() {
 
                   {/* Join Event Card */}
                   <Card
-                    className="border border-primary/20 dark:border-primary/40 dark:text-slate-100
-                      bg-primary/5 dark:bg-primary/10 p-4 space-y-4"
+                    className="border border-primary/20 bg-primary/5 p-4 space-y-4
+                       dark:border-primary/40 dark:bg-primary/10 dark:text-zinc-100"
                   >
                     {new Date(selectedEvent.end) < new Date() ? (
-                      // Past Event Notice
+                      /* Past Event Notice */
                       <div className="text-center text-sm text-muted-foreground space-y-1">
-                        <h3 className="font-semibold text-base text-gray-800">
+                        <h3 className="font-semibold text-base text-gray-800 dark:text-zinc-200">
                           Past Event
                         </h3>
                         <p>
@@ -859,7 +873,7 @@ export default function CalendarPage() {
                         </p>
                       </div>
                     ) : rsvpSuccess ? (
-                      // RSVP Success
+                      /* RSVP Success */
                       <div className="text-center py-2">
                         <div className="mb-2 mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
                           <Check className="h-5 w-5 text-green-600" />
@@ -872,7 +886,7 @@ export default function CalendarPage() {
                         </p>
                       </div>
                     ) : profile ? (
-                      // Logged-in RSVP
+                      /* Logged-in RSVP */
                       <div className="space-y-3 text-sm">
                         <div className="flex items-center gap-2 text-foreground">
                           <span className="font-semibold">
@@ -888,10 +902,7 @@ export default function CalendarPage() {
                           placeholder="Notes (optional)"
                           value={rsvpData.notes}
                           onChange={(e) =>
-                            setRsvpData({
-                              ...rsvpData,
-                              notes: e.target.value,
-                            })
+                            setRsvpData({ ...rsvpData, notes: e.target.value })
                           }
                           rows={2}
                           className="text-sm"
@@ -912,9 +923,9 @@ export default function CalendarPage() {
                         </Button>
                       </div>
                     ) : (
-                      // Guest RSVP
+                      /* Guest RSVP */
                       <div className="space-y-3 text-sm">
-                        <p className="font-medium text-gray-800">
+                        <p className="font-medium text-gray-800 dark:text-zinc-200">
                           Welcome! To join the event, please register below.
                         </p>
                         <div className="grid grid-cols-2 gap-3">
@@ -976,7 +987,6 @@ export default function CalendarPage() {
                   </Card>
 
                   {/* About Event */}
-
                   {selectedEvent.description?.trim() && (
                     <div className="space-y-3">
                       <h3 className="text-sm font-semibold text-muted-foreground">
@@ -984,7 +994,7 @@ export default function CalendarPage() {
                       </h3>
                       <Separator />
                       <div className="rounded-md px-4 py-2">
-                        <p className="text-sm leading-relaxed dark:text-slate-200">
+                        <p className="text-sm leading-relaxed dark:text-zinc-200">
                           {selectedEvent.description.trimStart()}
                         </p>
                       </div>

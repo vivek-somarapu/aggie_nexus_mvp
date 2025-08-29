@@ -47,7 +47,12 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { pageVariants, calendarVariants, categories, industryOptions } from "@/lib/constants";
+import {
+  pageVariants,
+  calendarVariants,
+  categories,
+  industryOptions,
+} from "@/lib/constants";
 import {
   Select,
   SelectTrigger,
@@ -114,7 +119,19 @@ const schema = z
         0,
         0
       );
-      return start >= new Date();
+      
+      // Get current date/time, but only compare dates for same-day events
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const eventDate = new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate());
+      
+      // If event is today, check if time has passed
+      if (eventDate.getTime() === today.getTime()) {
+        return start >= now;
+      }
+      
+      // If event is in the future, allow it
+      return eventDate >= today;
     },
     {
       message: "Cannot schedule an event in the past",
@@ -358,8 +375,8 @@ export default function NewEventPage() {
 
         <Card
           className="border-0 shadow-none md:border md:shadow-lg
-            bg-card/80  sm:dark:bg-slate-900/80
-            md:border-slate-200 dark:md:border-slate-700
+            bg-card/80 dark:bg-zinc-900
+            md:border-slate-200 dark:md:border-zinc-800
             backdrop-blur-sm"
         >
           <CardContent className="p-0 md:px-6 md:py-3 space-y-4">
@@ -388,7 +405,7 @@ export default function NewEventPage() {
                               {...field}
                               placeholder="Enter your event title..."
                               className={cn(
-                                "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                "h-10 dark:text-slate-200",
                                 !field.value?.trim() &&
                                   "border-red-300 focus:border-red-500"
                               )}
@@ -435,8 +452,9 @@ export default function NewEventPage() {
                             <FormControl>
                               <SelectTrigger
                                 className={cn(
-                                  "h-10 dark:bg-slate-900/80 dark:text-slate-200",
-                                  !field.value && "border-red-300 focus:border-red-500"
+                                  "h-10 dark:text-slate-200",
+                                  !field.value &&
+                                    "border-red-300 focus:border-red-500"
                                 )}
                               >
                                 <SelectValue placeholder="Select an industry..." />
@@ -444,10 +462,7 @@ export default function NewEventPage() {
                             </FormControl>
                             <SelectContent>
                               {industryOptions.map((industry) => (
-                                <SelectItem
-                                  key={industry}
-                                  value={industry}
-                                >
+                                <SelectItem key={industry} value={industry}>
                                   {industry}
                                 </SelectItem>
                               ))}
@@ -467,7 +482,8 @@ export default function NewEventPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Event Category <span className="text-red-500">*</span>
+                            Event Category{" "}
+                            <span className="text-red-500">*</span>
                           </FormLabel>
                           <Select
                             value={field.value}
@@ -476,8 +492,9 @@ export default function NewEventPage() {
                             <FormControl>
                               <SelectTrigger
                                 className={cn(
-                                  "h-10 dark:bg-slate-900/80 dark:text-slate-200",
-                                  !field.value && "border-red-300 focus:border-red-500"
+                                  "h-10 dark:text-slate-200",
+                                  !field.value &&
+                                    "border-red-300 focus:border-red-500"
                                 )}
                               >
                                 <SelectValue placeholder="Select a category..." />
@@ -485,10 +502,7 @@ export default function NewEventPage() {
                             </FormControl>
                             <SelectContent>
                               {eventTypes.map((t) => (
-                                <SelectItem
-                                  key={t.value}
-                                  value={t.value}
-                                >
+                                <SelectItem key={t.value} value={t.value}>
                                   {t.label}
                                 </SelectItem>
                               ))}
@@ -518,9 +532,10 @@ export default function NewEventPage() {
                             ) : (
                               <MapPin className="h-4 w-4 text-green-600" />
                             )}
-                            <span className="font-medium text-sm whitespace-nowrap text-slate-700 dark:text-slate-200">
+                            <span className="font-medium text-sm text-slate-700 dark:text-slate-200 inline-block w-20 text-center">
                               {field.value ? "Online" : "In-Person"}
                             </span>
+
                             <FormControl>
                               <Switch
                                 checked={field.value}
@@ -544,7 +559,7 @@ export default function NewEventPage() {
                                   placeholder="https://zoom.us/j/..."
                                   {...field}
                                   className={cn(
-                                    "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                    "h-10 dark:text-slate-200",
                                     isOnline &&
                                       !field.value?.trim() &&
                                       "border-red-300 focus:border-red-500"
@@ -566,7 +581,7 @@ export default function NewEventPage() {
                                   placeholder="123 Main St, City, State"
                                   {...field}
                                   className={cn(
-                                    "h-10 dark:bg-slate-900/80 dark:text-slate-200",
+                                    "h-10 dark:text-slate-200",
                                     !isOnline &&
                                       !field.value?.trim() &&
                                       "border-red-300 focus:border-red-500"
@@ -639,20 +654,21 @@ export default function NewEventPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1 h-10 dark:bg-slate-800 dark:border-slate-600"
+                    className="flex-1 h-10 dark:bg-zinc-800 dark:border-zinc-800"
                     onClick={() => setShowPreview(true)}
                   >
                     Preview Event Page
                   </Button>
                   <AlertDialog>
                     {/* primary button just OPENS the dialog */}
-                    <AlertDialogTrigger asChild onClick={() => form.trigger()}>
+                    <AlertDialogTrigger asChild>
                       <Button
                         type="button" // no immediate submit
                         className="flex-1 h-10 font-medium bg-gradient-to-r
                           from-primary to-primary/90
                           hover:from-primary/90 hover:to-primary"
                         disabled={submitting}
+
                       >
                         {submitting ? (
                           <>
@@ -666,7 +682,7 @@ export default function NewEventPage() {
                     </AlertDialogTrigger>
 
                     {/* confirmation dialog */}
-                    <AlertDialogContent className="dark:bg-slate-800 dark:border-slate-700">
+                    <AlertDialogContent className="dark:border-zinc-800">
                       <AlertDialogHeader>
                         <AlertDialogTitle>Heads-up!</AlertDialogTitle>
 
@@ -718,7 +734,7 @@ export default function NewEventPage() {
 
                         {/* final "Send anyway" — calls the SAME RHF submit */}
                         <AlertDialogAction
-                          className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+                          className="w-full sm:w-auto bg-green-600 dark:text-white hover:bg-green-700"
                           onClick={() =>
                             form.handleSubmit(async (data) => {
                               await onSubmit(data); // your existing submit fn
@@ -741,7 +757,7 @@ export default function NewEventPage() {
       </div>
       {/* Event Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="w-full max-h-[100dvh] p-0 overflow-hidden scrollbar-hidden overflow-y-auto sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:text-slate-1500 dark:bg-slate-800/70">
+        <DialogContent className="w-full max-h-[100dvh] p-0 overflow-hidden scrollbar-hidden overflow-y-auto sm:max-w-xl sm:max-h-[90vh] sm:rounded-lg dark:text-slate-1500">
           <div className="py-5 px-4">
             <div className="space-y-6">
               {/* Poster preview (only if a file was chosen) */}
@@ -789,21 +805,30 @@ export default function NewEventPage() {
                     {/* Calendar Icon */}
                     {form.watch("date") && (
                       <>
-                        <div className="w-10 h-10 rounded-sm border bg-white text-center overflow-hidden shadow-sm shrink-0">
-                          <div className="bg-gray-100 text-[10px] font-medium text-gray-700 py-[3px] leading-none">
+                        <div
+                          className="w-10 h-10 rounded-sm border bg-white text-center overflow-hidden shadow-sm shrink-0
+                        dark:bg-zinc-900 dark:border-zinc-700"
+                        >
+                          <div
+                            className="bg-gray-100 text-[10px] font-medium text-gray-700 py-[3px] leading-none
+                          dark:bg-zinc-800 dark:text-zinc-300"
+                          >
                             {format(form.watch("date"), "MMM").toUpperCase()}
                           </div>
-                          <div className="text-[15px] font-extrabold text-gray-900 leading-none pt-[3px]">
+                          <div
+                            className="text-[15px] font-extrabold text-gray-900 leading-none pt-[3px]
+                          dark:text-zinc-100"
+                          >
                             {format(form.watch("date"), "d")}
                           </div>
                         </div>
 
                         {/* Date & Time */}
                         <div className="text-sm">
-                          <p className="font-semibold text-[14px]">
+                          <p className="font-semibold text-[14px] dark:text-zinc-100">
                             {format(form.watch("date"), "EEEE, MMMM d")}
                           </p>
-                          <p className="text-muted-foreground">
+                          <p className="text-muted-foreground dark:text-zinc-400/90">
                             {form.watch("start_time") &&
                               form.watch("end_time") && (
                                 <>
@@ -826,26 +851,30 @@ export default function NewEventPage() {
                         </div>
 
                         {/* Divider */}
-                        <div className="w-px h-6 bg-border" />
+                        <div className="w-px h-6 bg-border dark:bg-zinc-700" />
                       </>
                     )}
 
                     {/* Location Info */}
                     <div className="flex items-center gap-2 text-sm">
-                      <div className="w-10 h-10 border rounded-md bg-gray-100 flex items-center justify-center">
+                      <div
+                        className="w-10 h-10 border rounded-md bg-gray-100 flex items-center justify-center
+                      dark:bg-zinc-900 dark:border-zinc-700"
+                      >
                         {isOnline ? (
-                          <LinkIcon className="h-5 w-5 text-blue-600" />
+                          // keep blue in light; neutralize in dark
+                          <LinkIcon className="h-5 w-5 text-blue-600 dark:text-zinc-200" />
                         ) : (
-                          <MapPin className="h-5 w-5 text-gray-500" />
+                          <MapPin className="h-5 w-5 text-gray-500 dark:text-zinc-300" />
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-[14px]">
+                        <p className="font-medium text-[14px] dark:text-zinc-100">
                           {isOnline
                             ? "Online Event"
                             : form.watch("location") || "Venue Address"}
                         </p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-xs dark:text-zinc-400/90">
                           {isOnline ? "Virtual Meeting" : "In-person Event"}
                         </p>
                       </div>
@@ -855,8 +884,8 @@ export default function NewEventPage() {
               </div>
 
               {/* Preview Notice */}
-              <Card className="border border-blue-200 bg-blue-50 p-4">
-                <div className="text-center text-sm text-blue-800">
+              <Card className="border border-blue-200 bg-blue-50 dark:border-zinc-800 dark:bg-zinc-900 p-4">
+                <div className="text-center text-sm text-blue-800 dark:text-slate-200">
                   <h3 className="font-semibold text-base">Event Preview</h3>
                   <p className="mt-1">
                     This is how your event will appear to attendees
