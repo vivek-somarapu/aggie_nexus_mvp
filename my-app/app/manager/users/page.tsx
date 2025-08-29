@@ -49,7 +49,7 @@ const itemVariants = {
 };
 
 export default function UserManagementPage() {
-  const { user, isLoading: authLoading, role } = useAuth();
+  const { authUser, isLoading: authLoading, role } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,11 +75,12 @@ export default function UserManagementPage() {
       
       const supabase = createClient();
       
-      // Fetch all users
+      // Fetch all users that are not the current user
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('deleted', false)
+        .neq('id', authUser?.id) // Exclude current user
         .order('full_name');
       
       if (error) {
@@ -111,7 +112,7 @@ export default function UserManagementPage() {
       
       // Update user role
       const { error } = await supabase
-        .from('profiles')
+        .from('users')
         .update({ role: newRole })
         .eq('id', userId);
       
@@ -151,7 +152,7 @@ export default function UserManagementPage() {
       
       // Delete user from profiles
       const { error } = await supabase
-        .from('profiles')
+        .from('users')
         .delete()
         .eq('id', userId);
       
