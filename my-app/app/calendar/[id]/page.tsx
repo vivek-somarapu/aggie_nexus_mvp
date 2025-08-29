@@ -90,7 +90,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
   const end = parseISO(event.end_time);
 
   return (
-    <main className="min-h-screen bg-background/95 py-8 px-4 dark:bg-slate-900/80">
+    <main className="min-h-screen bg-background/95 py-8 px-4 dark:border-zinc-800">
       <div className="mx-auto max-w-2xl space-y-8">
         {/* heading row */}
         <header className="space-y-1">
@@ -105,7 +105,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
               <span className="hidden xs:inline">Back</span>
             </Button>
 
-            <h1 className="text-3xl mb-2 font-bold tracking-tight dark:text-slate-100">
+            <h1 className="text-3xl mb-2 font-bold tracking-tight dark:text-zinc-100">
               {event.title}
             </h1>
           </div>
@@ -156,12 +156,12 @@ export default function EventPage({ params }: { params: { id: string } }) {
         )}
 
         <section className="space-y-4">
-          <div className="flex flex-wrap items-center gap-4 text-sm dark:text-slate-100">
+          <div className="flex flex-wrap items-center gap-4 text-sm dark:text-zinc-100">
             <div className="flex h-10 w-10 shrink-0 flex-col overflow-hidden rounded-sm border bg-background text-center shadow-sm">
-              <div className="bg-muted py-[3px] text-[10px] font-medium leading-none dark:text-slate-100">
+              <div className="bg-muted py-[3px] text-[10px] font-medium leading-none dark:text-zinc-100">
                 {format(start, "MMM").toUpperCase()}
               </div>
-              <div className="pt-[3px] text-[15px] font-extrabold leading-none text-foreground dark:text-slate-100">
+              <div className="pt-[3px] text-[15px] font-extrabold leading-none text-foreground dark:text-zinc-100">
                 {format(start, "d")}
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
           </div>
         </section>
 
-        <Card className="space-y-4 border border-primary/20 bg-primary/5 p-4 dark:border-primary/40 dark:bg-primary/10 dark:text-slate-100">
+        <Card className="space-y-4 border border-primary/20 bg-primary/5 p-4 dark:border-primary/40 dark:bg-primary/10 dark:text-zinc-100">
           {new Date(event.end_time) < new Date() ? (
             <div className="text-center text-sm text-muted-foreground">
               <h3 className="text-base font-semibold">Past Event</h3>
@@ -250,7 +250,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
             </div>
           ) : (
             <div className="space-y-3 text-sm">
-              <p className="font-medium text-gray-800 dark:text-slate-200">
+              <p className="font-medium text-gray-800 dark:text-zinc-200">
                 Welcome! To join the event, please register below.
               </p>
               <div className="grid grid-cols-2 gap-3">
@@ -307,7 +307,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
             </h2>
             <Separator />
             <div className="rounded-md px-4 py-2">
-              <p className="text-sm leading-relaxed dark:text-slate-200">
+              <p className="text-sm leading-relaxed dark:text-zinc-200">
                 {event.description.trimStart()}
               </p>
             </div>

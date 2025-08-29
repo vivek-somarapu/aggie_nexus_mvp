@@ -156,7 +156,8 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                   className={cn(
                     "h-10 w-full text-left font-normal",
                     !field.value && "text-muted-foreground",
-                    error && "border-red-300 focus:border-red-500"
+                    error && "border-red-300 focus:border-red-500",
+                    "dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -168,7 +169,7 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
             <PopoverContent
               sideOffset={8}
               align="start"
-              className="w-[450px] p-0 dark:bg-slate-900 dark:text-slate-200"
+              className="w-[450px] p-0 dark:bg-zinc-900 dark:text-zinc-200 dark:border dark:border-zinc-700"
             >
               <div className="flex">
                 {/* calendar */}
@@ -183,7 +184,7 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                     ...defaultClassNames,
                     day_button: cn(
                       defaultClassNames.day_button,
-                      "hover:bg-accent"
+                      "hover:bg-accent dark:hover:bg-zinc-800"
                     ),
                   }}
                   components={{ Chevron }}
@@ -194,7 +195,7 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                 />
 
                 {/* divider */}
-                <div className="w-px bg-border" />
+                <div className="w-px bg-border dark:bg-zinc-700" />
 
                 {/* time list */}
                 <div className="w-48 max-h-[336px] overflow-y-auto p-6 no-scrollbar">
@@ -220,8 +221,10 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                           }
                           onClick={() => onTimeClick(time)}
                           className={cn(
-                            "w-full shadow-none",
-                            inRange && rangeClass
+                            "w-full shadow-none border dark:border-zinc-700",
+                            inRange && "dark:bg-zinc-700 dark:text-zinc-100",
+                            (isStart || isEnd) &&
+                              "dark:bg-zinc-700 dark:text-white"
                           )}
                         >
                           {time}
