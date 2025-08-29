@@ -75,10 +75,11 @@ export default function UserManagementPage() {
       
       const supabase = createClient();
       
-      // Fetch all users (profiles)
+      // Fetch all users
       const { data, error } = await supabase
-        .from('profiles')
+        .from('users')
         .select('*')
+        .eq('deleted', false)
         .order('full_name');
       
       if (error) {
@@ -190,7 +191,7 @@ export default function UserManagementPage() {
     
     switch (confirmAction) {
       case "promote":
-        updateUserRole(userToManage.id, "Admin");
+        updateUserRole(userToManage.id, "manager");
         break;
       case "demote":
         updateUserRole(userToManage.id, "user");
