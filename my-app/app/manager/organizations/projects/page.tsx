@@ -5,16 +5,18 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, XCircle, Search, Clock, Calendar, MapPin } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertCircle, CheckCircle, XCircle, Search, Clock, Calendar, MapPin, Info } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { format } from "date-fns";
+import Link from "next/link";
+import Image from "next/image";
 
 // Define Project Organization Claim type for this page
 interface ProjectOrganizationClaim {
@@ -136,10 +138,6 @@ export default function OrganizationProjectManagement() {
     }
   }, [authLoading, role, activeTab]);
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value as "pending" | "approved" | "rejected");
-  };
-
   const handleApproveProject = async (projectId: string) => {
     try {
       setIsProcessing(true);
@@ -204,8 +202,8 @@ export default function OrganizationProjectManagement() {
         .from('project_organization_claims')
         .update({ 
           status: 'rejected',
-          decided_at: new Date().toISOString(),
-          decided_by: authUser?.id
+          decided_by: authUser?.id,
+          decided_at: new Date().toISOString()
         })
         .eq('id', projectId);
       
@@ -220,8 +218,8 @@ export default function OrganizationProjectManagement() {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error("Error rejecting project organization claim:", err);
-      setError("Failed to reject project organization claim. Please try again.");
+      console.error("Error rejecting project:", err);
+      setError("Failed to reject project. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -232,10 +230,6 @@ export default function OrganizationProjectManagement() {
     setConfirmAction(action);
     setConfirmDialogOpen(true);
   };
-
-  const filteredProjects = projectClaims.filter(claim =>
-    claim.project?.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -252,164 +246,176 @@ export default function OrganizationProjectManagement() {
 
   if (authLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-10 w-full" />
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full" />
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-6 w-64" />
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-40 w-full" />
           ))}
         </div>
       </div>
     );
   }
 
-  if (role !== 'admin' && role !== 'manager') {
+  if (role === 'user') {
     return null;
   }
 
   return (
     <motion.div
-      className="container mx-auto p-6 space-y-6"
+      className="container mx-auto max-w-7xl p-4 space-y-6"
       variants={pageVariants}
       initial="hidden"
       animate="visible"
     >
-      {/* Header */}
       <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Project Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Review and approve pending project submissions
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => router.push('/manager/organizations')}>
-            Back to Dashboard
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold tracking-tight">Project Organization Management</h1>
+        <p className="text-muted-foreground">
+          Review, approve, or reject project organization claims
+        </p>
       </motion.div>
 
-      {/* Error Alert */}
       {error && (
         <motion.div variants={itemVariants}>
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         </motion.div>
       )}
 
-      {/* Success Alert */}
       {success && (
         <motion.div variants={itemVariants}>
           <Alert>
             <CheckCircle className="h-4 w-4" />
-            <AlertTitle>Success</AlertTitle>
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         </motion.div>
       )}
 
-      {/* Search */}
       <motion.div variants={itemVariants}>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search projects by title or creator..."
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          {/* 🔎 Search Bar */}
+          <input
+            type="text"
+            placeholder="Search by project title..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="px-3 py-2 text-sm border rounded-md w-full sm:w-64"
           />
         </div>
-      </motion.div>
 
-      {/* Projects Table */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Projects ({filteredProjects.length})</CardTitle>
-            <CardDescription>
-              Projects awaiting approval for your organization
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
-              </div>
-            ) : filteredProjects.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No pending projects found</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProjects.map((claim) => (
-                    <TableRow key={claim.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{claim.project?.title}</div>
-                          <div className="text-sm text-gray-500 truncate max-w-xs">
-                            {claim.project?.description}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Pending
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">
-                            {new Date(claim.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => openConfirmDialog(claim, "approve")}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => openConfirmDialog(claim, "reject")}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "pending" | "approved" | "rejected")}
+        >
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected</TabsTrigger>
+          </TabsList>
+
+          {(["pending", "approved", "rejected"] as const).map((status) => (
+            <TabsContent key={status} value={status}>
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[1, 2].map((i) => (
+                    <Skeleton key={i} className="h-40 w-full" />
                   ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ) : projectClaims.length === 0 ? (
+                <Card>
+                  <CardContent className="py-6 text-center">
+                    <Info className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground">No {status} project claims</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {projectClaims
+                    .filter((claim) =>
+                      claim.project?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((claim) => (
+                      <motion.div
+                        key={claim.id}
+                        variants={itemVariants}
+                        whileHover={{ y: -4 }}
+                      >
+                        <Card>
+                          <CardHeader>
+                            <div className="flex justify-between items-center">
+                              <Badge variant="outline">
+                                Project Claim
+                              </Badge>
+                              {getStatusBadge(claim.status)}
+                            </div>
+                            <CardTitle className="pt-2">{claim.project?.title}</CardTitle>
+                            <CardDescription>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm">
+                                  {new Date(claim.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            {claim.project?.description && (
+                              <p className="text-sm line-clamp-3">
+                                {claim.project.description}
+                              </p>
+                            )}
+                          </CardContent>
+                          {status === "pending" && (
+                            <CardFooter className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => openConfirmDialog(claim, "reject")}
+                                className="flex-1"
+                              >
+                                <XCircle className="mr-1 h-4 w-4" /> Reject
+                              </Button>
+                              <Button
+                                onClick={() => openConfirmDialog(claim, "approve")}
+                                className="flex-1"
+                              >
+                                <CheckCircle className="mr-1 h-4 w-4" /> Approve
+                              </Button>
+                            </CardFooter>
+                          )}
+                          {status === "approved" && (
+                            <CardFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setClaimToManage(claim);
+                                  setConfirmDialogOpen(true);
+                                }}
+                              >
+                                View Details
+                              </Button>
+                            </CardFooter>
+                          )}
+                          {status === "rejected" && (
+                            <CardFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => openConfirmDialog(claim, "approve")}
+                              >
+                                Move to Approved
+                              </Button>
+                            </CardFooter>
+                          )}
+                        </Card>
+                      </motion.div>
+                    ))}
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
       </motion.div>
 
       {/* Confirmation Dialog */}
