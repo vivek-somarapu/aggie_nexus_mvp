@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, XCircle, Search, Clock, User, Calendar, Mail, Building2 } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertCircle, CheckCircle, XCircle, Search, Clock, User, Calendar, Mail, Info } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
+import { format } from "date-fns";
+import Link from "next/link";
+import Image from "next/image";
 
 // Define User Affiliation Claim type for this page
 interface UserAffiliationClaim {
@@ -22,9 +25,14 @@ interface UserAffiliationClaim {
   org_id: string;
   status: string;
   created_at: string;
+  decided_by?: string;
+  decided_at?: string;
+  
   user?: {
+    id: string;
     full_name: string;
     email: string;
+    avatar?: string | null;
   };
   organization?: {
     name: string;
@@ -65,32 +73,51 @@ export default function OrganizationUserManagement() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"approve" | "reject">("approve");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending");
 
   // Redirect non-organization managers
   useEffect(() => {
-    if (!authLoading && role !== 'admin' && role !== 'manager') {
+    if (!authLoading && role === 'user') {
       router.push('/');
     }
   }, [authLoading, role, router]);
 
   // Fetch affiliation claims
-  const fetchAffiliationClaims = async () => {
+  const fetchAffiliationClaims = async (status: "pending" | "approved" | "rejected" = "pending") => {
     try {
       setIsLoading(true);
       setError(null);
       
       const supabase = createClient();
       
-      // TODO: Implement organization-specific affiliation claim fetching
-      // For now, fetching all pending claims
+      // First, fetch the organization the user manages
+      const { data: managerData, error: managerError } = await supabase
+        .from('organization_managers')
+        .select('org_id')
+        .eq('user_id', authUser?.id)
+        .single();
+      
+      if (managerError) {
+        throw new Error('You are not authorized to manage any organization');
+      }
+      
+      const orgId = managerData.org_id;
+      
+      // Now fetch user affiliation claims for that organization with the specified status
       const { data, error } = await supabase
         .from('organization_affiliation_claims')
         .select(`
           *,
-          user:users!organization_affiliation_claims_user_id_fkey(full_name, email),
+          user:users!organization_affiliation_claims_user_id_fkey(
+            id,
+            full_name,
+            email,
+            avatar
+          ),
           organization:organizations!organization_affiliation_claims_org_id_fkey(name)
         `)
-        .eq('status', 'pending')
+        .eq('status', status)
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -106,60 +133,94 @@ export default function OrganizationUserManagement() {
     }
   };
 
-  // Fetch claims when component mounts
+  // Fetch claims when component mounts or tab changes
   useEffect(() => {
-    if (!authLoading && (role === 'admin' || role === 'manager')) {
-      fetchAffiliationClaims();
+    if (!authLoading && role !== 'user') {
+      fetchAffiliationClaims(activeTab);
     }
-  }, [authLoading, role]);
+  }, [authLoading, role, activeTab]);
 
-  const handleApproveClaim = async (claimId: string) => {
+  const handleApproveUser = async (claimId: string) => {
     try {
       setIsProcessing(true);
       setError(null);
       
       const supabase = createClient();
-      
+
+      // First, update the affiliation claim to approved
       const { error } = await supabase
         .from('organization_affiliation_claims')
         .update({ 
           status: 'approved',
-          approved_by: authUser?.id,
-          approved_at: new Date().toISOString()
+          decided_by: authUser?.id,
+          decided_at: new Date().toISOString()
         })
         .eq('id', claimId);
       
       if (error) {
         throw error;
       }
+
+      // Then, add the user to the organization_members table (if not already a member)
+      const claim = affiliationClaims.find(c => c.id === claimId);
+      if (claim) {
+        // Check if user is already a member
+        const { data: existingMember, error: checkError } = await supabase
+          .from('organization_members')
+          .select('org_id, user_id')
+          .eq('org_id', claim.org_id)
+          .eq('user_id', claim.user_id)
+          .single();
+        
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+          throw checkError;
+        }
+        
+        // Only insert if user is not already a member
+        if (!existingMember) {
+          const { error: memberError } = await supabase
+            .from('organization_members')
+            .insert({
+              org_id: claim.org_id,
+              user_id: claim.user_id,
+              verified_by: authUser?.id,
+              verified_at: new Date().toISOString()
+            });
+          
+          if (memberError) {
+            throw memberError;
+          }
+        }
+      }
       
-      setSuccess("Affiliation claim approved successfully!");
+      setSuccess("User affiliation claim approved successfully!");
       setAffiliationClaims(affiliationClaims.filter(c => c.id !== claimId));
       setConfirmDialogOpen(false);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error("Error approving affiliation claim:", err);
-      setError("Failed to approve affiliation claim. Please try again.");
+      console.error("Error approving user:", err);
+      setError("Failed to approve user. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleRejectClaim = async (claimId: string) => {
+  const handleRejectUser = async (claimId: string) => {
     try {
       setIsProcessing(true);
       setError(null);
       
       const supabase = createClient();
       
+      // Update the affiliation claim to rejected
       const { error } = await supabase
         .from('organization_affiliation_claims')
         .update({ 
           status: 'rejected',
-          approved_by: authUser?.id,
-          approved_at: new Date().toISOString()
+          decided_by: authUser?.id,
+          decided_at: new Date().toISOString()
         })
         .eq('id', claimId);
       
@@ -167,15 +228,15 @@ export default function OrganizationUserManagement() {
         throw error;
       }
       
-      setSuccess("Affiliation claim rejected successfully!");
+      setSuccess("User affiliation claim rejected successfully!");
       setAffiliationClaims(affiliationClaims.filter(c => c.id !== claimId));
       setConfirmDialogOpen(false);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error("Error rejecting affiliation claim:", err);
-      setError("Failed to reject affiliation claim. Please try again.");
+      console.error("Error rejecting user:", err);
+      setError("Failed to reject user. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -187,180 +248,199 @@ export default function OrganizationUserManagement() {
     setConfirmDialogOpen(true);
   };
 
-  const filteredClaims = affiliationClaims.filter(claim =>
-    claim.user?.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    claim.user?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    claim.organization?.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'approved':
+        return <Badge variant="default" className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
 
   if (authLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-10 w-full" />
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full" />
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-6 w-64" />
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-40 w-full" />
           ))}
         </div>
       </div>
     );
   }
 
-  if (role !== 'admin' && role !== 'manager') {
+  if (role === 'user') {
     return null;
   }
 
   return (
     <motion.div
-      className="container mx-auto p-6 space-y-6"
+      className="container mx-auto max-w-7xl p-4 space-y-6"
       variants={pageVariants}
       initial="hidden"
       animate="visible"
     >
-      {/* Header */}
       <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              User Affiliation Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Review and approve pending user affiliation requests
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => router.push('/manager/organizations')}>
-            Back to Dashboard
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold tracking-tight">User Affiliation Management</h1>
+        <p className="text-muted-foreground">
+          Review, approve, or reject user affiliation claims
+        </p>
       </motion.div>
 
-      {/* Error Alert */}
       {error && (
         <motion.div variants={itemVariants}>
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         </motion.div>
       )}
 
-      {/* Success Alert */}
       {success && (
         <motion.div variants={itemVariants}>
           <Alert>
             <CheckCircle className="h-4 w-4" />
-            <AlertTitle>Success</AlertTitle>
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         </motion.div>
       )}
 
-      {/* Search */}
       <motion.div variants={itemVariants}>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search by user name, email, or organization..."
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          {/* 🔎 Search Bar */}
+          <input
+            type="text"
+            placeholder="Search by user name or email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="px-3 py-2 text-sm border rounded-md w-full sm:w-64"
           />
         </div>
-      </motion.div>
 
-      {/* Affiliation Claims Table */}
-      <motion.div variants={itemVariants}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Affiliation Claims ({filteredClaims.length})</CardTitle>
-            <CardDescription>
-              User requests to be affiliated with your organization
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
-              </div>
-            ) : filteredClaims.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No pending affiliation claims found</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Organization</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Requested</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredClaims.map((claim) => (
-                    <TableRow key={claim.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{claim.user?.full_name || 'Unknown User'}</div>
-                          <div className="flex items-center space-x-2 text-sm text-gray-500">
-                            <Mail className="h-3 w-3" />
-                            <span>{claim.user?.email || 'No email'}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Building2 className="h-4 w-4 text-gray-400" />
-                          <span>{claim.organization?.name || 'Unknown Organization'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Pending
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">
-                            {new Date(claim.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => openConfirmDialog(claim, "approve")}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => openConfirmDialog(claim, "reject")}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "pending" | "approved" | "rejected")}
+        >
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected</TabsTrigger>
+          </TabsList>
+
+          {(["pending", "approved", "rejected"] as const).map((status) => (
+            <TabsContent key={status} value={status}>
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[1, 2].map((i) => (
+                    <Skeleton key={i} className="h-40 w-full" />
                   ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ) : affiliationClaims.length === 0 ? (
+                <Card>
+                  <CardContent className="py-6 text-center">
+                    <Info className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground">No {status} user claims</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {affiliationClaims
+                    .filter((claim) =>
+                      claim.user?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      claim.user?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((claim) => (
+                      <motion.div
+                        key={claim.id}
+                        variants={itemVariants}
+                        whileHover={{ y: -4 }}
+                      >
+                        <Card>
+                          <CardHeader>
+                            <div className="flex justify-between items-center">
+                              <Badge variant="outline">
+                                User Claim
+                              </Badge>
+                              {getStatusBadge(claim.status)}
+                            </div>
+                            <CardTitle className="pt-2">{claim.user?.full_name}</CardTitle>
+                            <CardDescription>
+                              <div className="flex items-center gap-2">
+                                <Mail className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm">{claim.user?.email}</span>
+                              </div>
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm">
+                                Requested: {new Date(claim.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {claim.decided_at && (
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm">
+                                  {claim.status === 'approved' ? 'Approved' : 'Rejected'}: {new Date(claim.decided_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            )}
+                          </CardContent>
+                          {status === "pending" && (
+                            <CardFooter className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                onClick={() => openConfirmDialog(claim, "reject")}
+                                className="flex-1"
+                              >
+                                <XCircle className="mr-1 h-4 w-4" /> Reject
+                              </Button>
+                              <Button
+                                onClick={() => openConfirmDialog(claim, "approve")}
+                                className="flex-1"
+                              >
+                                <CheckCircle className="mr-1 h-4 w-4" /> Approve
+                              </Button>
+                            </CardFooter>
+                          )}
+                          {status === "approved" && (
+                            <CardFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setClaimToManage(claim);
+                                  setConfirmDialogOpen(true);
+                                }}
+                              >
+                                View Details
+                              </Button>
+                            </CardFooter>
+                          )}
+                          {status === "rejected" && (
+                            <CardFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => openConfirmDialog(claim, "approve")}
+                              >
+                                Move to Approved
+                              </Button>
+                            </CardFooter>
+                          )}
+                        </Card>
+                      </motion.div>
+                    ))}
+                </div>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
       </motion.div>
 
       {/* Confirmation Dialog */}
@@ -368,15 +448,13 @@ export default function OrganizationUserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {confirmAction === "approve" ? "Approve Affiliation" : "Reject Affiliation"}
+              {confirmAction === "approve" ? "Approve User" : "Reject User"}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to {confirmAction} the affiliation request from{" "}
-              <strong>{claimToManage?.user?.full_name}</strong> for{" "}
-              <strong>{claimToManage?.organization?.name}</strong>?
+              Are you sure you want to {confirmAction} "{claimToManage?.user?.full_name}"?
               {confirmAction === "approve" 
-                ? " This will grant them affiliation status with your organization."
-                : " This will reject their affiliation request."
+                ? " This will add the user to your organization."
+                : " This will reject the user affiliation claim."
               }
             </DialogDescription>
           </DialogHeader>
@@ -392,9 +470,9 @@ export default function OrganizationUserManagement() {
               onClick={() => {
                 if (claimToManage) {
                   if (confirmAction === "approve") {
-                    handleApproveClaim(claimToManage.id);
+                    handleApproveUser(claimToManage.id);
                   } else {
-                    handleRejectClaim(claimToManage.id);
+                    handleRejectUser(claimToManage.id);
                   }
                 }
               }}
