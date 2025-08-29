@@ -279,9 +279,24 @@ export default function ProjectPage() {
                       {project.recruitment_status}
                     </Badge>
                     {/* Incubator/Accelerator Badges */}
-                    {project.incubator_accelerator && project.incubator_accelerator.length > 0 && (
-                      <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="sm"/>
-                    )}
+                    {project.organizations &&
+                      (() => {
+                        // Filter for only the specific incubator/accelerator programs
+                        const incubatorOrgs = project.organizations.filter(
+                          (org) =>
+                            org === "Aggies Create Incubator" ||
+                            org === "AggieX Accelerator"
+                        );
+                        // Only render the component if any were found
+                        return (
+                          incubatorOrgs.length > 0 && (
+                            <IncubatorAcceleratorBadges
+                              organizations={incubatorOrgs}
+                              size="sm"
+                            />
+                          )
+                        );
+                      })()}
                   </div>
                   <CardTitle className="text-2xl">{project.title}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-2">
@@ -384,27 +399,41 @@ export default function ProjectPage() {
               </div>
 
               {/* Program Affiliations */}
-              {(project.incubator_accelerator && project.incubator_accelerator.length > 0) && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Program Affiliations</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="md"/>
-                  </div>
-                </div>
+              {(project.organizations && project.organizations.length > 0) && (
+                (() => {
+                  const incubatorOrgs = project.organizations.filter(org => 
+                    org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                  );
+                  return incubatorOrgs.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Program Affiliations</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <IncubatorAcceleratorBadges organizations={incubatorOrgs} size="md"/>
+                      </div>
+                    </div>
+                  );
+                })()
               )}
 
               {/* Organization Affiliations */}
               {project.organizations && project.organizations.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Organization Affiliations</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {project.organizations.map((org) => (
-                      <Badge key={org} variant="outline">
-                        {org}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                (() => {
+                  const nonProgramOrgs = project.organizations.filter(org => 
+                    org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+                  );
+                  return nonProgramOrgs.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="font-semibold">Organization Affiliations</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {nonProgramOrgs.map((org) => (
+                          <Badge key={org} variant="outline">
+                            {org}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()
               )}
 
               {/* Funding Information */}

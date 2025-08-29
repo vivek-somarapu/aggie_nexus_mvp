@@ -16,7 +16,19 @@ export async function GET(request: NextRequest) {
     const ownerIdParam = searchParams.get('owner_id');
     
     // Create a query builder
-    let query = supabase.from('projects').select('*').eq('deleted', false);
+            let query = supabase
+          .from('projects')
+          .select(`
+            *,
+            project_organizations(
+              organizations(name)
+            ),
+            project_organization_claims(
+              organizations(name),
+              status
+            )
+          `)
+          .eq('deleted', false);
     
     // Apply filters if provided
     if (searchTerm) {
@@ -66,17 +78,24 @@ export async function GET(request: NextRequest) {
     }
     
     // Process projects to ensure consistent format
-    const processedProjects = (projects || []).map(project => ({
-      ...project,
-      industry: project.industry || [],
-      required_skills: project.required_skills || [],
-      contact_info: project.contact_info || {},
-      funding_received: project.funding_received || 0,
-      incubator_accelerator: project.incubator_accelerator || [],
-      organizations: project.organizations || [],
-      technical_requirements: project.technical_requirements || [],
-      soft_requirements: project.soft_requirements || []
-    }));
+    const processedProjects = (projects || []).map(project => {
+      // Show approved organizations and pending claims separately
+      const approvedOrgs = project.project_organizations?.map((po: { organizations?: { name: string } }) => po.organizations?.name).filter(Boolean) || [];
+      const pendingOrgs = project.project_organization_claims?.filter((claim: { status: string }) => claim.status === 'pending')
+        .map((claim: { organizations?: { name: string } }) => claim.organizations?.name).filter(Boolean) || [];
+
+      return {
+        ...project,
+        industry: project.industry || [],
+        required_skills: project.required_skills || [],
+        contact_info: project.contact_info || {},
+        funding_received: project.funding_received || 0,
+        organizations: approvedOrgs,
+        pending_organizations: pendingOrgs,
+        technical_requirements: project.technical_requirements || [],
+        soft_requirements: project.soft_requirements || []
+      };
+    });
     
     console.log(`Fetched ${processedProjects.length} projects successfully`);
     return NextResponse.json(processedProjects);
@@ -102,9 +121,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate that project is not in both incubator and accelerator
-      if (body.incubator_accelerator && body.incubator_accelerator.length > 0) {
-        const hasIncubator = body.incubator_accelerator.includes('Aggies Create Incubator');
-        const hasAccelerator = body.incubator_accelerator.includes('AggieX Accelerator');
+      if (body.organizations && body.organizations.length > 0) {
+        const hasIncubator = body.organizations.includes('Aggies Create Incubator');
+        const hasAccelerator = body.organizations.includes('AggieX Accelerator');
         
         if (hasIncubator && hasAccelerator) {
           return NextResponse.json(
@@ -160,8 +179,6 @@ export async function POST(request: NextRequest) {
           contact_info: contact_info,
           project_status: projectData.project_status || "Not Started",
           funding_received: projectData.funding_received || 0,
-          incubator_accelerator: projectData.incubator_accelerator || [],
-          organizations: projectData.organizations || [],
           technical_requirements: projectData.technical_requirements || [],
           soft_requirements: projectData.soft_requirements || [],
           views: 0,
@@ -175,7 +192,67 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create project: ' + error.message }, { status: 500 });
       }
       
-      return NextResponse.json(data, { status: 201 });
+      // Handle organization relationships - create claims first
+      if (body.organizations && body.organizations.length > 0) {
+        // Get organization IDs
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .in('name', body.organizations);
+        
+        if (orgData && orgData.length > 0) {
+          // Insert project-organization claims
+          const projectOrgClaims = orgData.map(org => ({
+            project_id: data.id,
+            org_id: org.id,
+            submitted_by: userId,
+            status: 'pending'
+          }));
+          
+          const { error: claimsError } = await supabase
+            .from('project_organization_claims')
+            .insert(projectOrgClaims);
+          
+          if (claimsError) {
+            console.error('Error creating project-organization claims:', claimsError);
+            // Don't fail the entire request, just log the error
+          }
+        }
+      }
+      
+      // Return the project with organizations (both approved and pending)
+      const { data: projectWithOrgs, error: fetchError } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          project_organizations(
+            organizations(name)
+          ),
+          project_organization_claims(
+            organizations(name),
+            status
+          )
+        `)
+        .eq('id', data.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching project with organizations:', fetchError);
+        return NextResponse.json(data, { status: 201 });
+      }
+
+      // Show approved organizations and pending claims separately
+      const approvedOrgs = projectWithOrgs.project_organizations?.map((po: { organizations?: { name: string } }) => po.organizations?.name).filter(Boolean) || [];
+      const pendingOrgs = projectWithOrgs.project_organization_claims?.filter((claim: { status: string }) => claim.status === 'pending')
+        .map((claim: { organizations?: { name: string } }) => claim.organizations?.name).filter(Boolean) || [];
+
+      const processedProject = {
+        ...projectWithOrgs,
+        organizations: approvedOrgs,
+        pending_organizations: pendingOrgs
+      };
+
+      return NextResponse.json(processedProject, { status: 201 });
     } catch (error: any) {
       console.error('Error creating project:', error);
       return NextResponse.json({ error: 'Failed to create project: ' + error.message }, { status: 500 });

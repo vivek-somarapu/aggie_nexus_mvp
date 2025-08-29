@@ -31,8 +31,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
-import { getAvailableProgramsForUser, userOrganizationOptions } from "@/lib/constants";
+
 import React from "react";
+import { createClient } from "@/lib/supabase/client";
 
 // Industry options
 const industryOptions = [
@@ -102,7 +103,7 @@ export default function EditProjectPage({
   // Just access params directly
   const projectId = params.id;
 
-  const { authUser: user, profile, isLoading: authLoading } = useAuth();
+  const { authUser: user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
@@ -110,8 +111,9 @@ export default function EditProjectPage({
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedIncubatorAccelerator, setSelectedIncubatorAccelerator] = useState<string[]>([]);
   const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
+  const [availablePrograms, setAvailablePrograms] = useState<string[]>([]);
+  const [availableOrganizations, setAvailableOrganizations] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>(
     undefined
   );
@@ -183,8 +185,30 @@ export default function EditProjectPage({
         // Initialize selected values
         setSelectedIndustries(projectData.industry || []);
         setSelectedSkills(projectData.required_skills || []);
-        setSelectedIncubatorAccelerator(projectData.incubator_accelerator || []);
         setSelectedOrganizations(projectData.organizations || []);
+
+        // Fetch available programs for user
+        if (user) {
+          const supabase = createClient();
+          const { data: orgMemberships } = await supabase
+            .from('organization_members')
+            .select(`
+              organizations(name)
+            `)
+            .eq('user_id', user.id);
+          
+        const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
+        // Filter to only include special programs (incubator/accelerator)
+        const specialPrograms = userOrgs.filter((org: string) => 
+          org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+        );
+        // Filter to only include regular organizations (non-special programs)
+        const regularOrganizations = userOrgs.filter((org: string) => 
+          org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+        );
+        setAvailablePrograms(specialPrograms);
+        setAvailableOrganizations(regularOrganizations);
+        }
 
         // Initialize date pickers
         if (projectData.estimated_start) {
@@ -328,7 +352,6 @@ export default function EditProjectPage({
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
-        incubator_accelerator: selectedIncubatorAccelerator,
         organizations: selectedOrganizations,
         funding_received: formData.funding_received,
         // Handle empty date strings - convert to undefined for database
@@ -336,7 +359,11 @@ export default function EditProjectPage({
         estimated_end: formData.estimated_end || undefined,
       };
 
-      await projectService.updateProject(projectId, projectData);
+      if (selectedOrganizations.length > 0) {
+        await projectService.updateProjectWithAffiliations(projectId, projectData, selectedOrganizations);
+      } else {
+        await projectService.updateProject(projectId, projectData);
+      }
 
       toast.success("Project updated successfully!");
       router.push(`/projects/${projectId}`);
@@ -589,34 +616,28 @@ export default function EditProjectPage({
               <div className="space-y-2">
                 <TagSelector
                   label="Program Affiliations"
-                  options={getAvailableProgramsForUser(profile?.organizations || [])}
-                  selected={selectedIncubatorAccelerator}
+                  options={availablePrograms}
+                  selected={selectedOrganizations.filter(org => 
+                    org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                  )}
                   onChange={(newPrograms) => {
+                    // Remove existing incubator/accelerator programs
+                    const nonProgramOrgs = selectedOrganizations.filter(org => 
+                      org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+                    );
+                    
                     // Check if adding this program would create a conflict
                     const hasIncubator = newPrograms.includes('Aggies Create Incubator');
                     const hasAccelerator = newPrograms.includes('AggieX Accelerator');
                     
+                    let finalPrograms = newPrograms;
                     if (hasIncubator && hasAccelerator) {
-                      // If both are selected, keep only the most recently added one
-                      const currentHasIncubator = selectedIncubatorAccelerator.includes('Aggies Create Incubator');
-                      const currentHasAccelerator = selectedIncubatorAccelerator.includes('AggieX Accelerator');
-                      
-                      let filteredPrograms;
-                      if (currentHasIncubator && !currentHasAccelerator && hasAccelerator) {
-                        // User just added accelerator, remove incubator
-                        filteredPrograms = newPrograms.filter(program => program !== 'Aggies Create Incubator');
-                      } else if (currentHasAccelerator && !currentHasIncubator && hasIncubator) {
-                        // User just added incubator, remove accelerator
-                        filteredPrograms = newPrograms.filter(program => program !== 'AggieX Accelerator');
-                      } else {
-                        // Fallback: keep the last one in the array
-                        filteredPrograms = [newPrograms[newPrograms.length - 1]];
-                      }
-                      
-                      setSelectedIncubatorAccelerator(filteredPrograms);
-                    } else {
-                      setSelectedIncubatorAccelerator(newPrograms);
+                      // Keep only the most recently added one
+                      finalPrograms = [newPrograms[newPrograms.length - 1]];
                     }
+                    
+                    // Combine non-program orgs with selected programs
+                    setSelectedOrganizations([...nonProgramOrgs, ...finalPrograms]);
                   }}
                   maxTags={5}
                   placeholder="Select special programs your project is part of"
@@ -632,7 +653,7 @@ export default function EditProjectPage({
               <div className="space-y-2">
                 <TagSelector
                   label="Organization Affiliations"
-                  options={userOrganizationOptions}
+                  options={availableOrganizations}
                   selected={selectedOrganizations}
                   onChange={setSelectedOrganizations}
                   maxTags={10}

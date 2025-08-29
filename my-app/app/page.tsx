@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import "keen-slider/keen-slider.min.css";
 import Link from "next/link";
 import Image from "next/image";
-import { format } from "date-fns";
 import {
   Carousel,
   CarouselContent,
@@ -13,15 +12,297 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from "@/components/ui/carousel";
-
+/* ────── Constants ────── */
+import { colorPalette } from "@/lib/constants";
 import Autoplay from "embla-carousel-autoplay";
-import { Users, MapPin, Calendar } from "lucide-react";
+import { SquarePoster } from "@/components/ui/SquarePoster";
+import {
+  Users,
+  MapPin,
+  ChevronRight,
+  ChevronLeft,
+  Calendar as CalendarIcon,
+  Zap,
+  Atom,
+  Recycle,
+} from "lucide-react";
+import { useMediaQuery } from "@uidotdev/usehooks";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
+import { eventService } from "@/lib/services/event-service";
+import {
+  Calendar,
+  CalendarCurrentDate,
+  CalendarTodayTrigger,
+  CalendarPrevTrigger,
+  CalendarNextTrigger,
+  type CalendarEvent as FullCalendarEvent,
+  useCalendar,
+} from "@/components/ui/full-calendar";
+import { cn } from "@/lib/utils";
+import { format, isSameDay, isSameMonth, isToday } from "date-fns";
+import { cva } from "class-variance-authority";
+import clsx from "clsx";
+import { CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+
+// Calendar utilities
+const monthEventVariants = cva("size-2 rounded-full", {
+  variants: {
+    variant: {
+      default: "bg-primary",
+      blue: "bg-blue-500",
+      green: "bg-green-500",
+      yellow: "bg-yellow-500",
+      pink: "bg-pink-500",
+      purple: "bg-purple-500",
+      red: "bg-red-500",
+      orange: "bg-orange-500",
+      indigo: "bg-indigo-500",
+      teal: "bg-teal-500",
+      cyan: "bg-cyan-500",
+      emerald: "bg-emerald-500",
+      rose: "bg-rose-500",
+      amber: "bg-amber-500",
+      lime: "bg-lime-500",
+      sky: "bg-sky-500",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+  },
+});
+
+const getDaysInMonth = (date: Date) => {
+  const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  const startOfWeekForMonth = new Date(startOfMonth);
+  startOfWeekForMonth.setDate(startOfMonth.getDate() - startOfMonth.getDay());
+
+  let currentDate = new Date(startOfWeekForMonth);
+  const calendar = [];
+
+  while (calendar.length < 42) {
+    calendar.push(new Date(currentDate));
+    currentDate = new Date(currentDate);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return calendar;
+};
+
+const generateWeekdays = (locale: any) => {
+  const daysOfWeek = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() - date.getDay() + i);
+    daysOfWeek.push(format(date, "EEEEEE"));
+  }
+  return daysOfWeek;
+};
+
+const getEventBackgroundColor = (color: any) => {
+  if (!color) return "bg-primary/20";
+
+  const colorMap: Record<string, string> = {
+    blue: "bg-blue-500/20",
+    green: "bg-green-500/20",
+    yellow: "bg-yellow-500/20",
+    pink: "bg-pink-500/20",
+    purple: "bg-purple-500/20",
+    red: "bg-red-500/20",
+    orange: "bg-orange-500/20",
+    indigo: "bg-indigo-500/20",
+    teal: "bg-teal-500/20",
+    cyan: "bg-cyan-500/20",
+    emerald: "bg-emerald-500/20",
+    rose: "bg-rose-500/20",
+    amber: "bg-amber-500/20",
+    lime: "bg-lime-500/20",
+    sky: "bg-sky-500/20",
+  };
+
+  return colorMap[color] || "bg-primary/20";
+};
+
+const CustomCalendarMonthView = () => {
+  const { view, events, locale, date, onEventClick } = useCalendar();
+  const MAX_EVENTS_VISIBLE = 2;
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  const monthDates = useMemo(() => getDaysInMonth(date), [date]);
+  const weekDays = useMemo(() => generateWeekdays(locale), [locale]);
+  const [expandedDate, setExpandedDate] = useState<Date | null>(null);
+  const [popoverPosition, setPopoverPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  if (view !== "month") return null;
+
+  return (
+    <div
+      ref={gridRef}
+      className="relative h-full grid grid-rows-6 grid-cols-7 min-h-[450px] overflow-hidden p-px gap-px"
+    >
+      {monthDates.map((_date, idx) => {
+        const currentEvents = events.filter((e) => isSameDay(e.start, _date));
+
+        return (
+          <div
+            key={_date.toString()}
+            data-cell
+            className={cn(
+              "ring-1 ring-border overflow-hidden p-1 text-xs sm:text-sm text-muted-foreground",
+              !isSameMonth(date, _date) && "text-muted-foreground/50"
+            )}
+          >
+            {/* weekday label for the first row -------------------------------- */}
+            {idx < 7 && (
+              <div
+                className={cn(
+                  "text-[10px] sm:text-xs font-medium text-center",
+                  [0, 6].includes(idx) && "text-muted-foreground/50"
+                )}
+              >
+                {weekDays[idx]}
+              </div>
+            )}
+
+            {/* day number ---------------------------------------------------- */}
+            <span
+              className={cn(
+                "size-5 sm:size-6 grid place-items-center rounded-full sticky top-0 text-xs sm:text-sm",
+                isToday(_date) && "bg-primary text-primary-foreground"
+              )}
+            >
+              {format(_date, "d")}
+            </span>
+
+            {/* events -------------------------------------------------------- */}
+            {currentEvents.slice(0, MAX_EVENTS_VISIBLE).map((event) => (
+              <div
+                key={`${event.id}-${_date.toISOString()}`}
+                className={cn(
+                  "px-1 rounded text-xs sm:text-sm flex items-center gap-1 cursor-pointer transition-colors",
+                  "sm:bg-transparent",
+                  getEventBackgroundColor(event.color)
+                )}
+                onClick={() => onEventClick?.(event)}
+              >
+                <div
+                  className={cn(
+                    "shrink-0 hidden sm:block",
+                    monthEventVariants({ variant: event.color })
+                  )}
+                />
+                <span className="flex-1 truncate">{event.title}</span>
+              </div>
+            ))}
+
+            {/* "+ n more" ---------------------------------------------------- */}
+            {currentEvents.length > MAX_EVENTS_VISIBLE && (
+              <button
+                className="text-[10px] sm:text-xs text-primary hover:underline"
+                onClick={(e) => {
+                  const cell = (e.currentTarget as HTMLElement).closest(
+                    "[data-cell]"
+                  )!;
+                  const cellRect = cell.getBoundingClientRect();
+                  const gridRect = gridRef.current!.getBoundingClientRect();
+
+                  setPopoverPosition({
+                    top: cellRect.top - gridRect.top - 25,
+                    left: cellRect.left - gridRect.left,
+                  });
+                  setExpandedDate(_date);
+                }}
+              >
+                +{currentEvents.length - MAX_EVENTS_VISIBLE} more…
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {expandedDate && popoverPosition && (
+        <>
+          {/* Backdrop to close popover */}
+          <div
+            className="absolute inset-0 z-40"
+            onClick={() => {
+              setExpandedDate(null);
+              setPopoverPosition(null);
+            }}
+          />
+
+          {/* Popover */}
+          <div
+            className="absolute z-50 bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg min-w-[50px] max-w-[200px]"
+            style={{
+              top: popoverPosition.top,
+              left: popoverPosition.left,
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-1">
+              <div className="text-xs font-medium text-muted-foreground">
+                {format(expandedDate, "EEE").toUpperCase()},{" "}
+                {format(expandedDate, "d")}
+              </div>
+              <button
+                className="text-muted-foreground hover:text-foreground px-1 rounded-sm hover:bg-muted/50"
+                onClick={() => {
+                  setExpandedDate(null);
+                  setPopoverPosition(null);
+                }}
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Events list */}
+            <div className="max-h-[300px] pb-1 overflow-y-auto">
+              {events
+                .filter((e) => isSameDay(e.start, expandedDate))
+                .map((event) => (
+                  <div
+                    key={event.id}
+                    className="pl-1 flex gap-1 items-center hover:bg-muted/40 cursor-pointer border-l-4 border-l-transparent hover:border-l-primary/20"
+                    onClick={() => {
+                      onEventClick?.(event);
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        "shrink-0 hidden sm:block",
+                        monthEventVariants({ variant: event.color })
+                      )}
+                    />
+                    <span className="flex-1 text-[12px]">{event.title}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 // Animation variants
 const fadeIn = {
@@ -122,6 +403,41 @@ export default function Home() {
   const searchParams = useSearchParams();
   const authError = searchParams?.get("auth_error");
   const [showError, setShowError] = useState(false);
+  const getRandomColor = () => {
+    return colorPalette[Math.floor(Math.random() * colorPalette.length)];
+  };
+  const isMobile = useMediaQuery("(max-width: 640px)");
+  const [calendarEvents, setCalendarEvents] = useState<FullCalendarEvent[]>([]);
+  const [eventsReady, setEventsReady] = useState(false);
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const raw = await eventService.getEvents();
+
+        const colourMap = new Map<string, string>();
+        const mapped: FullCalendarEvent[] = raw.map((e) => {
+          // decide where to read your dates from:
+          const startStr = (e as any).start_time ?? (e as any).start;
+          const endStr = (e as any).end_time ?? (e as any).end;
+
+          // assign a one‑time random colour
+          if (!colourMap.has(e.id)) colourMap.set(e.id, getRandomColor());
+
+          return {
+            id: e.id,
+            title: e.title,
+            start: new Date(startStr),
+            end: new Date(endStr),
+            color: colourMap.get(e.id) as any,
+          };
+        });
+        setCalendarEvents(mapped);
+      } finally {
+        setEventsReady(true);
+      }
+    }
+    fetchEvents();
+  }, []);
 
   // Handle auth errors from callback
   useEffect(() => {
@@ -214,7 +530,7 @@ export default function Home() {
               INNOVATION.
             </motion.h1>
 
-            <div className="px-4 pt-[8rem]">
+            <div className="pl-2 sm:pl-0 pr-4 pt-[8rem]">
               {/* sub-heading */}
               <motion.h2
                 variants={slideLeft}
@@ -342,7 +658,7 @@ export default function Home() {
                                   {p.location}
                                 </span>
                                 <span className="flex items-center gap-1">
-                                  <Calendar className="w-4 h-4" />
+                                  <CalendarIcon className="w-4 h-4" />
                                   {format(p.createdAt, "MMM d, yyyy")}
                                 </span>
                                 <span className="flex items-center gap-1">
@@ -385,17 +701,11 @@ export default function Home() {
           whileInView="visible"
           viewport={{ once: true, amount: 0.3 }}
           variants={scaleIn}
-          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
+          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden dark:bg-zinc-900"
         >
           <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
             {/* ── TEXT COLUMN ─────────────────────────────────────── */}
-            <div
-              className="
-                flex-1
-                grid grid-rows-[auto_1fr_auto]  
-                text-center lg:text-left
-              "
-            >
+            <div className="flex-1 grid grid-rows-[auto_1fr_auto] text-center lg:text-left">
               {/* row-1 : title (stays top-left) */}
               <motion.h2
                 variants={fadeIn}
@@ -407,87 +717,103 @@ export default function Home() {
               </motion.h2>
 
               {/* row-3 : subtitle + copy (sticks bottom-right) */}
-              <div
-                className="
-                  row-start-3
-                  place-self-center
-                  lg:place-self-end  
-                  text-center lg:text-right
-                  max-w-2xl mx-auto lg:mx-0 
-                  space-y-4
-                "
-              >
-                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
-                  Event Name, Host, Location, Speaker
-                </h3>
+              <div className="row-start-3 place-self-center lg:place-self-start text-center lg:text-left max-w-2xl mx-auto lg:mx-0 space-y-4">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap justify-center lg:justify-start gap-2 mb-3">
+                    <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-1">
+                      <Atom className="w-3 h-3 mr-1" />
+                      Active Project
+                    </Badge>
+                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs px-2 py-1">
+                      <Zap className="w-3 h-3 mr-1" />
+                      Actively Recruiting
+                    </Badge>
+                  </div>
 
-                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
-                  Lorem Ipsum is simply dummy text of the printing and
-                  typesetting industry. Lorem Ipsum has been the industry
-                  standard dummy text ever since the 1500s, when an unknown
-                  printer took a galley of type and scrambled it to make a type
-                  specimen book. It has survived not only five centuries, but
-                  also the leap into electronic typesetting, remaining
-                  essentially unchanged. It was popularised in the 1960s with
-                  the release of Letraset sheets containing Lorem Ipsum
-                  passages, and more recently with desktop publishing software
-                  like Aldus PageMaker including versions of Lorem Ipsum
+                  <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
+                    PETRA: Plasma Metallurgy Revolution
+                  </h3>
+
+                  <div className="flex flex-wrap justify-center lg:justify-start gap-4 text-sm text-gray-600 dark:text-zinc-400 mb-4">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>Jan 2025 - May 2026</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      <span>Flexible Location</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-4 h-4" />
+                      <span>175 views</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mx-auto lg:mr-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
+                  PETRA aims to revolutionize titanium production by replacing
+                  the outdated Kroll Process with a cleaner, faster, and more
+                  scalable microwave plasma-based method. Our goal is to design
+                  a fully custom system that enables continuous metal oxide
+                  reduction through high-temperature plasma, dramatically
+                  lowering environmental impact and cost.
                 </p>
+
+                <div className="space-y-2 text-left">
+                  <h4 className="font-medium text-gray-800 dark:text-zinc-200 text-sm">
+                    Key Focus Areas:
+                  </h4>
+                  <ul className="text-sm text-gray-600 dark:text-zinc-400 space-y-1">
+                    <li>• Custom microwave plasma torch for TiO₂ reduction</li>
+                    <li>• Full-system CFD simulations and optimization</li>
+                    <li>• High-performance materials for extreme conditions</li>
+                    <li>
+                      • Impact across aerospace, medical, and clean-tech sectors
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="flex flex-wrap justify-center lg:justify-start gap-1 mt-4">
+                  {[
+                    "Aerospace",
+                    "Material Science",
+                    "Metallurgy",
+                    "CFD",
+                    "CAD",
+                    "Research",
+                  ].map((skill, idx) => (
+                    <Badge
+                      key={idx}
+                      variant="outline"
+                      className="text-xs px-2 py-0.5 bg-white/50 dark:bg-zinc-800/50"
+                    >
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
+
             {/* ── IMAGE COLUMN ────────────────────────────────────── */}
-            <div
-              className="
-              flex-shrink-0
-              flex flex-col
-              md:flex-row md:justify-center
-              lg:flex-col lg:justify-start
-              gap-4
-              w-full lg:w-80
-            "
-            >
-              {/* square #1 */}
-              <div
-                className="
-                  aspect-square
-                  h-48 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
+            <div className="flex-shrink-0 flex flex-col md:flex-row md:justify-center lg:flex-col lg:justify-start gap-4 w-full lg:w-80">
+              {/* Image placeholder 1 - Plasma torch visualization */}
+              <div className="aspect-square h-48 md:h-60 rounded-lg overflow-hidden shadow-sm">
+                <img
+                  src="/images/PETRA_First_Ignition.png"
+                  alt="PETRA First Ignition - Laboratory setup showing plasma torch with bright purple plasma flame"
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
-              {/* square #2 */}
-              <div
-                className="
-                  aspect-square
-                  h-64 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
+              {/* Image placeholder 2 - Titanium production process */}
+              <div className="aspect-square h-64 md:h-60 rounded-lg overflow-hidden shadow-sm bg-gray-50 dark:bg-zinc-800 flex items-center justify-center p-4">
+                <img
+                  src="/images/PETRA_Reaction_Chamber.png"
+                  alt="PETRA Reaction Chamber - 3D technical rendering of plasma torch component"
+                  className="w-full h-full object-contain"
+                />
+              </div>
             </div>
-
-            {/* <Image
-              src=""
-              alt="Project highlight preview 1"
-              width={640}
-              height={640}
-              priority
-              className="
-                aspect-square h-48 md:h-64 w-full
-                object-cover       
-                rounded-lg shadow-sm
-              "
-            />
-            <Image
-              src=""
-              alt="Project highlight preview 2"
-              width={640}
-              height={640}
-              className="
-                aspect-square h-64 md:h-64 w-full
-                object-cover
-                rounded-lg shadow-sm
-              "
-            /> */}
           </div>
         </motion.section>
 
@@ -507,9 +833,7 @@ export default function Home() {
               whileInView="visible"
               className="max-w-4xl text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
             >
-              Expand your network. Find new opportunities.
-              <br className="hidden lg:block" />
-              Stay in the know.
+              Expand your network. Find new opportunities. Stay in the know.
             </motion.h2>
 
             {/* ── Calendar + copy grid ── */}
@@ -533,138 +857,81 @@ export default function Home() {
 
               {/* ✦ calendar preview — second on ≤md, first on ≥lg */}
               <motion.div
-                className="order-2 lg:order-1 lg:col-span-3 border rounded-2xl"
+                className="order-2 lg:order-1 lg:col-span-3 "
                 initial={{ scale: 0.95, opacity: 0 }}
                 whileInView={{ scale: 1.08, opacity: 1 }}
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 viewport={{ once: true, amount: 0.5 }}
+                // ⬇️ here we set the day‑cell min‑height based on screen size
+                style={
+                  {
+                    // on mobile give each cell only 1.5rem of height…
+                    "--fc-daygrid-day-min-height": isMobile
+                      ? "1rem"
+                      : undefined,
+                  } as React.CSSProperties
+                }
               >
-                <Card className="border-none shadow-none">
+                <Card className="border-none p-0 mx-5">
                   <CardContent className="p-0">
-                    <Image
-                      src="/images/calendar-view.png"
-                      alt="Aggie Nexus calendar month-view"
-                      width={1200}
-                      height={800}
-                      className="w-full h-auto"
-                      priority
-                    />
+                    {eventsReady /* ✅ only mount once data exists */ ? (
+                      <Calendar
+                        events={calendarEvents}
+                        view="month"
+                        onEventClick={() => {}}
+                      >
+                        <div className="h-full flex flex-col overflow-hidden">
+                          {/* header */}
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-2 p-2 sm:p-3 border rounded-t-lg bg-muted/30">
+                            <div className="relative flex flex-1 items-center justify-center">
+                              <CalendarCurrentDate
+                                className="
+                              absolute left-1/2 -translate-x-1/2
+                              pointer-events-none select-none
+                              text-sm sm:text-2xl md:text-3xl font-black tracking-tight
+                              !text-foreground
+                            "
+                              />
+                            </div>
+
+                            {/* prev / today / next controls */}
+                            <div className="flex gap-1">
+                              <CalendarPrevTrigger className="p-1 sm:p-2">
+                                <ChevronLeft
+                                  size={14}
+                                  className="sm:w-4 sm:h-4"
+                                />
+                                <span className="sr-only">Previous</span>
+                              </CalendarPrevTrigger>
+
+                              <CalendarTodayTrigger className="text-[10px] sm:text-xs px-1 sm:px-2 py-0.5 sm:py-1">
+                                Today
+                              </CalendarTodayTrigger>
+
+                              <CalendarNextTrigger className="p-1 sm:p-2">
+                                <ChevronRight
+                                  size={14}
+                                  className="sm:w-4 sm:h-4"
+                                />
+                                <span className="sr-only">Next</span>
+                              </CalendarNextTrigger>
+                            </div>
+                          </div>
+
+                          {/* month view */}
+                          <div className="flex-1 overflow-hidden">
+                            <CustomCalendarMonthView />
+                          </div>
+                        </div>
+                      </Calendar>
+                    ) : (
+                      /* tiny skeleton while we wait */
+                      <Skeleton className="h-80 w-full rounded-xl" />
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
             </div>
-          </div>
-        </motion.section>
-
-        {/* Event Highlights section */}
-        <motion.section
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.3 }}
-          variants={slideRight}
-          className="relative bg-gray-100 py-10 md:py-12 overflow-hidden bg-gray-100 dark:bg-zinc-900"
-        >
-          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
-            {/* ── TEXT COLUMN ─────────────────────────────────────── */}
-            <div
-              className="
-                flex-1
-                grid grid-rows-[auto_1fr_auto]  
-                text-center lg:text-left
-              "
-            >
-              {/* row-1 : title (stays top-left) */}
-              <motion.h2
-                variants={scaleIn}
-                initial="hidden"
-                whileInView="visible"
-                className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
-              >
-                Event Highlight
-              </motion.h2>
-
-              {/* row-3 : subtitle + copy (sticks bottom-right) */}
-              <div
-                className="
-                  row-start-3
-                  place-self-center
-                  lg:place-self-end  
-                  text-center lg:text-right
-                  max-w-2xl mx-auto lg:mx-0 
-                  space-y-4
-                "
-              >
-                <h3 className="text-xl md:text-2xl font-medium text-gray-800 dark:text-zinc-200">
-                  Event Name, Host, Location, Speaker
-                </h3>
-
-                <p className="mx-auto lg:ml-0 text-sm md:text-base leading-relaxed text-gray-700 dark:text-zinc-300">
-                  Lorem Ipsum is simply dummy text of the printing and
-                  typesetting industry. Lorem Ipsum has been the industry
-                  standard dummy text ever since the 1500s, when an unknown
-                  printer took a galley of type and scrambled it to make a type
-                  specimen book. It has survived not only five centuries, but
-                  also the leap into electronic typesetting, remaining
-                  essentially unchanged. It was popularised in the 1960s with
-                  the release of Letraset sheets containing Lorem Ipsum
-                  passages, and more recently with desktop publishing software
-                  like Aldus PageMaker including versions of Lorem Ipsum
-                </p>
-              </div>
-            </div>
-            {/* ── IMAGE COLUMN ────────────────────────────────────── */}
-            <div
-              className="
-              flex-shrink-0
-              flex flex-col
-              md:flex-row md:justify-center
-              lg:flex-col lg:justify-start
-              gap-4
-              w-full lg:w-80
-            "
-            >
-              {/* square #1 */}
-              <div
-                className="
-                  aspect-square
-                  h-48 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
-
-              {/* square #2 */}
-              <div
-                className="
-                  aspect-square
-                  h-64 md:h-60
-                  rounded-lg bg-gray-400 shadow-sm dark:bg-zinc-700
-                "
-              />
-            </div>
-
-            {/* <Image
-              src=""
-              alt="Project highlight preview 1"
-              width={640}
-              height={640}
-              priority
-              className="
-                aspect-square h-48 md:h-64 w-full
-                object-cover       
-                rounded-lg shadow-sm
-              "
-            />
-            <Image
-              src=""
-              alt="Project highlight preview 2"
-              width={640}
-              height={640}
-              className="
-                aspect-square h-64 md:h-64 w-full
-                object-cover
-                rounded-lg shadow-sm
-              "
-            /> */}
           </div>
         </motion.section>
 

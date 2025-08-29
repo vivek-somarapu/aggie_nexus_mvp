@@ -43,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProfileCompletionBanner from "@/components/profile/completion-banner";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { ProfileTab } from "@/components/profile/profile-tab";
+import { OrganizationAffiliationStatus } from "@/components/profile/organization-affiliation-status";
 
 /* ────── Libs ────── */
 import { formatDate } from "@/lib/utils";
@@ -213,8 +214,8 @@ export default function ProfilePage() {
     });
 
     setSelectedSkills(profile.skills || []);
-            setSelectedIndustries(profile.industry || []);
-        setSelectedOrganizations(profile.organizations || []);
+    setSelectedIndustries(profile.industry || []);
+    setSelectedOrganizations(profile.organizations || []);
 
     const { shouldSetupProfile } = profileSetupStatus(profile, true);
     setShowCompletionBanner(shouldSetupProfile);
@@ -467,14 +468,17 @@ export default function ProfilePage() {
         avatar: avatarUrl || null,
         resume_url: resumeUrl || null,
         industry: selectedIndustries,
-        organizations: selectedOrganizations,
         skills: selectedSkills,
         contact: formData.contact,
         additional_links: cleanedLinks,
       };
 
-      // 4) update user profile
-      await userService.updateUser(profile.id, payload);
+      // 4) update user profile 
+      if (selectedOrganizations.length > 0) {
+        await userService.updateUserWithAffiliations(profile.id, payload, selectedOrganizations);
+      } else {
+        await userService.updateUser(profile.id, payload);
+      }
       await refreshProfile();
 
       // 5) reset form state
@@ -653,6 +657,9 @@ export default function ProfilePage() {
           isSaving={isSaving}
           showCompletionBanner={showCompletionBanner}
         />
+
+        {/* Organization Affiliation Status */}
+        <OrganizationAffiliationStatus userId={profile.id} />
 
         <Tabs value={activeTab} onValueChange={onTabChange} className="w-full"> 
           <div className="hidden sm:flex justify-center mb-4">

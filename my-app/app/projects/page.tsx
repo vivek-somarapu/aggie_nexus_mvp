@@ -511,21 +511,27 @@ export default function ProjectsPage() {
                             <Badge variant="outline">
                               {project.project_status}
                             </Badge>
-                            {/* Incubator/Accelerator Badges */}
-                            {project.incubator_accelerator && project.incubator_accelerator.length > 0 && (
-                              <IncubatorAcceleratorBadges programs={project.incubator_accelerator} size="sm" maxDisplay={2}/>
+                            {project.organizations && project.organizations.length > 0 && (
+                              project.organizations.some(org => 
+                                org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+                              ) && (
+                                <IncubatorAcceleratorBadges organizations={project.organizations} size="sm" maxDisplay={2}/>
+                              )
                             )}
                           </div>
                           {/* Organization Tags */}
-                          {project.organizations && project.organizations.slice(0, 2).map((org: string, orgIndex: number) => (
-                            <Badge
-                              key={`${project.id}-org-${orgIndex}`}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {org}
-                            </Badge>
-                          ))}
+                          {project.organizations && project.organizations
+                            .filter((org: string) => org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator')
+                            .slice(0, 2)
+                            .map((org: string, orgIndex: number) => (
+                              <Badge
+                                key={`${project.id}-org-${orgIndex}`}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {org}
+                              </Badge>
+                            ))}
                           {project.organizations && project.organizations.length > 2 && (
                             <Badge variant="outline" className="text-xs">
                               +{project.organizations.length - 2}

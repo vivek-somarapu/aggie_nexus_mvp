@@ -5,12 +5,12 @@ import { ProgramLogo } from './program-logo';
 
 interface IncubatorAcceleratorBadgeProps {
   type: 'incubator' | 'accelerator';
-  program: string;
+  organization: string;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
-const programConfig = {
+const organizationConfig = {
   'Aggies Create Incubator': {
     type: 'incubator' as const,
     gradient: 'from-amber-500 to-gray-900',
@@ -28,21 +28,21 @@ const programConfig = {
 
 export function IncubatorAcceleratorBadge({ 
   type, 
-  program, 
+  organization, 
   className = '', 
   size = 'md' 
 }: IncubatorAcceleratorBadgeProps) {
-  const config = programConfig[program as keyof typeof programConfig];
+  const config = organizationConfig[organization as keyof typeof organizationConfig];
   
   if (!config) {
-    // Fallback for unknown programs
+    // Fallback for unknown organizations
     return (
       <Badge 
         variant="outline" 
         className={`${className} flex items-center gap-1`}
       >
         <Award className="h-3 w-3" />
-        {program}
+        {organization}
       </Badge>
     );
   }
@@ -70,41 +70,41 @@ export function IncubatorAcceleratorBadge({
         duration-200
       `}
     >
-      <ProgramLogo program={program} size={size} />
-      {program}
+      <ProgramLogo program={organization} size={size} />
+      {organization}
     </Badge>
   );
 }
 
 interface IncubatorAcceleratorBadgesProps {
-  programs: string[];
+  organizations: string[];
   className?: string;
   size?: 'sm' | 'md' | 'lg';
   maxDisplay?: number;
 }
 
 export function IncubatorAcceleratorBadges({ 
-  programs, 
+  organizations, 
   className = '', 
   size = 'md',
   maxDisplay = 2 
 }: IncubatorAcceleratorBadgesProps) {
-  if (!programs || programs.length === 0) return null;
+  if (!organizations || organizations.length === 0) return null;
 
-  const displayPrograms = programs.slice(0, maxDisplay);
-  const remainingCount = programs.length - maxDisplay;
+  const displayorganizations = organizations.slice(0, maxDisplay);
+  const remainingCount = organizations.length - maxDisplay;
 
   return (
     <div className={`flex flex-wrap gap-1 ${className}`}>
-      {displayPrograms.map((program) => {
-        const config = programConfig[program as keyof typeof programConfig];
+      {displayorganizations.map((organization) => {
+        const config = organizationConfig[organization as keyof typeof organizationConfig];
         const type = config?.type || 'incubator';
         
         return (
           <IncubatorAcceleratorBadge
-            key={program}
+            key={organization}
             type={type}
-            program={program}
+            organization={organization}
             size={size}
           />
         );
@@ -122,21 +122,21 @@ export function IncubatorAcceleratorBadges({
 }
 
 interface ProjectProgramBadgeProps {
-  programs: string[];
+  organizations: string[];
   className?: string;
 }
 
 export function ProjectProgramBadge({ 
-  programs, 
+  organizations, 
   className = '' 
 }: ProjectProgramBadgeProps) {
-  if (!programs || programs.length === 0) return null;
+  if (!organizations || organizations.length === 0) return null;
 
   return (
     <div className={`space-y-2 ${className}`}>
       <h3 className="font-semibold text-sm">Program Affiliations</h3>
       <IncubatorAcceleratorBadges 
-        programs={programs} 
+        organizations={organizations} 
         size="md"
         maxDisplay={3}
       />

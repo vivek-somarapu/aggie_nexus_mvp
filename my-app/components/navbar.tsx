@@ -35,7 +35,7 @@ import { inquiryService } from "@/lib/services/inquiry-service";
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { authUser, profile, signOut, isLoading, isManager } = useAuth();
+  const { authUser, profile, signOut, isLoading, role } = useAuth();
   const [pendingInquiries, setPendingInquiries] = useState(0);
   const [openNavigation, setOpenNavigation] = useState(false);
   const toggleNavigation = () => {
@@ -330,7 +330,7 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
 
-                  {isManager && (
+                  {role === 'admin' && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
@@ -348,6 +348,26 @@ export default function Navbar() {
                       <DropdownMenuItem asChild>
                         <Link
                           href="/manager/projects"
+                          className="cursor-pointer"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Project Management
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {role === 'manager' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/manager/organizations/users" className="cursor-pointer">
+                          <Users className="mr-2 h-4 w-4" />
+                          User Management
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/manager/organizations/projects"
                           className="cursor-pointer"
                         >
                           <FileText className="mr-2 h-4 w-4" />

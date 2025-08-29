@@ -84,7 +84,7 @@ export type Profile = {
   profile_setup_completed?: boolean;
   profile_setup_skipped_at?: string;
   last_login_at?: string;
-  is_manager?: boolean;
+  role?: string;
   additional_links?: { url: string; title: string }[];
 };
 
@@ -107,7 +107,7 @@ type AuthContextType = {
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
-  isManager: boolean;
+  role: string;
 };
 
 // Create auth context with default values
@@ -125,7 +125,7 @@ const AuthContext = createContext<AuthContextType>({
   requestPasswordReset: async () => {},
   resetPassword: async () => {},
   refreshProfile: async () => {},
-  isManager: false,
+  role: 'user',
 });
 
 /**
@@ -742,7 +742,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requestPasswordReset,
     resetPassword,
     refreshProfile,
-    isManager: profile?.is_manager === true,
+    role: profile?.role || 'user',
   };
 
   authLog("AuthProvider: Rendering with state", {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { DayPicker } from "react-day-picker";
 import {
@@ -54,18 +54,12 @@ const defaultClassNames = {
 
 const timeSlots: string[] = (() => {
   const out: string[] = [];
-  const d = new Date(2000, 0, 1);
-  d.setSeconds(0);
-  d.setMilliseconds(0);
-  for (let mins = 8 * 60; mins <= 20 * 60; mins += 30) {
-    d.setHours(0, mins);
-    out.push(
-      d.toLocaleTimeString([], {
-        hour12: true,
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    );
+  for (let h = 8; h <= 20; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      out.push(
+        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+      );
+    }
   }
   return out;
 })();
@@ -92,17 +86,14 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
     start: string | null;
     end: string | null;
   }>({
-    start: null,
-    end: null,
+    start: form.getValues("start_time") || null,
+    end: form.getValues("end_time") || null,
   });
 
   /* helpers ------------------------------------------------------- */
   const t2m = (t: string) => {
-    const [time, period] = t.split(" ");
-    const [h, m] = time.split(":").map(Number);
-    const pm = period.toLowerCase() === "pm";
-    const hour = (pm && h !== 12 ? h + 12 : !pm && h === 12 ? 0 : h) % 24;
-    return hour * 60 + m;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
   };
 
   const onTimeClick = (t: string) => {
@@ -121,6 +112,16 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
   };
 
   const dateValue = form.watch("date");
+  const startTime = form.watch("start_time");
+  const endTime = form.watch("end_time");
+
+  // Sync timeRange with form values
+  useEffect(() => {
+    setTimeRange({
+      start: startTime || null,
+      end: endTime || null,
+    });
+  }, [startTime, endTime]);
 
   const triggerLabel = useMemo(() => {
     if (!dateValue) return "Select date";
@@ -130,13 +131,20 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
       day: "numeric",
       year: "numeric",
     });
-    const fmt = (t?: string | null) => t ?? "— — —";
+    
+    const formatTime = (t?: string | null) => {
+      if (!t) return "— — —";
+      const [h, m] = t.split(":").map(Number);
+      const hour = h % 12 || 12;
+      const ampm = h >= 12 ? "PM" : "AM";
+      return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
+    };
 
     if (timeRange.start && timeRange.end) {
-      return `${datePart} · ${fmt(timeRange.start)} – ${fmt(timeRange.end)}`;
+      return `${datePart} · ${formatTime(timeRange.start)} – ${formatTime(timeRange.end)}`;
     }
     if (timeRange.start) {
-      return `${datePart} · ${fmt(timeRange.start)}`;
+      return `${datePart} · ${formatTime(timeRange.start)}`;
     }
     return datePart;
   }, [dateValue, timeRange.start, timeRange.end]);
@@ -156,7 +164,8 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                   className={cn(
                     "h-10 w-full text-left font-normal",
                     !field.value && "text-muted-foreground",
-                    error && "border-red-300 focus:border-red-500"
+                    error && "border-red-300 focus:border-red-500",
+                    "dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -168,7 +177,7 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
             <PopoverContent
               sideOffset={8}
               align="start"
-              className="w-[450px] p-0 dark:bg-slate-900 dark:text-slate-200"
+              className="w-[450px] p-0 dark:bg-zinc-900 dark:text-zinc-200 dark:border dark:border-zinc-700"
             >
               <div className="flex">
                 {/* calendar */}
@@ -183,7 +192,7 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                     ...defaultClassNames,
                     day_button: cn(
                       defaultClassNames.day_button,
-                      "hover:bg-accent"
+                      "hover:bg-accent dark:hover:bg-zinc-800"
                     ),
                   }}
                   components={{ Chevron }}
@@ -194,7 +203,7 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                 />
 
                 {/* divider */}
-                <div className="w-px bg-border" />
+                <div className="w-px bg-border dark:bg-zinc-700" />
 
                 {/* time list */}
                 <div className="w-48 max-h-[336px] overflow-y-auto p-6 no-scrollbar">
@@ -220,11 +229,18 @@ export default function DateTimePicker({ error }: { error?: boolean }) {
                           }
                           onClick={() => onTimeClick(time)}
                           className={cn(
-                            "w-full shadow-none",
-                            inRange && rangeClass
+                            "w-full shadow-none border dark:border-zinc-700",
+                            inRange && "dark:bg-zinc-700 dark:text-zinc-100",
+                            (isStart || isEnd) &&
+                              "dark:bg-zinc-700 dark:text-white"
                           )}
                         >
-                          {time}
+                          {(() => {
+                            const [h, m] = time.split(":").map(Number);
+                            const hour = h % 12 || 12;
+                            const ampm = h >= 12 ? "PM" : "AM";
+                            return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
+                          })()}
                         </Button>
                       );
                     })}

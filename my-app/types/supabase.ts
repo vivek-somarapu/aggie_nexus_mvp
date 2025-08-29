@@ -35,6 +35,7 @@ export interface Database {
           refresh_token: string | null
           email_verified: boolean | null
           deleted: boolean
+          role: string
         }
         Insert: {
           id: string
@@ -58,6 +59,7 @@ export interface Database {
           refresh_token?: string | null
           email_verified?: boolean | null
           deleted: boolean
+          role?: string
         }
         Update: {
           id?: string
@@ -81,6 +83,164 @@ export interface Database {
           refresh_token?: string | null
           email_verified?: boolean | null
           deleted?: boolean
+          role?: string
+        }
+      }
+      // New verification system tables
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          website_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          website_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          website_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      organization_managers: {
+        Row: {
+          org_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          org_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          org_id?: string
+          user_id?: string
+          created_at?: string
+        }
+      }
+      organization_members: {
+        Row: {
+          org_id: string
+          user_id: string
+          verified_by: string | null
+          verified_at: string
+        }
+        Insert: {
+          org_id: string
+          user_id: string
+          verified_by?: string | null
+          verified_at?: string
+        }
+        Update: {
+          org_id?: string
+          user_id?: string
+          verified_by?: string | null
+          verified_at?: string
+        }
+      }
+      organization_affiliation_claims: {
+        Row: {
+          id: string
+          org_id: string
+          user_id: string
+          evidence: Json
+          status: string
+          created_at: string
+          decided_by: string | null
+          decided_at: string | null
+          decision_note: string | null
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          user_id: string
+          evidence?: Json
+          status?: string
+          created_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          user_id?: string
+          evidence?: Json
+          status?: string
+          created_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+        }
+      }
+      project_organization_claims: {
+        Row: {
+          id: string
+          project_id: string
+          org_id: string
+          submitted_by: string
+          evidence: Json
+          status: string
+          created_at: string
+          decided_by: string | null
+          decided_at: string | null
+          decision_note: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          org_id: string
+          submitted_by: string
+          evidence?: Json
+          status?: string
+          created_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          org_id?: string
+          submitted_by?: string
+          evidence?: Json
+          status?: string
+          created_at?: string
+          decided_by?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+        }
+      }
+      project_organizations: {
+        Row: {
+          project_id: string
+          org_id: string
+          verified_by: string | null
+          verified_at: string
+        }
+        Insert: {
+          project_id: string
+          org_id: string
+          verified_by?: string | null
+          verified_at?: string
+        }
+        Update: {
+          project_id?: string
+          org_id?: string
+          verified_by?: string | null
+          verified_at?: string
         }
       }
       events: {

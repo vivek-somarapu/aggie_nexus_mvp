@@ -1,4 +1,5 @@
 import { CalendarEvent } from "@/components/ui/full-calendar";
+import { createClient } from '@/lib/supabase/client';
 
 export type Project = {
   id: string;
@@ -19,13 +20,28 @@ export type Project = {
   project_status: string;
   deleted: boolean;
   // Gamification fields
+  organizations: string[];
   funding_received?: number;
-  incubator_accelerator?: string[];
-  organizations?: string[];
   technical_requirements?: string[];
   soft_requirements?: string[];
-  
 };
+
+export interface ProjectOrganizationClaim {
+  id: string;
+  project_id: string;
+  org_id: string;
+  submitted_by: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  decided_by?: string | null;
+  decided_at?: string | null;
+  decision_note?: string | null;
+  organizations?: {
+    id: string;
+    name: string;
+  };
+}
+
 
 export interface ProjectSearchParams {
   search?: string;
@@ -184,5 +200,216 @@ export const projectService = {
       end: endDate,
       color: project.is_idea ? "default" : "green",
     };
+  },
+
+  // Project Organization Affiliation Methods
+  // Create a new project-organization claim
+  createProjectOrganizationClaim: async (projectId: string, orgName: string, submittedBy: string): Promise<ProjectOrganizationClaim> => {
+    try {
+      const supabase = createClient();
+
+      // First get the organization ID by name
+      const { data: orgData, error: orgError} = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('name', orgName)
+        .single();
+
+      if (orgError) {
+        console.error('Error fetching organization ID:', orgError);
+        throw orgError;
+      }
+
+      const orgId = orgData.id;
+      
+      // Create the project-organization claim
+      const { data, error } = await supabase
+        .from('project_organization_claims')
+        .insert({
+          project_id: projectId,
+          org_id: orgId,
+          submitted_by: submittedBy,
+          status: 'pending'
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error creating project-organization claim:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error creating project-organization claim:', error);
+      throw error;
+    }
+  },
+
+  // Get all project-organization claims for a project
+  getProjectOrganizationClaims: async (projectId: string): Promise<ProjectOrganizationClaim[]> => {
+    try {
+      const supabase = createClient();
+      
+      const { data, error } = await supabase
+        .from('project_organization_claims')
+        .select(`
+          *,
+          organizations (
+            id,
+            name
+          )
+        `)
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching project organization claims:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching project organization claims:', error);
+      throw error;
+    }
+  },
+
+  // Check if project already has a pending claim for an organization
+  hasPendingProjectOrganizationClaim: async (projectId: string, orgId: string): Promise<boolean> => {
+    try {
+      const supabase = createClient();
+      
+      const { data, error } = await supabase
+        .from('project_organization_claims')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('org_id', orgId)
+        .eq('status', 'pending')
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking pending project-organization claim:', error);
+        throw error;
+      }
+      
+      return !!data;
+    } catch (error) {
+      console.error('Error checking pending project-organization claim:', error);
+      throw error;
+    }
+  },
+
+  // Create project with organization affiliations
+  createProjectWithAffiliations: async (
+    projectData: Omit<Project, "id" | "views" | "created_at" | "last_updated" | "deleted" | "owner_id"> & { owner_id?: string },
+    selectedOrganizations: string[]
+  ): Promise<Project> => {
+    try {
+      // First create the project
+      const project = await projectService.createProject(projectData);
+      
+      // Handle organization affiliation claims
+      if (selectedOrganizations.length > 0) {
+        try {
+          // Get current project claims to see what's already been claimed
+          const existingClaims = await projectService.getProjectOrganizationClaims(project.id);
+          const existingClaimedOrgs = existingClaims.map(claim => claim.org_id);
+
+          // Process each selected organization
+          for (const orgName of selectedOrganizations) {
+            // Get organization ID by name
+            const supabase = createClient();
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('id')
+              .eq('name', orgName)
+              .single();
+            
+            if (orgData) {
+              const orgId = orgData.id;
+              // Check if project already has a pending claim for this organization
+              const hasPending = await projectService.hasPendingProjectOrganizationClaim(project.id, orgId);
+              
+              // Only create a new claim if there's no existing pending claim
+              if (!hasPending && !existingClaimedOrgs.includes(orgId)) {
+                await projectService.createProjectOrganizationClaim(
+                  project.id, 
+                  orgName, 
+                  project.owner_id
+                );
+              }
+            }
+          }
+        } catch (claimError) {
+          console.error("Error creating project-organization claims:", claimError);
+          // Don't fail the entire project creation, just log the error
+        }
+      }
+      
+      return project;
+    } catch (error) {
+      console.error('Error creating project with affiliations:', error);
+      throw error;
+    }
+  },
+
+  // Update project with organization affiliations
+  updateProjectWithAffiliations: async (
+    projectId: string, 
+    projectData: Partial<Project>, 
+    selectedOrganizations: string[]
+  ): Promise<Project | null> => {
+    try {
+      // First update the project
+      const project = await projectService.updateProject(projectId, projectData);
+      
+      if (!project) {
+        return null;
+      }
+
+      // Handle organization affiliation claims
+      if (selectedOrganizations.length > 0) {
+        try {
+          // Get current project claims to see what's already been claimed
+          const existingClaims = await projectService.getProjectOrganizationClaims(projectId);
+          const existingClaimedOrgs = existingClaims.map(claim => claim.org_id);
+
+          // Process each selected organization
+          for (const orgName of selectedOrganizations) {
+            // Get organization ID by name
+            const supabase = createClient();
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('id')
+              .eq('name', orgName)
+              .single();
+            
+            if (orgData) {
+              const orgId = orgData.id;
+              // Check if project already has a pending claim for this organization
+              const hasPending = await projectService.hasPendingProjectOrganizationClaim(projectId, orgId);
+              
+              // Only create a new claim if there's no existing pending claim
+              if (!hasPending && !existingClaimedOrgs.includes(orgId)) {
+                await projectService.createProjectOrganizationClaim(
+                  projectId, 
+                  orgName, 
+                  project.owner_id
+                );
+              }
+            }
+          }
+        } catch (claimError) {
+          console.error("Error creating project-organization claims:", claimError);
+          // Don't fail the entire project update, just log the error
+        }
+      }
+      
+      return project;
+    } catch (error) {
+      console.error('Error updating project with affiliations:', error);
+      throw error;
+    }
   }
 }; 

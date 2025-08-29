@@ -1,8 +1,9 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
-import { getOrganizationVerificationStatus } from '@/lib/utils/organization-verification';
+import { userService } from '@/lib/services/user-service';
 import { Profile } from '@/lib/auth';
+import { useState, useEffect } from 'react';
 
 interface VerificationBadgeProps {
   organization: string;
@@ -19,10 +20,37 @@ export function VerificationBadge({
   showText = true,
   className = '' 
 }: VerificationBadgeProps) {
-  const status = getOrganizationVerificationStatus(profile, organization);
-  
-  if (status === 'not_claimed') {
-    return null; // Don't show badge if not claimed
+  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      if (!profile?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const summary = await userService.getUserOrganizationSummary(profile.id);
+        const orgStatus = summary.organizations.find(org => org.name === organization)?.status;
+        setStatus(orgStatus);
+      } catch (error) {
+        console.error('Error fetching organization status:', error);
+        setStatus(undefined);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStatus();
+  }, [profile?.id, organization]);
+
+  if (loading) {
+    return null; // Don't show anything while loading
+  }
+
+  if (!status || status === 'not_claimed') {
+    return null; // Don't show badge if not claimed or no status
   }
 
   const getBadgeConfig = () => {
