@@ -58,7 +58,7 @@ const itemVariants = {
 };
 
 export default function ProjectManagementPage() {
-  const { user, isLoading: authLoading, isManager } = useAuth();
+  const { user, isLoading: authLoading, role } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<ExtendedProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,10 +70,10 @@ export default function ProjectManagementPage() {
 
   // Redirect non-managers
   useEffect(() => {
-    if (!authLoading && !isManager) {
+    if (!authLoading && role !== 'admin') {
       router.push('/projects');
     }
-  }, [authLoading, isManager, router]);
+  }, [authLoading, role, router]);
 
   // Fetch projects
   const fetchProjects = async () => {
@@ -154,10 +154,10 @@ export default function ProjectManagementPage() {
 
   // Fetch projects when component mounts
   useEffect(() => {
-    if (!authLoading && isManager) {
+    if (!authLoading && role === 'admin') {
       fetchProjects();
     }
-  }, [authLoading, isManager]);
+  }, [authLoading, role]);
 
   // Handle project deletion with proper error handling
   const deleteProject = async (projectId: string) => {
@@ -290,7 +290,7 @@ export default function ProjectManagementPage() {
     );
   }
 
-  if (!isManager) {
+  if (role !== 'admin') {
     return null; // Will be redirected by the useEffect
   }
 

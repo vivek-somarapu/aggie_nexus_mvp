@@ -107,7 +107,7 @@ type AuthContextType = {
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
-  isManager: boolean;
+  role: string;
 };
 
 // Create auth context with default values
@@ -125,7 +125,7 @@ const AuthContext = createContext<AuthContextType>({
   requestPasswordReset: async () => {},
   resetPassword: async () => {},
   refreshProfile: async () => {},
-  isManager: false,
+  role: 'user',
 });
 
 /**
@@ -742,7 +742,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     requestPasswordReset,
     resetPassword,
     refreshProfile,
-    isManager: profile?.role === 'admin',
+    role: profile?.role || 'user',
   };
 
   authLog("AuthProvider: Rendering with state", {

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
  * Authentication Monitoring Page (Phase 5)
  * 
  * Provides comprehensive monitoring and testing capabilities
- * for the authentication system. Accessible to managers only.
+ * for the authentication system. Accessible to admins only.
  */
 export default function AuthMonitoringPage() {
   return (

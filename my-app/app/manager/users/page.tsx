@@ -49,7 +49,7 @@ const itemVariants = {
 };
 
 export default function UserManagementPage() {
-  const { user, isLoading: authLoading, isManager } = useAuth();
+  const { user, isLoading: authLoading, role } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,10 +62,10 @@ export default function UserManagementPage() {
 
   // Redirect non-managers
   useEffect(() => {
-    if (!authLoading && !isManager) {
+    if (!authLoading && role !== 'admin') {
       router.push('/');
     }
-  }, [authLoading, isManager, router]);
+  }, [authLoading, role, router]);
 
   // Fetch users
   const fetchUsers = async () => {
@@ -96,10 +96,10 @@ export default function UserManagementPage() {
 
   // Fetch users when component mounts
   useEffect(() => {
-    if (!authLoading && isManager) {
+    if (!authLoading && role === 'admin') {
       fetchUsers();
     }
-  }, [authLoading, isManager]);
+  }, [authLoading, role]);
 
   // Handle user role update
   const updateUserRole = async (userId: string, newRole: string) => {
@@ -218,7 +218,7 @@ export default function UserManagementPage() {
     );
   }
 
-  if (!isManager) {
+  if (role !== 'admin') {
     return null; // Will be redirected by the useEffect
   }
 

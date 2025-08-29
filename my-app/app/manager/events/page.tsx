@@ -53,7 +53,7 @@ const itemVariants = {
 };
 
 export default function ManagerEventsPage() {
-  const { user, isLoading: authLoading, isManager } = useAuth();
+  const { user, isLoading: authLoading, role } = useAuth();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,10 +63,10 @@ export default function ManagerEventsPage() {
 
   // Redirect non-managers
   useEffect(() => {
-    if (!authLoading && !isManager) {
+    if (!authLoading && role !== 'admin') {
       router.push('/calendar');
     }
-  }, [authLoading, isManager, router]);
+  }, [authLoading, role, router]);
 
   // Fetch events based on status
   const fetchEvents = async (status: string) => {
@@ -107,10 +107,10 @@ export default function ManagerEventsPage() {
 
   // Fetch events on tab change
   useEffect(() => {
-    if (!authLoading && isManager) {
+    if (!authLoading && role === 'admin') {
       fetchEvents(activeTab);
     }
-  }, [activeTab, authLoading, isManager]);
+  }, [activeTab, authLoading, role]);
 
   // Handle event status update
   const updateEventStatus = async (eventId: string, status: 'approved' | 'rejected') => {
@@ -196,7 +196,7 @@ export default function ManagerEventsPage() {
     );
   }
 
-  if (!isManager) {
+  if (role !== 'admin') {
     return null; // Will be redirected by the useEffect
   }
 

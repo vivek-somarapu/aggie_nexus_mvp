@@ -35,7 +35,7 @@ import { inquiryService } from "@/lib/services/inquiry-service";
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { authUser, profile, signOut, isLoading, isManager } = useAuth();
+  const { authUser, profile, signOut, isLoading, role } = useAuth();
   const [pendingInquiries, setPendingInquiries] = useState(0);
   const [openNavigation, setOpenNavigation] = useState(false);
   const toggleNavigation = () => {
@@ -330,7 +330,7 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
 
-                  {isManager && (
+                  {role === 'admin' && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
