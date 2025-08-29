@@ -339,20 +339,26 @@ export const userService = {
       const supabase = createClient();
       
       // First, update the user profile
-      const { data: updatedUser, error: updateError } = await supabase
+      const { data: updatedUsers, error: updateError } = await supabase
         .from('users')
         .update({
           ...userData,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
-        .select()
-        .single();
+        .select();
       
       if (updateError) {
         console.error('Error updating user:', updateError);
         throw updateError;
       }
+
+      if (!updatedUsers || updatedUsers.length === 0) {
+        console.error('No user found to update');
+        throw new Error('User not found');
+      }
+
+      const updatedUser = updatedUsers[0];
 
       // Handle organization affiliation claims
       if (selectedOrganizations.length > 0) {

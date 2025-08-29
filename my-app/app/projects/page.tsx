@@ -523,15 +523,18 @@ export default function ProjectsPage() {
                             )}
                           </div>
                           {/* Organization Tags */}
-                          {project.organizations && project.organizations.slice(0, 2).map((org: string, orgIndex: number) => (
-                            <Badge
-                              key={`${project.id}-org-${orgIndex}`}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {org}
-                            </Badge>
-                          ))}
+                          {project.organizations && project.organizations
+                            .filter((org: string) => org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator')
+                            .slice(0, 2)
+                            .map((org: string, orgIndex: number) => (
+                              <Badge
+                                key={`${project.id}-org-${orgIndex}`}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {org}
+                              </Badge>
+                            ))}
                           {project.organizations && project.organizations.length > 2 && (
                             <Badge variant="outline" className="text-xs">
                               +{project.organizations.length - 2}

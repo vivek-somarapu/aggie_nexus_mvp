@@ -28,7 +28,6 @@ export async function PATCH(
       .update({ status: body.status })
       .eq('id', id)
       .select()
-      .single();
 
     if (error) {
       console.error("Error updating event:", error);
