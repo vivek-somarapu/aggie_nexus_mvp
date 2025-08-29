@@ -356,6 +356,26 @@ export default function Navbar() {
                       </DropdownMenuItem>
                     </>
                   )}
+                  {role === 'manager' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/manager/organizations/users" className="cursor-pointer">
+                          <Users className="mr-2 h-4 w-4" />
+                          User Management
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/manager/organizations/projects"
+                          className="cursor-pointer"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Project Management
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleLogout}
