@@ -533,10 +533,11 @@ const getAvailableSkills = () => {
         // owner_id is handled by the server via auth middleware
       };
 
+      let newProject;
       if (selectedOrganizations.length > 0) {
-        await projectService.createProjectWithAffiliations(projectData, selectedOrganizations);
+        newProject = await projectService.createProjectWithAffiliations(projectData, selectedOrganizations);
       } else {
-        await projectService.createProject(projectData);
+        newProject = await projectService.createProject(projectData);
       }
 
       toast.success("Project created successfully!");

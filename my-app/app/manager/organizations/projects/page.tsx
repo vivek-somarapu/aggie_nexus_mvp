@@ -11,22 +11,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, XCircle, Search, Clock, User, Calendar, MapPin } from "lucide-react";
+import { AlertCircle, CheckCircle, XCircle, Search, Clock, Calendar, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 
-// Define Project type for this page
-interface Project {
+// Define Project Organization Claim type for this page
+interface ProjectOrganizationClaim {
   id: string;
-  title: string;
-  description: string | null;
+  project_id: string;
+  org_id: string;
   status: string;
-  created_by: string;
   created_at: string;
-  updated_at: string;
-  creator?: {
-    full_name: string;
-    email: string;
+  verified_at?: string;
+  verified_by?: string;
+  
+  project?: {
+    id: string;
+    title: string;
+    description: string | null;
+    created_at: string;
+    updated_at: string;
   };
 }
 
@@ -55,15 +60,16 @@ const itemVariants = {
 export default function OrganizationProjectManagement() {
   const { authUser, isLoading: authLoading, role } = useAuth();
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectClaims, setProjectClaims] = useState<ProjectOrganizationClaim[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [projectToManage, setProjectToManage] = useState<Project | null>(null);
+  const [claimToManage, setClaimToManage] = useState<ProjectOrganizationClaim | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"approve" | "reject">("approve");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending");
 
   // Redirect non-organization managers
   useEffect(() => {
@@ -73,28 +79,48 @@ export default function OrganizationProjectManagement() {
   }, [authLoading, role, router]);
 
   // Fetch projects
-  const fetchProjects = async () => {
+  const fetchProjects = async (status: "pending" | "approved" | "rejected" = "pending") => {
     try {
       setIsLoading(true);
       setError(null);
       
       const supabase = createClient();
       
-      // Fetching all pending projects towards the organization
+      // First, fetch the organization the user manages
+      const { data: managerData, error: managerError } = await supabase
+        .from('organization_managers')
+        .select('org_id')
+        .eq('user_id', authUser?.id)
+        .single();
+      
+      if (managerError) {
+        throw new Error('You are not authorized to manage any organization');
+      }
+      
+      const orgId = managerData.org_id;
+      
+      // Now fetch project organization claims for that organization with the specified status
       const { data, error } = await supabase
-        .from('projects')
+        .from('project_organization_claims')
         .select(`
           *,
-          creator:users!projects_created_by_fkey(full_name, email)
+          project:projects!project_organization_claims_project_id_fkey(
+            id,
+            title,
+            description,
+            created_at,
+            updated_at
+          )
         `)
-        .eq('status', 'pending')
+        .eq('status', status)
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false });
       
       if (error) {
         throw error;
       }
       
-      setProjects(data as Project[]);
+      setProjectClaims(data as ProjectOrganizationClaim[]);
     } catch (err) {
       console.error("Error fetching projects:", err);
       setError("Failed to load projects. Please try again.");
@@ -103,12 +129,16 @@ export default function OrganizationProjectManagement() {
     }
   };
 
-  // Fetch projects when component mounts
+  // Fetch projects when component mounts or tab changes
   useEffect(() => {
-    if (!authLoading && (role === 'admin' || role === 'manager')) {
-      fetchProjects();
+    if (!authLoading && role !== 'user') {
+      fetchProjects(activeTab);
     }
-  }, [authLoading, role]);
+  }, [authLoading, role, activeTab]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as "pending" | "approved" | "rejected");
+  };
 
   const handleApproveProject = async (projectId: string) => {
     try {
@@ -116,22 +146,40 @@ export default function OrganizationProjectManagement() {
       setError(null);
       
       const supabase = createClient();
-      
+
+      // First, update the project organization claim to approved
       const { error } = await supabase
-        .from('projects')
+        .from('project_organization_claims')
         .update({ 
           status: 'approved',
-          approved_by: authUser?.id,
-          approved_at: new Date().toISOString()
+          decided_by: authUser?.id,
+          decided_at: new Date().toISOString()
         })
         .eq('id', projectId);
       
       if (error) {
         throw error;
       }
+
+      // Then, update the project to be associated with the organization via the project_organizations table
+      const claim = projectClaims.find(c => c.id === projectId);
+      if (claim) {
+        const { error: orgError } = await supabase
+          .from('project_organizations')
+          .insert({
+            project_id: claim.project_id,
+            org_id: claim.org_id,
+            verified_at: new Date().toISOString(),
+            verified_by: authUser?.id
+          });
+        
+        if (orgError) {
+          throw orgError;
+        }
+      }
       
-      setSuccess("Project approved successfully!");
-      setProjects(projects.filter(p => p.id !== projectId));
+      setSuccess("Project organization claim approved successfully!");
+      setProjectClaims(projectClaims.filter(p => p.id !== projectId));
       setConfirmDialogOpen(false);
       
       // Clear success message after 3 seconds
@@ -151,12 +199,13 @@ export default function OrganizationProjectManagement() {
       
       const supabase = createClient();
       
+      // Update the project organization claim to rejected
       const { error } = await supabase
-        .from('projects')
+        .from('project_organization_claims')
         .update({ 
           status: 'rejected',
-          approved_by: authUser?.id,
-          approved_at: new Date().toISOString()
+          decided_at: new Date().toISOString(),
+          decided_by: authUser?.id
         })
         .eq('id', projectId);
       
@@ -164,30 +213,42 @@ export default function OrganizationProjectManagement() {
         throw error;
       }
       
-      setSuccess("Project rejected successfully!");
-      setProjects(projects.filter(p => p.id !== projectId));
+      setSuccess("Project organization claim rejected successfully!");
+      setProjectClaims(projectClaims.filter(p => p.id !== projectId));
       setConfirmDialogOpen(false);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      console.error("Error rejecting project:", err);
-      setError("Failed to reject project. Please try again.");
+      console.error("Error rejecting project organization claim:", err);
+      setError("Failed to reject project organization claim. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const openConfirmDialog = (project: Project, action: "approve" | "reject") => {
-    setProjectToManage(project);
+  const openConfirmDialog = (claim: ProjectOrganizationClaim, action: "approve" | "reject") => {
+    setClaimToManage(claim);
     setConfirmAction(action);
     setConfirmDialogOpen(true);
   };
 
-  const filteredProjects = projects.filter(project =>
-    project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.creator?.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProjects = projectClaims.filter(claim =>
+    claim.project?.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'approved':
+        return <Badge variant="default" className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
 
   if (authLoading) {
     return (
@@ -292,27 +353,20 @@ export default function OrganizationProjectManagement() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Project</TableHead>
-                    <TableHead>Creator</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProjects.map((project) => (
-                    <TableRow key={project.id}>
+                  {filteredProjects.map((claim) => (
+                    <TableRow key={claim.id}>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{project.title}</div>
+                          <div className="font-medium">{claim.project?.title}</div>
                           <div className="text-sm text-gray-500 truncate max-w-xs">
-                            {project.description}
+                            {claim.project?.description}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <span>{project.creator?.full_name || 'Unknown'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -325,7 +379,7 @@ export default function OrganizationProjectManagement() {
                         <div className="flex items-center space-x-2">
                           <Calendar className="h-4 w-4 text-gray-400" />
                           <span className="text-sm">
-                            {new Date(project.created_at).toLocaleDateString()}
+                            {new Date(claim.created_at).toLocaleDateString()}
                           </span>
                         </div>
                       </TableCell>
@@ -333,7 +387,7 @@ export default function OrganizationProjectManagement() {
                         <div className="flex space-x-2">
                           <Button
                             size="sm"
-                            onClick={() => openConfirmDialog(project, "approve")}
+                            onClick={() => openConfirmDialog(claim, "approve")}
                             className="bg-green-600 hover:bg-green-700"
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
@@ -342,7 +396,7 @@ export default function OrganizationProjectManagement() {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={() => openConfirmDialog(project, "reject")}
+                            onClick={() => openConfirmDialog(claim, "reject")}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
                             Reject
@@ -366,10 +420,10 @@ export default function OrganizationProjectManagement() {
               {confirmAction === "approve" ? "Approve Project" : "Reject Project"}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to {confirmAction} "{projectToManage?.title}"?
+              Are you sure you want to {confirmAction} "{claimToManage?.project?.title}"?
               {confirmAction === "approve" 
-                ? " This will make the project visible to all users."
-                : " This will reject the project submission."
+                ? " This will associate the project with your organization."
+                : " This will reject the project organization claim."
               }
             </DialogDescription>
           </DialogHeader>
@@ -383,11 +437,11 @@ export default function OrganizationProjectManagement() {
             </Button>
             <Button
               onClick={() => {
-                if (projectToManage) {
+                if (claimToManage) {
                   if (confirmAction === "approve") {
-                    handleApproveProject(projectToManage.id);
+                    handleApproveProject(claimToManage.id);
                   } else {
-                    handleRejectProject(projectToManage.id);
+                    handleRejectProject(claimToManage.id);
                   }
                 }
               }}
