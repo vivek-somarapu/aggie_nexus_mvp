@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client"; 
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, User, Users, Shield, Trash2, Search, UserCheck, UserX } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { AlertCircle, CheckCircle, User, Users, Shield, Trash2, Search, UserCheck, UserX, Building2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 
@@ -59,8 +60,11 @@ export default function UserManagementPage() {
   const [userToManage, setUserToManage] = useState<User | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"promote" | "demote" | "delete">("delete");
+  const [organizations, setOrganizations] = useState<Array<{id: string, name: string}>>([]);
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
+  const [showOrgSelection, setShowOrgSelection] = useState(false);
 
-  // Redirect non-managers
+  // Redirect non-admins
   useEffect(() => {
     if (!authLoading && role !== 'admin') {
       router.push('/');
@@ -75,13 +79,20 @@ export default function UserManagementPage() {
       
       const supabase = createClient();
       
-      // Fetch all users that are not the current user
-      const { data, error } = await supabase
+      // Fetch users based on role hierarchy
+      let query = supabase
         .from('users')
         .select('*')
         .eq('deleted', false)
-        .neq('id', authUser?.id) // Exclude current user
-        .order('full_name');
+        .neq('id', authUser?.id); // Exclude current user
+      
+      // Role-based filtering: admins can see managers and users, but not other admins
+      if (role === 'admin') {
+        query = query.in('role', ['manager', 'user']);
+      }
+      // Note: managers would only see users, but this page is admin-only
+      
+      const { data, error } = await query.order('full_name');
       
       if (error) {
         throw error;
@@ -96,29 +107,61 @@ export default function UserManagementPage() {
     }
   };
 
+  // Fetch organizations
+  const fetchOrganizations = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name');
+      
+      if (error) {
+        console.error("Error fetching organizations:", error);
+        return;
+      }
+      
+      setOrganizations(data || []);
+    } catch (err) {
+      console.error("Error fetching organizations:", err);
+    }
+  };
+
   // Fetch users when component mounts
   useEffect(() => {
     if (!authLoading && role === 'admin') {
       fetchUsers();
+      fetchOrganizations();
     }
   }, [authLoading, role]);
 
-  // Handle user role update
-  const updateUserRole = async (userId: string, newRole: string) => {
+  // Handle user role update with organization management
+  const updateUserRole = async (userId: string, newRole: string, orgIds?: string[]) => {
     try {
       setError(null);
       
-      const supabase = createClient();
+      console.log('Updating user role via API:', { userId, newRole, orgIds });
       
-      // Update user role
-      const { error } = await supabase
-        .from('users')
-        .update({ role: newRole })
-        .eq('id', userId);
-      
-      if (error) {
-        throw error;
+      // Use the API route instead of client-side Supabase
+      const response = await fetch(`/api/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          role: newRole,
+          orgIds: orgIds || []
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Failed to update user role');
       }
+
+      const data = await response.json();
+      console.log('API response:', data);
       
       // Update local state
       setUsers(prev => 
@@ -140,6 +183,8 @@ export default function UserManagementPage() {
       setError("Failed to update user role. Please try again.");
     } finally {
       setConfirmDialogOpen(false);
+      setShowOrgSelection(false);
+      setSelectedOrganizations([]);
     }
   };
 
@@ -183,7 +228,13 @@ export default function UserManagementPage() {
   const openConfirmDialog = (user: User, action: "promote" | "demote" | "delete") => {
     setUserToManage(user);
     setConfirmAction(action);
-    setConfirmDialogOpen(true);
+    
+    if (action === "promote") {
+      setShowOrgSelection(true);
+      setSelectedOrganizations([]);
+    } else {
+      setConfirmDialogOpen(true);
+    }
   };
 
   // Handle confirm action
@@ -192,7 +243,7 @@ export default function UserManagementPage() {
     
     switch (confirmAction) {
       case "promote":
-        updateUserRole(userToManage.id, "manager");
+        updateUserRole(userToManage.id, "manager", selectedOrganizations);
         break;
       case "demote":
         updateUserRole(userToManage.id, "user");
@@ -200,6 +251,15 @@ export default function UserManagementPage() {
       case "delete":
         deleteUser(userToManage.id);
         break;
+    }
+  };
+
+  // Handle organization selection
+  const handleOrgSelection = (orgId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedOrganizations(prev => [...prev, orgId]);
+    } else {
+      setSelectedOrganizations(prev => prev.filter(id => id !== orgId));
     }
   };
 
@@ -404,6 +464,60 @@ export default function UserManagementPage() {
                 : confirmAction === "demote" 
                   ? "Confirm Role Change" 
                   : "Confirm Deletion"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Organization Selection Dialog */}
+      <Dialog open={showOrgSelection} onOpenChange={setShowOrgSelection}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Organizations to Manage</DialogTitle>
+            <DialogDescription>
+              Choose which organizations {userToManage?.full_name} will manage as a manager.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {userToManage && (
+              <div className="flex items-center gap-4 p-4 border rounded-lg mb-4">
+                <User className="h-8 w-8 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">{userToManage.full_name}</p>
+                  <p className="text-sm text-muted-foreground">{userToManage.email}</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Organizations:</Label>
+              {organizations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No organizations available.</p>
+              ) : (
+                organizations.map((org) => (
+                  <div key={org.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={org.id}
+                      checked={selectedOrganizations.includes(org.id)}
+                      onCheckedChange={(checked) => handleOrgSelection(org.id, checked as boolean)}
+                    />
+                    <Label htmlFor={org.id} className="text-sm">
+                      {org.name}
+                    </Label>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowOrgSelection(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmAction}
+              disabled={selectedOrganizations.length === 0}
+            >
+              Promote to Manager
             </Button>
           </DialogFooter>
         </DialogContent>
