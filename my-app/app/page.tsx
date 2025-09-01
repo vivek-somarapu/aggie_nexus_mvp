@@ -527,7 +527,7 @@ export default function Home() {
               <br />
               OF AGGIE
               <br />
-              INNOVATION.
+              ENTREPRENEURSHIP.
             </motion.h1>
 
             <div className="pl-2 sm:pl-0 pr-4 pt-[8rem]">
@@ -555,7 +555,7 @@ export default function Home() {
                 than stay up-to-date with industry progress—you now have the
                 opportunity to be a part of the growth forward. Post your ideas,
                 join a startup, network your product. It all happens right here,
-                in the central hub for A&M innovation.
+                in the central hub for A&M entrepreneurship.
               </p>
             </div>
 
@@ -971,7 +971,7 @@ export default function Home() {
                 Our Mission
               </motion.h2>
               <p className="leading-relaxed font-light text-base md:text-lg">
-                Aggie&nbsp;Nexus exists to create a central hub of innovation by
+                Aggie&nbsp;Nexus exists to create a central hub of entrepreneurship by
                 connecting entrepreneurs, builders, and investors into a unified
                 ecosystem. Our mission is to accelerate technology
                 commercialization and foster transformative collaboration—rooted
