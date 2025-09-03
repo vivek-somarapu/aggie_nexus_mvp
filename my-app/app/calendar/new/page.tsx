@@ -185,7 +185,9 @@ async function uploadPoster(file: File): Promise<string> {
     body: form,
   });
   if (!res.ok) {
-    throw new Error("Upload failed");
+    const errorData = await res.json().catch(() => ({}));
+    console.error("Upload error:", errorData);
+    throw new Error(`Upload failed: ${errorData.error || res.statusText}`);
   }
   const { publicUrl } = (await res.json()) as { publicUrl: string };
   return publicUrl;
