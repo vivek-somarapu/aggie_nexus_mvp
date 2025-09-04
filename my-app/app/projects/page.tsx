@@ -304,9 +304,6 @@ export default function ProjectsPage() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.4 }}
         >
-          <Button asChild className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white">
-            <Link href="/projects/new">Create New Project</Link>
-          </Button>
         </motion.div>
       </div>
 

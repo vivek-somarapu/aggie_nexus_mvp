@@ -245,7 +245,7 @@ export default function UsersPage() {
           {/* Blue accent background for talent */}
           <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
           <div className="relative z-10">
-            <h1 className="text-3xl font-bold tracking-tight">Talent</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Community</h1>
             <p className="text-muted-foreground">Connect with talented Aggies, industry experts, and potential mentors to grow your network</p>
           </div>
         </motion.div>
@@ -259,7 +259,7 @@ export default function UsersPage() {
         <Alert variant="info" className="mb-6 bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Note: Only talent with complete profiles (including bio and skills) are displayed here.
+            Note: Only people with complete profiles (including bio and skills) are displayed here.
           </AlertDescription>
         </Alert>
       </motion.div>
@@ -302,7 +302,7 @@ export default function UsersPage() {
         >
           <div className="flex-1">
             <Input
-              placeholder="Search talent..."
+              placeholder="Search community..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full"
@@ -348,7 +348,7 @@ export default function UsersPage() {
                 transition={{ duration: 0.3 }}
               >
                 <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                <span className="ml-2">Loading talent...</span>
+                <span className="ml-2">Loading community...</span>
               </motion.div>
             ) : (
               <>
