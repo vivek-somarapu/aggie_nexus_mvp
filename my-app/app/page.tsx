@@ -523,11 +523,11 @@ export default function Home() {
               animate="visible"
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[0.9]"
             >
-              THE CENTRAL HUB
+              WHERE HOWDY
               <br />
-              OF AGGIE
+              MEETS
               <br />
-              ENTREPRENEURSHIP.
+              OPPORTUNITY.
             </motion.h1>
 
             <div className="pl-2 sm:pl-0 pr-4 pt-[8rem]">
@@ -550,12 +550,12 @@ export default function Home() {
                   text-sm     sm:text-md   md:text-lg  
                 "
               >
-                Aggie Nexus was created to connect the needs of the industry
+                Howdy Nexus was created to connect the needs of the industry
                 with builders excited to meet those needs. Here you can do more
                 than stay up-to-date with industry progress—you now have the
                 opportunity to be a part of the growth forward. Post your ideas,
                 join a startup, network your product. It all happens right here,
-                in the central hub for A&M entrepreneurship.
+                in the innovation nexus of College Station.
               </p>
             </div>
 
@@ -608,7 +608,7 @@ export default function Home() {
                 <p className="text-muted-foreground text-center px-10 lg:px-5 lg:text-left leading-relaxed text-lg">
                   Our Projects Page is where ideas become a reality. Whether
                   you're starting a company or just looking for experience,
-                  Aggie Nexus is the place to start.
+                  Nexus is the place to start.
                 </p>
               </div>
 
@@ -971,7 +971,7 @@ export default function Home() {
                 Our Mission
               </motion.h2>
               <p className="leading-relaxed font-light text-base md:text-lg">
-                Aggie&nbsp;Nexus exists to create a central hub of entrepreneurship by
+                Nexus exists to create a hub of innovation by
                 connecting entrepreneurs, builders, and investors into a unified
                 ecosystem. Our mission is to accelerate technology
                 commercialization and foster transformative collaboration—rooted
@@ -996,7 +996,7 @@ export default function Home() {
               Privacy
             </Link>
           </div>
-          <p className="text-sm">© 2025 Aggie Nexus. All rights reserved.</p>
+          <p className="text-sm">© 2025 Howdy Nexus. All rights reserved.</p>
         </div>
       </section>
     </div>

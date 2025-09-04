@@ -26,6 +26,7 @@ import {
   FileText,
   MessageSquare,
   Bookmark,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
@@ -360,18 +361,9 @@ export default function Navbar() {
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link href="/manager/organizations/users" className="cursor-pointer">
-                          <Users className="mr-2 h-4 w-4" />
-                          User Management
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href="/manager/organizations/projects"
-                          className="cursor-pointer"
-                        >
-                          <FileText className="mr-2 h-4 w-4" />
-                          Project Management
+                        <Link href="/manager/organizations" className="cursor-pointer">
+                          <Building2 className="mr-2 h-4 w-4" />
+                          Organization Management
                         </Link>
                       </DropdownMenuItem>
                     </>

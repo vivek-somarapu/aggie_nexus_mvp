@@ -996,18 +996,18 @@ export default function ProfilePage() {
                                   <Avatar className="h-16 w-16">
                                     <AvatarImage
                                       src={inquiry.applicant_avatar || ""}
-                                      alt={inquiry.applicant_name}
+                                      alt={inquiry.applicant_name || "Applicant"}
                                     />
                                     <AvatarFallback>
-                                      {inquiry.applicant_name.charAt(0)}
+                                      {inquiry.applicant_name?.charAt(0) || '?'}
                                     </AvatarFallback> 
                                   </Avatar>
                                   <div className="text-center sm:text-left md:text-center">
                                     <h3 className="font-medium">
-                                      {inquiry.applicant_name}
+                                      {inquiry.applicant_name || 'Unknown User'}
                                     </h3>
                                     <p className="text-sm text-muted-foreground">
-                                      {inquiry.applicant_email}
+                                      {inquiry.applicant_email || 'No email available'}
                                     </p>
                                     <Button
                                       variant="outline"
