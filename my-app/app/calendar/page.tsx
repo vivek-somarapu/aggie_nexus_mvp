@@ -61,6 +61,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 /* ────── Constants ────── */
 import {
@@ -666,7 +667,7 @@ export default function CalendarPage() {
                                             {/* Location */}
                                             <div className="flex items-center gap-2 text-xs sm:text-sm dark:text-zinc-300 text-slate-600">
                                               {/^(https?:\/\/)/i.test(
-                                                e.location
+                                                e.location ?? ""
                                               ) ? (
                                                 <>
                                                   <LinkIcon className="h-5 w-5 text-muted-foreground" />
@@ -834,12 +835,16 @@ export default function CalendarPage() {
                             </div>
                             <div>
                               <p className="font-medium text-[14px]">
-                                {/^(https?:\/\/)/i.test(selectedEvent.location)
+                                {/^(https?:\/\/)/i.test(
+                                  selectedEvent.location ?? ""
+                                )
                                   ? "Online Event"
                                   : selectedEvent.location}
                               </p>
                               <p className="text-muted-foreground text-xs">
-                                {/^(https?:\/\/)/i.test(selectedEvent.location)
+                                {/^(https?:\/\/)/i.test(
+                                  selectedEvent.location ?? ""
+                                )
                                   ? ""
                                   : "In-person Event"}
                               </p>
@@ -907,20 +912,114 @@ export default function CalendarPage() {
                           rows={2}
                           className="text-sm"
                         />
-                        <Button
-                          onClick={handleRSVP}
-                          disabled={rsvpLoading}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 text-sm"
-                        >
-                          {rsvpLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Registering...
-                            </>
-                          ) : (
-                            "One-Click RSVP"
-                          )}
-                        </Button>
+                        <div className="flex gap-2 w-full">
+                          <Button
+                            onClick={handleRSVP}
+                            disabled={rsvpLoading}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 text-sm min-w-0"
+                          >
+                            {rsvpLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Registering...
+                              </>
+                            ) : (
+                              "One-Click RSVP"
+                            )}
+                          </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 text-sm min-w-0">
+                                Add to Calendar
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-56 p-0">
+                              <div className="flex flex-col divide-y divide-border">
+                                <button
+                                  className="w-full text-left px-4 py-3 hover:bg-muted text-sm"
+                                  onClick={() => {
+                                    // Google Calendar link
+                                    const start = encodeURIComponent(
+                                      selectedEvent.start
+                                        .toISOString()
+                                        .replace(/[-:]|\.\d{3}/g, "")
+                                    );
+                                    const end = encodeURIComponent(
+                                      selectedEvent.end
+                                        .toISOString()
+                                        .replace(/[-:]|\.\d{3}/g, "")
+                                    );
+                                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+                                      selectedEvent.title
+                                    )}&dates=${start}/${end}&details=${encodeURIComponent(
+                                      selectedEvent.description || ""
+                                    )}&location=${encodeURIComponent(
+                                      selectedEvent.location || ""
+                                    )}`;
+                                    window.open(url, "_blank");
+                                  }}
+                                >
+                                  Google Calendar
+                                </button>
+                                <button
+                                  className="w-full text-left px-4 py-3 hover:bg-muted text-sm"
+                                  onClick={() => {
+                                    // Outlook Calendar link
+                                    const start = encodeURIComponent(
+                                      selectedEvent.start.toISOString()
+                                    );
+                                    const end = encodeURIComponent(
+                                      selectedEvent.end.toISOString()
+                                    );
+                                    const url = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(
+                                      selectedEvent.title
+                                    )}&body=${encodeURIComponent(
+                                      selectedEvent.description || ""
+                                    )}&startdt=${start}&enddt=${end}&location=${encodeURIComponent(
+                                      selectedEvent.location || ""
+                                    )}`;
+                                    window.open(url, "_blank");
+                                  }}
+                                >
+                                  Outlook Calendar
+                                </button>
+                                <button
+                                  className="w-full text-left px-4 py-3 hover:bg-muted text-sm"
+                                  onClick={() => {
+                                    // Apple Calendar: download .ics
+                                    const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${selectedEvent.title}\nDESCRIPTION:${
+                                      selectedEvent.description || ""
+                                    }\nLOCATION:${
+                                      selectedEvent.location || ""
+                                    }\nDTSTART:${selectedEvent.start
+                                      .toISOString()
+                                      .replace(/[-:]|\.\d{3}/g, "")
+                                      .replace("Z", "Z")}\nDTEND:${selectedEvent.end
+                                      .toISOString()
+                                      .replace(/[-:]|\.\d{3}/g, "")
+                                      .replace("Z", "Z")}\nEND:VEVENT\nEND:VCALENDAR`;
+                                    const blob = new Blob([icsContent], {
+                                      type: "text/calendar",
+                                    });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = url;
+                                    a.download = `${selectedEvent.title.replace(
+                                      /\s+/g,
+                                      "_"
+                                    )}.ics`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                  }}
+                                >
+                                  Apple Calendar
+                                </button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
                     ) : (
                       /* Guest RSVP */
@@ -964,24 +1063,118 @@ export default function CalendarPage() {
                           rows={2}
                           className="text-sm"
                         />
-                        <Button
-                          onClick={handleRSVP}
-                          disabled={
-                            rsvpLoading ||
-                            !rsvpData.name.trim() ||
-                            !rsvpData.email.trim()
-                          }
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 text-sm"
-                        >
-                          {rsvpLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Registering...
-                            </>
-                          ) : (
-                            "Register for Event"
-                          )}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={handleRSVP}
+                            disabled={
+                              rsvpLoading ||
+                              !rsvpData.name.trim() ||
+                              !rsvpData.email.trim()
+                            }
+                            className="w-full bg-green-600 hover:bg-green-700 text-white py-2 text-sm"
+                          >
+                            {rsvpLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Registering...
+                              </>
+                            ) : (
+                              "Register for Event"
+                            )}
+                          </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm min-w-0">
+                                Add to Calendar
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-56 p-0">
+                              <div className="flex flex-col divide-y divide-border">
+                                <button
+                                  className="w-full text-left px-4 py-3 hover:bg-muted text-sm"
+                                  onClick={() => {
+                                    // Google Calendar link
+                                    const start = encodeURIComponent(
+                                      selectedEvent.start
+                                        .toISOString()
+                                        .replace(/[-:]|\.\d{3}/g, "")
+                                    );
+                                    const end = encodeURIComponent(
+                                      selectedEvent.end
+                                        .toISOString()
+                                        .replace(/[-:]|\.\d{3}/g, "")
+                                    );
+                                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+                                      selectedEvent.title
+                                    )}&dates=${start}/${end}&details=${encodeURIComponent(
+                                      selectedEvent.description || ""
+                                    )}&location=${encodeURIComponent(
+                                      selectedEvent.location || ""
+                                    )}`;
+                                    window.open(url, "_blank");
+                                  }}
+                                >
+                                  Google Calendar
+                                </button>
+                                <button
+                                  className="w-full text-left px-4 py-3 hover:bg-muted text-sm"
+                                  onClick={() => {
+                                    // Outlook Calendar link
+                                    const start = encodeURIComponent(
+                                      selectedEvent.start.toISOString()
+                                    );
+                                    const end = encodeURIComponent(
+                                      selectedEvent.end.toISOString()
+                                    );
+                                    const url = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(
+                                      selectedEvent.title
+                                    )}&body=${encodeURIComponent(
+                                      selectedEvent.description || ""
+                                    )}&startdt=${start}&enddt=${end}&location=${encodeURIComponent(
+                                      selectedEvent.location || ""
+                                    )}`;
+                                    window.open(url, "_blank");
+                                  }}
+                                >
+                                  Outlook Calendar
+                                </button>
+                                <button
+                                  className="w-full text-left px-4 py-3 hover:bg-muted text-sm"
+                                  onClick={() => {
+                                    // Apple Calendar: download .ics
+                                    const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${selectedEvent.title}\nDESCRIPTION:${
+                                      selectedEvent.description || ""
+                                    }\nLOCATION:${
+                                      selectedEvent.location || ""
+                                    }\nDTSTART:${selectedEvent.start
+                                      .toISOString()
+                                      .replace(/[-:]|\.\d{3}/g, "")
+                                      .replace("Z", "Z")}\nDTEND:${selectedEvent.end
+                                      .toISOString()
+                                      .replace(/[-:]|\.\d{3}/g, "")
+                                      .replace("Z", "Z")}\nEND:VEVENT\nEND:VCALENDAR`;
+                                    const blob = new Blob([icsContent], {
+                                      type: "text/calendar",
+                                    });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = url;
+                                    a.download = `${selectedEvent.title.replace(
+                                      /\s+/g,
+                                      "_"
+                                    )}.ics`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                  }}
+                                >
+                                  Apple Calendar
+                                </button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
                     )}
                   </Card>
