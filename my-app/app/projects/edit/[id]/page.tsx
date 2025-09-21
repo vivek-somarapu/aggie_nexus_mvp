@@ -25,12 +25,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -137,6 +138,9 @@ export default function EditProjectPage({
     project_status: "Idea Phase",
     funding_received: 0,
   });
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
 
   // Fetch project data when component mounts
   useEffect(() => {
@@ -375,6 +379,29 @@ export default function EditProjectPage({
     }
   };
 
+  const handleDeleteProject = async () => {
+    setDeleteInProgress(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete project");
+      toast.success("Project deleted successfully");
+      router.push("/profile?tab=projects");
+    } catch (err) {
+      toast.error("Failed to delete project");
+    } finally {
+      setDeleteInProgress(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/projects");
+    }
+  };
+
   // Display loading state
   if (authLoading || isLoading) {
     return (
@@ -442,7 +469,7 @@ export default function EditProjectPage({
           variant="ghost"
           size="sm"
           className="mb-4"
-          onClick={() => router.back()}
+          onClick={handleBack}
         >
           <ChevronLeft className="mr-2 h-4 w-4" />
           Back
@@ -790,6 +817,14 @@ export default function EditProjectPage({
           >
             Cancel
           </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={deleteInProgress}
+          >
+            Delete Project
+          </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
@@ -800,6 +835,27 @@ export default function EditProjectPage({
               "Update Project"
             )}
           </Button>
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Project</DialogTitle>
+              </DialogHeader>
+              <p>Are you sure you want to delete this project? This action cannot be undone.</p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteProject}
+                  disabled={deleteInProgress}
+                >
+                  {deleteInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </form>
     </div>
