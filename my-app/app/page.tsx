@@ -338,63 +338,51 @@ const fadeUpSlow = {
 const projects = [
   {
     id: 1,
-    title: "Mobile App for Local Farmers Markets",
+    title: "Firelight Innovations",
     stage: "Project",
     status: "In Progress",
     recruiting: "Actively Recruiting",
     summary:
-      "Developing an augmented-reality application that provides interactive information about local vendors and their goods.",
-    location: "Hybrid",
-    createdAt: new Date("2025-05-25"),
-    tags: ["Technology", "Agriculture"],
+      "We are building Weave, a practical AI automation platform, and validating it through FiApply and Orbit to make everyday automation private, affordable, and easy to adopt.",
+    location: "Flexible",
+    createdAt: new Date("2025-05-28"),
+    tags: ["Information Technology", "AI", "Web Dev"],
   },
   {
     id: 2,
-    title: "Aerial Drone Launcher Development",
+    title: "Search & Rescue Drone",
     stage: "Idea",
-    status: "Planning",
-    recruiting: "Full team, seeking investment",
+    status: "In Progress",
+    recruiting: "Actively Recruiting",
     summary:
-      "Building a full-scale prototype of a military-grade drone launcher for water craft. Looking for students interested in mechanical engineering.",
-    location: "In-person",
+      "Designing and building a long range drone to be used for search and rescue and other needed purposes",
+    location: "Hybrid",
     createdAt: new Date("2025-06-28"),
-    tags: ["Manufacturing", "Technology", "Other"],
+    tags: ["Aerospace"],
   },
   {
     id: 3,
-    title: "FinTech App",
+    title: "Leaf Blower Nozzle Development",
     stage: "Project",
-    status: "Ongoing",
-    recruiting: "Looking for co-founders",
+    status: "Planning",
+    recruiting: "Not Recruiting",
     summary:
-      "We’re looking for teammates with Customer Service and Design expertise to join us on this FinTech application.",
-    location: "Hybrid",
-    createdAt: new Date("2025-04-18"),
-    tags: ["Nonprofit", "Customer Service", "Design"],
+      "Work with an experienced product development engineer and a Texas A&M professor to design, develop, and test novel nozzle designs for leaf blowers.",
+    location: "Remote",
+    createdAt: new Date("2025-07-06"),
+    tags: ["STEM", "Retail"],
   },
   {
     id: 4,
-    title: "AI App",
+    title: "PETRA: Plasma Metallurgy",
     stage: "Project",
-    status: "Not Started",
-    recruiting: "Looking for co-founders",
+    status: "In Progress",
+    recruiting: "Open to Collaboration",
     summary:
-      "Seeking Marketing and Sales talent to help launch an AI-driven application in the food & beverage space.",
+      "PETRA aims to revolutionize titanium production by replacing the outdated Kroll Process with a cleaner, faster, and more scalable microwave plasma-based method.",
     location: "Remote",
-    createdAt: new Date("2025-04-18"),
-    tags: ["Food & Beverage", "Marketing", "Sales"],
-  },
-  {
-    id: 5,
-    title: "ML App",
-    stage: "Idea",
-    status: "Not Started",
-    recruiting: "Recruiting team members",
-    summary:
-      "Looking for teammates with strong Problem-Solving and Research skills to build an energy-sector ML solution.",
-    location: "Remote",
-    createdAt: new Date("2025-04-18"),
-    tags: ["Energy", "Problem Solving", "Research"],
+    createdAt: new Date("2025-01-16"),
+    tags: ["Aerospace", "Electrical", "Material Science"],
   },
 ];
 
@@ -523,11 +511,11 @@ export default function Home() {
               animate="visible"
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[0.9]"
             >
-              WHERE HOWDY
+              THE CENTRAL
               <br />
-              MEETS
+              HUB OF AGGIE
               <br />
-              OPPORTUNITY.
+              ENTREPRENEURSHIP.
             </motion.h1>
 
             <div className="pl-2 sm:pl-0 pr-4 pt-[8rem]">
@@ -538,7 +526,7 @@ export default function Home() {
                 animate="visible"
                 className="text-xl sm:text-3xl md:text-3xl lg:text-4xl font-semibold tracking-tight mb-1"
               >
-                The Future Starts Here.
+                Our Ecosystem.
               </motion.h2>
 
               {/* body copy */}
@@ -550,12 +538,9 @@ export default function Home() {
                   text-sm     sm:text-md   md:text-lg  
                 "
               >
-                Howdy Nexus was created to connect the needs of the industry
-                with builders excited to meet those needs. Here you can do more
-                than stay up-to-date with industry progress—you now have the
-                opportunity to be a part of the growth forward. Post your ideas,
-                join a startup, network your product. It all happens right here,
-                in the innovation nexus of College Station.
+                AggieX was formed to connect entrepreneurial students, faculty, 
+                and alumni across all disciplines and industries. For the Founders, 
+                Funders, and Builders at Texas A&M..
               </p>
             </div>
 
@@ -591,9 +576,9 @@ export default function Home() {
               whileInView="visible"
               className="ml-auto max-w-4xl text-right pr-0 2xl:pr-[7.5rem] text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
             >
-              Join a project in progress.
+              Join a project. 
               <br className="hidden sm:block" />
-              Post your idea for a new one.
+              Or post a new one.
             </motion.h2>
 
             {/* ── Copy + carousel wrapper ── */}
@@ -833,7 +818,7 @@ export default function Home() {
               whileInView="visible"
               className="max-w-4xl text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight mb-12"
             >
-              Expand your network. Find new opportunities. Stay in the know.
+              Find new opportunities to network.
             </motion.h2>
 
             {/* ── Calendar + copy grid ── */}
@@ -848,11 +833,9 @@ export default function Home() {
                   text-sm sm:text-base md:text-lg
                 "
               >
-                Our Nexus calendar lets you stay up to date with all of the
-                A&amp;M events that you wouldn’t want to miss. Looking to grow
-                your network? Find an upcoming networking event in your
-                industry. Trying to hone your technical skills? Look for a
-                workshop. We have it all right here, convenient and accessible.
+                The AggieX calendar allows you to stay up to date with all entrepreneurial 
+                events. Want to post an event? Contact us to become a Manager of your 
+                organization.
               </p>
 
               {/* ✦ calendar preview — second on ≤md, first on ≥lg */}
@@ -919,7 +902,7 @@ export default function Home() {
                           </div>
 
                           {/* month view */}
-                          <div className="flex-1 overflow-hidden">
+                          <div className="flex-1 overflow-hidden rounded-b-xl">
                             <CustomCalendarMonthView />
                           </div>
                         </div>
@@ -971,11 +954,8 @@ export default function Home() {
                 Our Mission
               </motion.h2>
               <p className="leading-relaxed font-light text-base md:text-lg">
-                Nexus exists to create a hub of innovation by
-                connecting entrepreneurs, builders, and investors into a unified
-                ecosystem. Our mission is to accelerate technology
-                commercialization and foster transformative collaboration—rooted
-                in Texas&nbsp;A&amp;M University and its affiliated network.
+                Are you an organization or program that wants to partner with AggieX? 
+                Contact us to set up an organization profile.
               </p>
             </div>
           </div>
@@ -984,17 +964,25 @@ export default function Home() {
         {/* Footer */}
         <div className="container py-8 text-center dark:text-white/60 text-muted-foreground border-t">
           <div className="flex items-center justify-center gap-4 mb-2">
-            <Link href="/about" className="text-sm hover:underline">
-              About
-            </Link>
-            <span className="text-muted-foreground">•</span>
+            <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              navigator.clipboard.writeText("fathkedakota@gmail.com");
+              alert("Email copied to clipboard!");
+            }}
+            className="text-sm hover:underline cursor-pointer"
+          >
+            Contact
+          </a>
+            {/* <span className="text-muted-foreground">•</span>
             <Link href="/terms" className="text-sm hover:underline">
               Terms
             </Link>
             <span className="text-muted-foreground">•</span>
             <Link href="/privacy" className="text-sm hover:underline">
               Privacy
-            </Link>
+            </Link> */}
           </div>
           <p className="text-sm">© 2025 Howdy Nexus. All rights reserved.</p>
         </div>
