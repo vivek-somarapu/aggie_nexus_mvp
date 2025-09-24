@@ -681,7 +681,7 @@ export default function ProfilePage() {
         <OrganizationAffiliationStatus userId={profile.id} />
 
         <Tabs value={activeTab} onValueChange={onTabChange} className="w-full"> 
-          <div className="hidden sm:flex justify-center mb-4">
+          <div className="hidden sm:flex justify-center m-4">
             <TabsList className="flex flex-wrap gap-2">
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="projects">My Projects</TabsTrigger>
@@ -692,7 +692,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Dropdown for mobile */}
-          <div className="sm:hidden mb-4">
+          <div className="sm:hidden m-4">
           <Select value={activeTab} onValueChange={onTabChange}>
             <SelectTrigger className="w-full h-10 px-3 text-sm border rounded-lg">
               <SelectValue placeholder="Select a section" />
@@ -1510,7 +1510,7 @@ export default function ProfilePage() {
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <Calendar className="w-4 h-4" />
-                                      {format(rsvp.end_time, "MMM d, yyyy")}
+                                      {format(rsvp.start_time, "MMM d, yyyy")}
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <MapPin className="w-4 h-4" />
@@ -1580,7 +1580,7 @@ export default function ProfilePage() {
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <Calendar className="w-4 h-4" />
-                                      {format(event.end, "MMM d, yyyy")}
+                                      {format(event.start, "MMM d, yyyy")}
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <MapPin className="w-4 h-4" />
