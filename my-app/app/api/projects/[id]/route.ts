@@ -78,8 +78,13 @@ export async function DELETE(
   return withAuth(req, async (userId, req) => {
     try {
       const { id } = await params;
-      
-      // Check if the user is the owner of the project
+      const supabase = await import("@/lib/supabase/server").then(m => m.createClient());
+      // Get current user info
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+      }
+      // Get project
       const project = await getProjectById(id);
       if (!project) {
         return NextResponse.json(
@@ -87,17 +92,27 @@ export async function DELETE(
           { status: 404 }
         );
       }
-      
-      if (project.owner_id !== userId) {
+      // Check if admin (role === 'admin')
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      const isAdmin = userProfile?.role === 'admin';
+      // Admins can hard delete, owners can soft delete
+      if (isAdmin) {
+        const { hardDeleteProject } = await import("@/lib/models/projects");
+        const success = await hardDeleteProject(id);
+        return NextResponse.json({ success, admin: true });
+      } else if (project.owner_id === userId) {
+        const success = await deleteProject(id);
+        return NextResponse.json({ success, admin: false });
+      } else {
         return NextResponse.json(
           { error: "You don't have permission to delete this project" },
           { status: 403 }
         );
       }
-      
-      const success = await deleteProject(id);
-      
-      return NextResponse.json({ success: true });
     } catch (error) {
       console.error('Error deleting project:', error);
       return NextResponse.json(
@@ -106,4 +121,4 @@ export async function DELETE(
       );
     }
   });
-} 
+}
