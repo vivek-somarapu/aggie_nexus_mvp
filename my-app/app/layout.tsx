@@ -13,20 +13,20 @@ import AuthStateSync from "../components/auth-state-sync";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Aggie Nexus",
+  title: "AggieX",
   description: "Connect builders, funders, and commercializers",
   openGraph: {
-    title: "Aggie Nexus",
+    title: "AggieX",
     description:
       "Connect builders, funders, and commercializers within the Aggie community",
     url: "https://aggienexus.com",
-    siteName: "Aggie Nexus",
+    siteName: "AggieX",
     images: [
       {
         url: "/images/circles-logo.png",
         width: 1200,
         height: 630,
-        alt: "Aggie Nexus logo",
+        alt: "AggieX logo",
       },
     ],
     locale: "en_US",
