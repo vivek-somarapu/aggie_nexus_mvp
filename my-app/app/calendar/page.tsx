@@ -310,7 +310,7 @@ export default function CalendarPage() {
             {/* Desktop: inline filters & stats */}
             <div className="hidden md:flex items-center gap-6">
               {/* Industry Filter */}
-              <div>
+              {/* <div>
                 <label className="sr-only">Industry</label>
                 <Select
                   value={industryFilter}
@@ -328,7 +328,7 @@ export default function CalendarPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div> */}
 
               {/* Event Type */}
               <div>
@@ -420,7 +420,7 @@ export default function CalendarPage() {
         >
           <div className="space-y-3 py-3 ">
             {/* Industry Filter */}
-            <div>
+            {/* <div>
               <Label
                 htmlFor="mobile-filter-industry"
                 className="text-sm py-2 font-medium"
@@ -440,7 +440,7 @@ export default function CalendarPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </div> */}
 
             {/* Event Type */}
             <div>
