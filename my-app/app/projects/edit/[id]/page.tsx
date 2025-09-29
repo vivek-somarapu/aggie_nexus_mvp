@@ -35,25 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 
 import React from "react";
 import { createClient } from "@/lib/supabase/client";
-
-// Industry options
-const industryOptions = [
-  "Technology",
-  "Healthcare",
-  "Education",
-  "Finance",
-  "Entertainment",
-  "Retail",
-  "Manufacturing",
-  "Agriculture",
-  "Energy",
-  "Transportation",
-  "Real Estate",
-  "Nonprofit",
-  "Sports",
-  "Food & Beverage",
-  "Other",
-];
+import { industryOptions } from "@/lib/constants";
 
 // Skill options
 const skillOptions = [
@@ -194,6 +176,7 @@ export default function EditProjectPage({
         // Fetch available programs for user
         if (user) {
           const supabase = createClient();
+          if (!supabase) return;
           const { data: orgMemberships } = await supabase
             .from('organization_members')
             .select(`
@@ -202,13 +185,13 @@ export default function EditProjectPage({
             .eq('user_id', user.id);
           
         const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
-        // Filter to only include special programs (incubator/accelerator)
-        const specialPrograms = userOrgs.filter((org: string) => 
-          org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
+        // Fix: filter out undefined values from userOrgs before filtering for special/regular programs
+        const userOrgsFiltered = (userOrgs as string[]).filter((org): org is string => typeof org === "string");
+        const specialPrograms = userOrgsFiltered.filter(
+          (org) => org === "Aggies Create Incubator" || org === "AggieX Accelerator"
         );
-        // Filter to only include regular organizations (non-special programs)
-        const regularOrganizations = userOrgs.filter((org: string) => 
-          org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
+        const regularOrganizations = userOrgsFiltered.filter(
+          (org) => org !== "Aggies Create Incubator" && org !== "AggieX Accelerator"
         );
         setAvailablePrograms(specialPrograms);
         setAvailableOrganizations(regularOrganizations);
