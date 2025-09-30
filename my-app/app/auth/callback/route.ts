@@ -113,8 +113,8 @@ export async function GET(request: NextRequest) {
     
     // Check email verification status first
     if (!user.email_confirmed_at) {
-      callbackLog("User email not verified, redirecting to verification page");
-      return NextResponse.redirect(new URL('/auth/verify-email', requestUrl.origin))
+      callbackLog("User email not verified, redirecting to waiting page");
+      return NextResponse.redirect(new URL('/auth/waiting', requestUrl.origin))
     }
     
     // After OAuth login, check/create user profile and determine redirect

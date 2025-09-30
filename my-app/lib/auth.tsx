@@ -4,7 +4,7 @@
 // ---------------------------------------------
 // This module exports:
 // 1. `AuthUser`  - minimal auth user info from Supabase Auth (id, email)
-// 2. `Profile`   - extended user profile stored in your own `users` table
+// 2. `Profile`   - extended user profile stored in `users` table
 // 3. `AuthProvider` & `useAuth` hook for accessing both
 
 import { createContext, useContext, useEffect, useState, useRef } from "react";
@@ -345,6 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setAuthUser(null);
               setProfile(null);
               setAuthState(null);
+              await supabase.auth.signOut(); // This destroys the Supabase session
             }
           }
         );
@@ -529,7 +530,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
 
       const supabase = createClient();
-      authLog("signUp: Calling signUp");
+      
+      // First check if user already exists in users table
+      authLog("signUp: Checking if user already exists in users table");
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('email', email)
+        .single();
+      
+      if (existingUser) {
+        authLog("signUp: User already exists in users table", { userId: existingUser.id });
+        setError("An account with this email already exists. Please sign in instead.");
+        return false;
+      }
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        authError("signUp: Error checking existing user", checkError);
+        setError("Failed to check existing account. Please try again.");
+        return false;
+      }
+      
+      authLog("signUp: User does not exist, proceeding with signup");
       const { error, data } = await supabase.auth.signUp({
         email,
         password,
