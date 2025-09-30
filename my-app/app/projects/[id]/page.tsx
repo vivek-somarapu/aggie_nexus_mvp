@@ -68,6 +68,7 @@ export default function ProjectPage() {
 
   // Inquiry dialog state
   const [inquiryNote, setInquiryNote] = useState("");
+  const [preferredContact, setPreferredContact] = useState("");
   const [isInquiryOpen, setIsInquiryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inquiryError, setInquiryError] = useState<string | null>(null);
@@ -180,6 +181,11 @@ export default function ProjectPage() {
       return;
     }
 
+    if (!preferredContact) {
+      setInquiryError("Please select your preferred form of contact");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setInquiryError(null);
@@ -206,6 +212,7 @@ export default function ProjectPage() {
         project_id: project.id,
         user_id: currentUser.id,
         note: inquiryNote,
+        preferred_contact: preferredContact,
         status: "pending",
       });
 
@@ -214,6 +221,7 @@ export default function ProjectPage() {
       // Show success message and reset form
       setInquirySuccess(true);
       setInquiryNote("");
+      setPreferredContact("");
 
       // Close dialog after a delay
       setTimeout(() => {
@@ -525,6 +533,22 @@ export default function ProjectPage() {
                           </Alert>
                         )}
 
+                        <div className="mb-4">
+                          <label htmlFor="preferredContact" className="block text-sm font-medium mb-1">Preferred Form of Contact <span className="text-red-500">*</span></label>
+                          <select
+                            id="preferredContact"
+                            className="w-full border rounded px-3 py-2"
+                            value={preferredContact}
+                            onChange={e => setPreferredContact(e.target.value)}
+                            required
+                          >
+                            <option value="" disabled>Select an option</option>
+                            <option value="Email">Email</option>
+                            <option value="Phone">Phone</option>
+                            <option value="LinkedIn">LinkedIn</option>
+                          </select>
+                        </div>
+
                         <Textarea
                           placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
                           value={inquiryNote}
@@ -546,6 +570,7 @@ export default function ProjectPage() {
                             disabled={
                               isSubmitting ||
                               !inquiryNote.trim() ||
+                              !preferredContact ||
                               !currentUser
                             }
                           >

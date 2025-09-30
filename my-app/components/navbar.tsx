@@ -31,7 +31,9 @@ import {
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { inquiryService } from "@/lib/services/inquiry-service";
+import { inquiryService, ProjectInquiry } from "@/lib/services/inquiry-service";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -42,6 +44,12 @@ export default function Navbar() {
   const toggleNavigation = () => {
     setOpenNavigation(!openNavigation);
   };
+
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxTab, setInboxTab] = useState<'received' | 'sent'>('received');
+  const [receivedInquiries, setReceivedInquiries] = useState<ProjectInquiry[]>([]);
+  const [sentInquiries, setSentInquiries] = useState<ProjectInquiry[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
 
   // Load pending inquiries
   useEffect(() => {
@@ -70,9 +78,24 @@ export default function Navbar() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [authUser]);
+
+  // Load inquiries for inbox popup
+  useEffect(() => {
+    if (!authUser || !inboxOpen) return;
+    setInquiriesLoading(true);
+    Promise.all([
+      inquiryService.getReceivedInquiries(authUser.id),
+      inquiryService.getSentInquiries(authUser.id),
+    ]).then(([received, sent]) => {
+      setReceivedInquiries(received);
+      setSentInquiries(sent);
+    }).finally(() => setInquiriesLoading(false));
+  }, [authUser, inboxOpen]);
 
   const handleLogout = async () => {
     setOpenNavigation(false);
@@ -244,6 +267,72 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="flex flex-1 items-center justify-end space-x-4">
+              {/* Inbox Icon Popup */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                onClick={() => setInboxOpen(true)}
+                aria-label="Inbox"
+              >
+                <MessageSquare className="h-6 w-6" />
+                {pendingInquiries > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-1 -right-1 px-1 py-0 h-5 min-w-5 flex items-center justify-center rounded-full"
+                  >
+                    {pendingInquiries}
+                  </Badge>
+                )}
+              </Button>
+              <Dialog open={inboxOpen} onOpenChange={setInboxOpen}>
+                <DialogContent className="max-w-lg w-full">
+                  <DialogHeader>
+                    <DialogTitle>Inbox</DialogTitle>
+                  </DialogHeader>
+                  <Tabs value={inboxTab} onValueChange={v => setInboxTab(v as 'received' | 'sent')}>
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="received">Received</TabsTrigger>
+                      <TabsTrigger value="sent">Sent</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="received">
+                      {inquiriesLoading ? (
+                        <div className="py-8 text-center">Loading...</div>
+                      ) : receivedInquiries.length === 0 ? (
+                        <div className="py-8 text-center text-muted-foreground">No received inquiries.</div>
+                      ) : (
+                        <ul className="space-y-2 max-h-80 overflow-y-auto">
+                          {receivedInquiries.map(inq => (
+                            <li key={inq.id} className="border rounded p-2">
+                              <div className="font-semibold">{inq.project_title}</div>
+                              <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
+                              <div className="text-sm mt-1">{inq.note}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="sent">
+                      {inquiriesLoading ? (
+                        <div className="py-8 text-center">Loading...</div>
+                      ) : sentInquiries.length === 0 ? (
+                        <div className="py-8 text-center text-muted-foreground">No sent inquiries.</div>
+                      ) : (
+                        <ul className="space-y-2 max-h-80 overflow-y-auto">
+                          {sentInquiries.map(inq => (
+                            <li key={inq.id} className="border rounded p-2">
+                              <div className="font-semibold">{inq.project_title}</div>
+                              <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
+                              <div className="text-sm mt-1">{inq.note}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </DialogContent>
+              </Dialog>
+              {/* Create Project Button */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -291,25 +380,6 @@ export default function Navbar() {
                     <Link href="/profile" className="cursor-pointer">
                       <UserIcon className="mr-2 h-4 w-4" />
                       Profile
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href="/profile?tab=inquiries"
-                      className="cursor-pointer flex items-center justify-between"
-                    >
-                      <div className="flex items-center">
-                        <MessageSquare className="mr-4 h-4 w-4" />
-                        Project Inquiries
-                      </div>
-                      {pendingInquiries > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 px-1 py-0 h-5 min-w-5 flex items-center justify-center rounded-full"
-                        >
-                          {pendingInquiries}
-                        </Badge>
-                      )}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
