@@ -41,9 +41,13 @@ export function profileSetupStatus(user: Profile | null) {
   // Check if they have the minimal required fields
   const hasRequiredData =
     user.full_name?.trim() !== "" &&
+    user.full_name?.trim() !== "User" &&
     user.bio?.trim() !== "" &&
+    user.email?.trim() !== "" &&
     Array.isArray(user.skills) &&
-    user.skills.length > 0;
+    user.skills.length > 0 && 
+    Array.isArray(user.industry) &&
+    user.industry.length > 0;
 
   // If they lack required data and haven't explicitly skipped, prompt for setup
   if (!hasRequiredData) {

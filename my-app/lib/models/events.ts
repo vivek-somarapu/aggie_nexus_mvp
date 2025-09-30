@@ -115,7 +115,7 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
 }
 
 /** ─────── UPDATE STATUS ─────── */
-export async function (
+export async function updateEventStatus(
   id: string,
   status: "pending" | "approved" | "rejected",
   managerId?: string

@@ -13,8 +13,6 @@ import { createClient } from "./supabase/client";
 import {
   User as SupabaseUser,
   Session,
-  AuthError,
-  User,
 } from "@supabase/supabase-js";
 import { getClientAuthState, clearAuthState, type AuthState } from "./auth-state-client";
 
@@ -59,21 +57,6 @@ export type Profile = {
   website_url?: string;
   industry?: string[];
   skills?: string[];
-  organizations?: string[];
-// New fields for orgnanization affiliations and verifications
-  organization_claims?: Array<{
-    organization: string;
-    claimed_at: string;
-    verification_method?: string;
-    status: 'pending' | 'verified' | 'rejected';
-  }>;
-  organization_verifications?: Record<string, {
-    verified_at: string;
-    verified_by: string;
-    verification_method: string;
-    notes?: string;
-  }>;
-
   graduation_year?: number;
   is_texas_am_affiliate?: boolean;
   contact?: {
@@ -83,6 +66,7 @@ export type Profile = {
   profile_setup_skipped?: boolean;
   profile_setup_completed?: boolean;
   profile_setup_skipped_at?: string;
+  email_verified?: boolean;
   last_login_at?: string;
   role?: string;
   additional_links?: { url: string; title: string }[];
@@ -133,7 +117,7 @@ const AuthContext = createContext<AuthContextType>({
  * @param userId User ID to fetch profile for
  * @returns User profile or null if not found
  */
-async function fetchUserProfile(userId: string): Promise<Profile | null> {
+async function fetchUserProfile(userId: string, userFullName: string, userEmail: string, isVerifiedEmail: boolean): Promise<Profile | null> {
   authLog("fetchUserProfile: Starting profile fetch", { userId });
   const supabase = createClient();
 
@@ -150,29 +134,60 @@ async function fetchUserProfile(userId: string): Promise<Profile | null> {
     if (error) {
       authError("fetchUserProfile: Database error", { error: error.message, code: error.code });
       
-      // If user not found, create a fallback profile
+      // If user not found, create a new profile in the database
       if (error.code === 'PGRST116') {
-        authLog("fetchUserProfile: User not found in database, creating fallback profile");
-        return {
-          id: userId,
-          full_name: "User",
-          email: "",
-          bio: "",
-          skills: [],
-          industry: [],
-        };
+        authLog("fetchUserProfile: User not found in database, creating new profile");
+        
+        try {
+          const { error: createError } = await supabase
+            .from('users')
+            .insert({
+              id: userId,
+              email: userEmail,
+              full_name: userFullName || 'User',
+              email_verified: isVerifiedEmail,
+              industry: [],
+              skills: [],
+              contact: { email: userEmail },
+              views: 0,
+              is_texas_am_affiliate: false,
+              deleted: false,
+              last_login_at: new Date().toISOString(),
+              profile_setup_completed: false,
+              profile_setup_skipped: false
+            });
+          
+          if (createError) {
+            authError("fetchUserProfile: Failed to create user profile", createError);
+            return null;
+          }
+          
+          authLog("fetchUserProfile: User profile created successfully");
+          
+          // Fetch the newly created profile
+          const { data: newData, error: fetchError } = await supabase
+            .from("users")
+            .select("*")
+            .eq("id", userId)
+            .eq("deleted", false)
+            .single();
+          
+          if (fetchError) {
+            authError("fetchUserProfile: Failed to fetch newly created profile", fetchError);
+            return null;
+          }
+          
+          return newData as Profile;
+          
+        } catch (createErr: any) {
+          authError("fetchUserProfile: Exception creating user profile", createErr);
+          return null;
+        }
       }
       
-      // For other errors, return fallback profile to prevent blocking
-      authError("fetchUserProfile: Returning fallback profile due to error");
-      return {
-        id: userId,
-        full_name: "User",
-        email: "",
-        bio: "",
-        skills: [],
-        industry: [],
-      };
+      // For other errors, return null to indicate failure
+      authError("fetchUserProfile: Database error, returning null");
+      return null;
     }
 
     authLog("fetchUserProfile: Profile fetch successful", { 
@@ -185,15 +200,7 @@ async function fetchUserProfile(userId: string): Promise<Profile | null> {
     return data as Profile;
   } catch (err) {
     authError("fetchUserProfile: Exception during profile fetch", err);
-    // Return fallback profile to prevent complete failure
-    return {
-      id: userId,
-      full_name: "User",
-      email: "",
-      bio: "",
-      skills: [],
-      industry: [],
-    };
+    return null;
   }
 }
 
@@ -267,7 +274,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (clientAuthState.isAuthenticated && clientAuthState.user) {
           setAuthUser(mapSupabaseUser(clientAuthState.user));
-          setProfile(clientAuthState.profile);
+          
+          // Fetch user profile (will create if missing)
+          const userProfile = await fetchUserProfile(
+            clientAuthState.user.id, 
+            clientAuthState.user.email || '', 
+            clientAuthState.user.user_metadata.full_name || 'User',
+            !!clientAuthState.user.email_confirmed_at
+          );
+          
+          if (userProfile) {
+            setProfile(userProfile);
+          } else {
+            authError("useEffect: Failed to fetch or create user profile");
+            // Don't fail the entire auth initialization
+          }
         } else {
           setAuthUser(null);
           setProfile(null);
@@ -409,7 +430,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      authLog("signIn: Authentication successful", { 
+      authLog("signIn: Supabase Authentication successful", { 
         userId: data.user.id,
         isEmailConfirmed: !!data.user.email_confirmed_at 
       });
@@ -450,19 +471,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
 
-      // Fetch user profile after successful sign-in (for verified users)
+      // Fetch user profile (will create if missing)
       authLog("signIn: Email verified, fetching user profile");
       setAuthUser(mapSupabaseUser(data.user));
       
-      const userProfile = await fetchUserProfile(data.user.id);
+      const userProfile = await fetchUserProfile(
+        data.user.id,
+        data.user.user_metadata?.full_name || 'User',
+        data.user.email || '', 
+        !!data.user.email_confirmed_at
+      );
+      
+      if (!userProfile) {
+        authError("signIn: Failed to fetch or create user profile");
+        setError("Failed to access your profile. Please try again.");
+        return false;
+      }
+      
+      authLog("signIn: User profile ready - checking completeness");
       setProfile(userProfile);
 
-      // Redirect based on the fetched profile's completeness
+      // Redirect based on the profile's completeness
       if (
-        !userProfile ||
+        !userProfile.email || 
+        userProfile.email == '' ||
         !userProfile.bio ||
         !userProfile.skills ||
-        userProfile.skills.length === 0
+        userProfile.skills.length === 0 ||
+        !userProfile.industry ||
+        userProfile.industry.length === 0 ||
+        userProfile.full_name === "User"
       ) {
         authLog("signIn: Profile incomplete, redirecting to setup");
         router.push("/profile/setup");
@@ -714,7 +752,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setIsLoading(true);
-      const userProfile = await fetchUserProfile(authUser.id);
+      const userProfile = await fetchUserProfile(
+        authUser.id,
+        profile?.full_name || 'User',
+        authUser.email, 
+        profile?.email_verified || false
+      );
       authLog("refreshProfile: Profile refresh completed", { 
         hasProfile: !!userProfile 
       });
