@@ -96,23 +96,29 @@ export async function DELETE(
     try {
       const { id } = await params;
       const supabase = await createClient();
-      
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        console.error('Error deleting user:', error);
-        return NextResponse.json({ 
-          error: 'Failed to delete user',
-          details: error.message 
-        }, { status: 500 });
+      // Get current user info
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "Authentication required" }, { status: 401 });
       }
-      
-      return NextResponse.json({ 
-        message: 'User deleted successfully' 
-      });
+      // Get user profile
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      const isAdmin = userProfile?.role === 'admin';
+      // Admins can delete any user, users can only delete themselves
+      if (isAdmin || userId === id) {
+        const { deleteUser } = await import("@/lib/models/users");
+        const success = await deleteUser(id);
+        return NextResponse.json({ success, admin: isAdmin });
+      } else {
+        return NextResponse.json(
+          { error: "You don't have permission to delete this user" },
+          { status: 403 }
+        );
+      }
     } catch (error) {
       console.error('User DELETE API error:', error);
       return NextResponse.json({ 
@@ -121,4 +127,4 @@ export async function DELETE(
       }, { status: 500 });
     }
   });
-} 
+}

@@ -79,7 +79,7 @@ import { toast } from "sonner";
 import { se } from "date-fns/locale";
 import { eventService } from "@/lib/services/event-service";
 import { SquarePoster } from "@/components/ui/SquarePoster";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@radix-ui/react-dropdown-menu";
 import { Event } from "@/lib/models/events";
 
@@ -97,6 +97,8 @@ export default function ProfilePage() {
   const [RSVPLoading, setRSVPLoading] = useState(true);
   const [userEventLoading, setUserEventLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const router = useRouter();
 
@@ -609,6 +611,23 @@ export default function ProfilePage() {
     }
   };
 
+  // Project delete handler
+  const handleDeleteProject = async (projectId: string) => {
+    setDeleteInProgress(projectId);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete project");
+      setUserProjects((prev) => prev.filter((p) => p.id !== projectId));
+      toast.success("Project deleted successfully");
+    } catch (err) {
+      toast.error("Failed to delete project");
+    } finally {
+      setDeleteInProgress(null);
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+    }
+  };
+
   if (!profile) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -662,7 +681,7 @@ export default function ProfilePage() {
         <OrganizationAffiliationStatus userId={profile.id} />
 
         <Tabs value={activeTab} onValueChange={onTabChange} className="w-full"> 
-          <div className="hidden sm:flex justify-center mb-4">
+          <div className="hidden sm:flex justify-center m-4">
             <TabsList className="flex flex-wrap gap-2">
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="projects">My Projects</TabsTrigger>
@@ -673,7 +692,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Dropdown for mobile */}
-          <div className="sm:hidden mb-4">
+          <div className="sm:hidden m-4">
           <Select value={activeTab} onValueChange={onTabChange}>
             <SelectTrigger className="w-full h-10 px-3 text-sm border rounded-lg">
               <SelectValue placeholder="Select a section" />
@@ -834,6 +853,22 @@ export default function ProfilePage() {
                                 Edit
                               </Link>
                             </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                setProjectToDelete(project);
+                                setDeleteDialogOpen(true);
+                              }}
+                              disabled={deleteInProgress === project.id}
+                            >
+                              {deleteInProgress === project.id ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3 mr-1" />
+                              )}
+                              Delete
+                            </Button>
                           </div>
                         </CardFooter>
                       </Card>
@@ -842,6 +877,28 @@ export default function ProfilePage() {
                 </motion.div>
               )}
             </AnimatePresence>
+            {/* Delete confirmation dialog */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete Project</DialogTitle>
+                </DialogHeader>
+                <p>Are you sure you want to delete the project "{projectToDelete?.title}"? This action cannot be undone.</p>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => projectToDelete && handleDeleteProject(projectToDelete.id)}
+                    disabled={!!deleteInProgress}
+                  >
+                    {deleteInProgress ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Delete
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Project Inquiries Tab */}
@@ -1453,7 +1510,7 @@ export default function ProfilePage() {
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <Calendar className="w-4 h-4" />
-                                      {format(rsvp.end_time, "MMM d, yyyy")}
+                                      {format(rsvp.start_time, "MMM d, yyyy")}
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <MapPin className="w-4 h-4" />
@@ -1523,7 +1580,7 @@ export default function ProfilePage() {
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <Calendar className="w-4 h-4" />
-                                      {format(event.end, "MMM d, yyyy")}
+                                      {format(event.start, "MMM d, yyyy")}
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                       <MapPin className="w-4 h-4" />

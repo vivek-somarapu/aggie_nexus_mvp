@@ -91,7 +91,7 @@ const schema = z
     description: z.string().max(10_000).optional(),
   })
   /* -------------------------------------------------------------- */
-  /*  ❶ address / link requirement (your old rule)                  */
+  /*   address / link requirement (your old rule)                  */
   /* -------------------------------------------------------------- */
   .refine(
     (d) => (d.is_online ? !!d.event_link : !!d.location),
@@ -104,7 +104,7 @@ const schema = z
   )
 
   /* -------------------------------------------------------------- */
-  /*  ❷ NO events in the past ↴                                     */
+  /*   NO events in the past ↴                                     */
   /* -------------------------------------------------------------- */
   .refine(
     (d) => {
@@ -139,7 +139,7 @@ const schema = z
     }
   )
   /* -------------------------------------------------------------- */
-  /*  ❸ End time must be after start time ↴                         */
+  /*   End time must be after start time ↴                         */
   /* -------------------------------------------------------------- */
   .refine(
     (d) => {
@@ -426,6 +426,9 @@ export default function NewEventPage() {
                         Event Date (choose start and end time)
                         <span className="text-red-500">*</span>
                       </FormLabel>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        <strong>Note:</strong> After selecting a date, click a <span className="font-semibold">start time</span> and then an <span className="font-semibold">end time</span> from the time list. The end time must be after the start time.
+                      </p>
                       <DateTimePicker
                         error={
                           !watchedValues.start_time || !watchedValues.end_time
