@@ -16,6 +16,7 @@ import { bookmarkService } from "@/lib/services/bookmark-service"
 import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
+import { useEmailVerification } from "@/lib/hooks/use-email-verification"
 import { motion, AnimatePresence } from "framer-motion"
 import type { Variants } from "framer-motion"
 
@@ -59,6 +60,7 @@ const cardVariants: Variants = {
 export default function UsersPage() {
   const { authUser: currentUser, isLoading: authLoading } = useAuth()
   const router = useRouter()
+  const { isEmailVerified } = useEmailVerification()
   
   const [users, setUsers] = useState<User[]>([])
   const [bookmarkedUsers, setBookmarkedUsers] = useState<string[]>([])

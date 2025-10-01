@@ -350,7 +350,7 @@ export default function AuthWaitingPage() {
                   {userEmail && (
                     <p className="text-xs text-muted-foreground mb-4">
                       💡 You'll need to verify your email before you can access
-                      all features.
+                      the community and projects. Without verification, you have limited visibility on the site.
                     </p>
                   )}
                 </motion.div>

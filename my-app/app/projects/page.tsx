@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEmailVerification } from "@/lib/hooks/use-email-verification";
 import {
   Card,
   CardContent,
@@ -81,6 +82,7 @@ const buttonVariants = {
 export default function ProjectsPage() {
   const { authUser: currentUser, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const { isEmailVerified } = useEmailVerification();
 
   // Client-side authentication check
   useEffect(() => {
@@ -154,8 +156,8 @@ export default function ProjectsPage() {
     fetchProjects();
   }, [searchQuery, tamuFilter, projectTypeFilter, currentUser, authLoading]);
 
-  // If auth is still loading or user is not authenticated, show loading state
-  if (authLoading || !currentUser) {
+  // If auth is still loading, email verification is checking, or user is not authenticated, show loading state
+  if (authLoading || isCheckingEmail || !currentUser) {
     return (
       <motion.div
         className="flex flex-col justify-center items-center py-12 space-y-4"
@@ -165,7 +167,9 @@ export default function ProjectsPage() {
       >
         <Loader2 className="h-12 w-12 text-primary animate-spin" />
         <div className="text-center">
-          <p className="text-lg font-medium">Checking authentication...</p>
+          <p className="text-lg font-medium">
+            {isCheckingEmail ? "Checking email verification..." : "Checking authentication..."}
+          </p>
           <p className="text-sm text-muted-foreground">Please wait</p>
         </div>
       </motion.div>

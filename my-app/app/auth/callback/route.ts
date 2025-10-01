@@ -77,8 +77,9 @@ export async function GET(request: NextRequest) {
             callbackLog('No user row yet — inserting placeholder profile')
             await supabase.from('users').insert({
               id: user.id,
-              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'New User',
+              full_name: user.user_metadata?.full_name || 'User',
               email: user.email,
+              email_verified: !!user.email_confirmed_at,
               industry: [],
               skills: [],
               contact: { email: user.email },
@@ -109,6 +110,12 @@ export async function GET(request: NextRequest) {
       email: user.email,
       isEmailConfirmed: !!user.email_confirmed_at
     });
+    
+    // Check email verification status first
+    if (!user.email_confirmed_at) {
+      callbackLog("User email not verified, redirecting to waiting page");
+      return NextResponse.redirect(new URL('/auth/waiting', requestUrl.origin))
+    }
     
     // After OAuth login, check/create user profile and determine redirect
     try {
@@ -189,8 +196,9 @@ export async function GET(request: NextRequest) {
           .from('users')
           .insert({
             id: user.id,
-            full_name: full_name || userEmail.split('@')[0] || 'New User',
+            full_name: full_name || 'User',
             email: userEmail,
+            email_verified: !!user.email_confirmed_at,
             industry: [],
             skills: [],
             contact: { email: userEmail },
