@@ -94,27 +94,72 @@ export default function AuthWaitingPage() {
 
   /* ─────────── Manual “check verification” button ─────────── */
   const handleManualCheck = async () => {
+    console.log("🔍 Manual check started")
     setIsChecking(true)
+    setErrorMessage(null)
+    setMessage("Checking verification status...")
+    console.log("🔍 State set: checking=true, error=null, message=checking...")
+    
     try {
-      const supabase = createClient()
-      const { data } = await supabase.auth.getSession() 
-
-      if (
-        data.session?.user?.email_confirmed_at &&
-        data.session.user.email === userEmail 
-      ) {
-        localStorage.setItem("emailVerified", "true") 
-        setIsVerified(true)
-        setMessage(
-          "Email verified! Click below to continue to profile setup."
-        )
-      } else {
-        setMessage("Email not verified yet. Please check your inbox.")
+      if (!userEmail) {
+        console.log("❌ No userEmail found:", userEmail)
+        setErrorMessage("No email found. Please sign up again.")
+        setMessage("Please verify your email to continue...")
+        console.log("🔍 State set: error=no email, message=verify email")
+        return
       }
-    } catch (err) {
-      console.error("Error checking verification:", err)
+
+      const supabase = createClient()
+
+      // First, try to find the user by email (regardless of verification status)
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
+        .single()
+
+      console.log("Manual check - User profile:", userProfile, "Error:", profileError)
+
+      if (profileError) {
+        console.error("❌ Profile error:", profileError)
+        setMessage("Email not verified yet. Please check your inbox and spam folder.")
+        setErrorMessage("Could not find user profile. Please try signing up again.")
+        console.log("🔍 State set: error=profile error, message=not verified")
+        return
+      }
+
+      if (!userProfile) {
+        console.log("❌ No user profile found")
+        setMessage("Email not verified yet. Please check your inbox and spam folder.")
+        setErrorMessage("User profile not found. Please try signing up again.")
+        console.log("🔍 State set: error=no profile, message=not verified")
+        return
+      }
+
+      if (!userProfile.email_verified) {
+        console.log("❌ Email not verified for user:", userProfile.email)
+        setMessage("Email not verified yet. Please check your inbox and spam folder.")
+        setErrorMessage("Your email is not verified. Please click the verification link in your email.")
+        console.log("🔍 State set: error=not verified, message=not verified")
+        return
+      }
+
+      // Email is verified!
+      console.log("✅ Email verified for user:", userProfile.email)
+      localStorage.setItem("emailVerified", "true") 
+      setIsVerified(true)
+      setMessage("Email verified! Click below to continue to profile setup.")
+      setErrorMessage(null)
+      console.log("🔍 State set: verified=true, message=verified, error=null")
+      
+    } catch (error) {
+      console.error("❌ Error checking verification:", error)
+      setMessage("Please verify your email to continue...")
+      setErrorMessage("Failed to check verification status. Please try again.")
+      console.log("🔍 State set: error=exception, message=verify email")
     } finally {
       setIsChecking(false)
+      console.log("🔍 Manual check finished, checking=false")
     }
   }
 
@@ -365,6 +410,15 @@ export default function AuthWaitingPage() {
                     </Alert>
                   </motion.div>
                 )}
+
+                {/* Always show current message */}
+                <motion.div variants={itemVariants}>
+                  <Alert className="mb-4">
+                    <AlertDescription>
+                      Status: {message}
+                    </AlertDescription>
+                  </Alert>
+                </motion.div>
 
                 <motion.div variants={itemVariants} className="space-y-4">
                   {!emailResent ? (

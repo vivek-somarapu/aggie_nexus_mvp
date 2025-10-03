@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEmailVerification } from "@/lib/hooks/use-email-verification";
 import {
   Card,
   CardContent,
@@ -35,7 +34,6 @@ import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
-import { cn } from "@/lib/utils";
 
 // Animation variants
 const pageVariants = {
@@ -81,7 +79,8 @@ const buttonVariants = {
 export default function ProjectsPage() {
   const { authUser: currentUser, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const { isEmailVerified } = useEmailVerification();
+  
+  // Email verification is now handled server-side in middleware
 
   // Client-side authentication check
   useEffect(() => {
@@ -155,26 +154,6 @@ export default function ProjectsPage() {
     fetchProjects();
   }, [searchQuery, tamuFilter, projectTypeFilter, currentUser, authLoading]);
 
-  // If auth is still loading, email verification is checking, or user is not authenticated, show loading state
-  if (authLoading || isCheckingEmail || !currentUser) {
-    return (
-      <motion.div
-        className="flex flex-col justify-center items-center py-12 space-y-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Loader2 className="h-12 w-12 text-primary animate-spin" />
-        <div className="text-center">
-          <p className="text-lg font-medium">
-            {isCheckingEmail ? "Checking email verification..." : "Checking authentication..."}
-          </p>
-          <p className="text-sm text-muted-foreground">Please wait</p>
-        </div>
-      </motion.div>
-    );
-  }
-
   // Fetch bookmarked projects if user is logged in
   useEffect(() => {
     const fetchBookmarks = async () => {
@@ -193,6 +172,32 @@ export default function ProjectsPage() {
 
     fetchBookmarks();
   }, [currentUser]);
+
+  // Log filtering results for debugging (moved here to avoid hook order issues)
+  useEffect(() => {
+    if (projects.length > 0) {
+      console.log(`Projects loaded: ${projects.length} total`);
+      console.log(`Filters: projectType=${projectTypeFilter}, tamu=${tamuFilter}, industry=${industryFilter}, status=${statusFilter}`);
+    }
+  }, [projects.length, projectTypeFilter, tamuFilter, industryFilter, statusFilter]);
+
+  // If auth is still loading or user is not authenticated, show loading state
+  if (authLoading || !currentUser) {
+    return (
+      <motion.div
+        className="flex flex-col justify-center items-center py-12 space-y-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        <div className="text-center">
+          <p className="text-lg font-medium">Checking authentication...</p>
+          <p className="text-sm text-muted-foreground">Please wait</p>
+        </div>
+      </motion.div>
+    );
+  }
 
   const handleBookmarkToggle = async (
     projectId: string,
@@ -253,23 +258,6 @@ export default function ProjectsPage() {
         return 0;
       })
     : filteredProjects;
-
-  // Log filtering results for debugging
-  useEffect(() => {
-    console.log(
-      `Filtering projects: ${projects.length} total, ${filteredProjects.length} after filters`
-    );
-    console.log(
-      `Filters: projectType=${projectTypeFilter}, tamu=${tamuFilter}, industry=${industryFilter}, status=${statusFilter}`
-    );
-  }, [
-    filteredProjects,
-    projects,
-    projectTypeFilter,
-    tamuFilter,
-    industryFilter,
-    statusFilter,
-  ]);
 
   return (
     <motion.div
