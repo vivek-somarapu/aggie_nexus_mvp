@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import RootCodeRedirect from "./root-code-redirect"; // already imported
 import AuthDebug from "@/components/auth-debug"; // Import the debug component
 import AuthStateSync from "../components/auth-state-sync";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -66,6 +67,7 @@ export default function RootLayout({
             <Toaster />
             <AuthDebug />
             <AuthStateSync />
+            <Analytics />
           </AuthProvider>
         </ThemeProvider>
       </body>
