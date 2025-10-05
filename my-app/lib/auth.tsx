@@ -278,8 +278,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Fetch user profile (will create if missing)
           const userProfile = await fetchUserProfile(
             clientAuthState.user.id, 
-            clientAuthState.user.email || '', 
             clientAuthState.user.user_metadata.full_name || 'User',
+            clientAuthState.user.email || '', 
             !!clientAuthState.user.email_confirmed_at
           );
           
@@ -421,7 +421,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         authError("signIn: Authentication failed", error);
-        setError(error.message);
+        
+        // Handle email confirmation error by redirecting to waiting page
+        authLog("signIn: Checking error message", { errorMessage: error.message });
+        
+        if (error.message.includes("Email Not Confirmed") || error.message.includes("email not confirmed") || error.message.includes("not confirmed")) {
+          authLog("signIn: Email confirmation error detected, redirecting to waiting page");
+          
+          // Store email for the waiting page (check if localStorage is available)
+          if (typeof window !== 'undefined') {
+            localStorage.setItem("lastSignupEmail", email);
+            authLog("signIn: Email stored in localStorage");
+          }
+          
+          // Redirect to waiting page instead of showing error
+          authLog("signIn: Redirecting to /auth/waiting");
+          router.push("/auth/waiting");
+          return false;
+        } else if (error.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password. Please check your credentials and try again.");
+        } else {
+          setError(error.message);
+        }
         return false;
       }
 
@@ -574,8 +595,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId: data.user?.id 
       });
 
-      // If we have user data, set it
+      // If we have user data, create profile in users table
       if (data.user) {
+        authLog("signUp: Creating user profile in users table");
+        try {
+          const { error: profileError } = await supabase
+            .from('users')
+            .insert({
+              id: data.user.id,
+              email: data.user.email,
+              full_name: fullName || 'User',
+              email_verified: !!data.user.email_confirmed_at,
+              industry: [],
+              skills: [],
+              contact: { email: data.user.email },
+              views: 0,
+              is_texas_am_affiliate: false,
+              deleted: false,
+              last_login_at: new Date().toISOString(),
+              profile_setup_completed: false,
+              profile_setup_skipped: false
+            });
+
+          if (profileError) {
+            authError("signUp: Failed to create user profile", profileError);
+            setError(`Account created but profile setup failed: ${profileError.message}`);
+            return false;
+          }
+
+          authLog("signUp: User profile created successfully");
+        } catch (profileErr: any) {
+          authError("signUp: Exception creating user profile", profileErr);
+          setError(`Account created but profile setup failed: ${profileErr.message}`);
+          return false;
+        }
+
         setAuthUser(mapSupabaseUser(data.user));
       }
 
@@ -776,8 +830,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       const userProfile = await fetchUserProfile(
         authUser.id,
+        authUser.email,
         profile?.full_name || 'User',
-        authUser.email, 
         profile?.email_verified || false
       );
       authLog("refreshProfile: Profile refresh completed", { 

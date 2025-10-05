@@ -63,8 +63,6 @@ export async function middleware(request: NextRequest) {
       '/auth/callback',
       '/auth/waiting',
       '/auth/reset-password',
-      '/projects', // Allow unauthenticated users to view projects
-      '/users', // Allow unauthenticated users to view users  
       '/calendar', // Allow unauthenticated users to view calendar
       '/api/events', // Allow fetching events without auth
     ];
@@ -100,6 +98,8 @@ export async function middleware(request: NextRequest) {
     // List of routes that require email verification
     const verificationRequiredRoutes = [
       '/profile',
+      '/projects',
+      '/users', 
       '/projects/new',
       '/projects/edit',
     ];

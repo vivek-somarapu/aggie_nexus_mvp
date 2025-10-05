@@ -16,7 +16,6 @@ import { bookmarkService } from "@/lib/services/bookmark-service"
 import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
-import { useEmailVerification } from "@/lib/hooks/use-email-verification"
 import { motion, AnimatePresence } from "framer-motion"
 import type { Variants } from "framer-motion"
 
@@ -60,7 +59,8 @@ const cardVariants: Variants = {
 export default function UsersPage() {
   const { authUser: currentUser, isLoading: authLoading } = useAuth()
   const router = useRouter()
-  const { isEmailVerified } = useEmailVerification()
+  
+  // Email verification is now handled server-side in middleware
   
   const [users, setUsers] = useState<User[]>([])
   const [bookmarkedUsers, setBookmarkedUsers] = useState<string[]>([])
@@ -73,7 +73,6 @@ export default function UsersPage() {
   const [industryFilter, setIndustryFilter] = useState("all")
   const [skillFilter, setSkillFilter] = useState("all")
   const [tamuFilter, setTamuFilter] = useState("all")
-  const [userTypeFilter, setUserTypeFilter] = useState("all")
 
   // Fetch users once auth state is resolved
   useEffect(() => {
@@ -228,6 +227,24 @@ export default function UsersPage() {
       console.log(`Filters: tamu=${tamuFilter}, industry=${industryFilter}, skill=${skillFilter}`);
     }
   }, [filteredUsers, users, tamuFilter, industryFilter, skillFilter, dataFetched]);
+
+  // If auth is still loading or user is not authenticated, show loading state
+  if (authLoading || !currentUser) {
+    return (
+      <motion.div
+        className="flex flex-col justify-center items-center py-12 space-y-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        <div className="text-center">
+          <p className="text-lg font-medium">Checking authentication...</p>
+          <p className="text-sm text-muted-foreground">Please wait</p>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 

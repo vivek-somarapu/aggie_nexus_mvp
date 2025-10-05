@@ -19,9 +19,12 @@ export function useEmailVerification(redirectTo: string = "/auth/waiting") {
     // If no auth user, they'll be handled by other auth logic
     if (!authUser) return;
 
-    // Check if user has verified email
-    if (profile && !profile.email_verified) {
-      console.log("User needs email verification, redirecting to waiting page...");
+    // Check if user has verified email - redirect if no profile OR email not verified
+    if (!profile || !profile.email_verified) {
+      console.log("User needs email verification, redirecting to waiting page...", {
+        hasProfile: !!profile,
+        emailVerified: profile?.email_verified
+      });
       router.push(redirectTo);
       return;
     }
