@@ -151,7 +151,7 @@ export default function Navbar() {
               {/* dark-mode logo */}
               <div className="relative w-24 sm:w-28 md:w-32 h-6 sm:h-7 md:h-8 dark:block hidden">
                 <Image
-                  src="/images/logo_png_white.png"
+                  src="/images/AggieX_LogoLight.png"
                   alt="Aggie Nexus"
                   fill
                   priority
@@ -165,7 +165,7 @@ export default function Navbar() {
               {/* light-mode logo */}
               <div className="relative w-24 sm:w-28 md:w-32 h-6 sm:h-7 md:h-8 dark:hidden block">
                 <Image
-                  src="/images/AggieNexus_LogoHorizontal.png"
+                  src="/images/AggieX_LogoDark.png"
                   alt="Aggie Nexus"
                   fill
                   priority
