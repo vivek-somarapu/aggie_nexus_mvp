@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { IndustryBadges } from "@/components/ui/industry-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bookmark, GraduationCap, Loader2, Info } from "lucide-react"
@@ -398,7 +399,7 @@ export default function UsersPage() {
                         whileHover={{ y: -5, transition: { duration: 0.2 } }}
                       >
                         <Link href={`/users/${user.id}`}>
-                          <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
+                          <Card className="h-full flex flex-col overflow-hidden hover:shadow-md transition-shadow">
                             <CardHeader className="pb-0 pt-3 px-4">
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-3">
@@ -441,7 +442,7 @@ export default function UsersPage() {
                                 </motion.div>
                               </div>
                             </CardHeader>
-                            <CardContent className="py-2 px-4">
+                            <CardContent className="flex-grow py-2 px-4">
                               <p className="text-muted-foreground text-sm line-clamp-3 mb-2">{user.bio}</p>
                               <div className="flex flex-wrap gap-1 mb-1">
                                 {user.industry?.slice(0, 2).map((ind, indIndex) => (
@@ -456,17 +457,12 @@ export default function UsersPage() {
                                 )}
                               </div>
                             </CardContent>
-                            <CardFooter className="border-t pt-2 pb-2 px-4 flex flex-wrap gap-1">
-                              {user.skills?.slice(0, 3).map((skill, skillIndex) => (
-                                <Badge key={`${user.id}-skill-${skillIndex}`} variant="outline" className="text-xs px-1.5 py-0">
-                                  {skill}
-                                </Badge>
-                              ))}
-                              {user.skills?.length > 3 && (
-                                <Badge variant="outline" className="text-xs px-1.5 py-0">
-                                  +{user.skills.length - 3}
-                                </Badge>
-                              )}
+                            <CardFooter className="border-t pt-4">
+                              <IndustryBadges
+                                className="w-full"
+                                items={user.skills}
+                                defaultVariant="outline"
+                              />
                             </CardFooter>
                           </Card>
                         </Link>

@@ -19,6 +19,8 @@ interface DatePickerProps {
   minDate?: Date
   maxDate?: Date
   disabled?: boolean
+  required?: boolean
+  error?: string
 }
 
 export function DatePicker({
@@ -28,6 +30,8 @@ export function DatePicker({
   minDate,
   maxDate,
   disabled = false,
+  required = false,
+  error,
 }: DatePickerProps) {
   return (
     <Popover>
@@ -36,7 +40,8 @@ export function DatePicker({
           variant={"outline"}
           className={cn(
             "w-full justify-start text-left font-normal",
-            !selected && "text-muted-foreground"
+            !selected && "text-muted-foreground",
+            error && "border-red-500" // <-- red border if error
           )}
           disabled={disabled}
         >
@@ -58,5 +63,6 @@ export function DatePicker({
         />
       </PopoverContent>
     </Popover>
+    
   )
 } 

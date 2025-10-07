@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import DateTimePicker from "@/components/DateTimePicker";
 
 import {
   Select,
@@ -35,7 +36,27 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
 
 import { createClient } from "@/lib/supabase/client";
-import { industryOptions } from "@/lib/constants";
+
+
+// Industry options
+const industryOptions = [
+  "Agriculture, Food & Natural Resources",
+  "Architecture & Construction",
+  "Arts, A/V Technology & Communications",
+  "Business Management & Administration",
+  "Education & Training",
+  "Finance",
+  "Government & Public Administration",
+  "Health Science",
+  "Human Services",
+  "Hospitality & Tourism",
+  "Information Technology",
+  "Law, Public Safety, Corrections & Security",
+  "Manufacturing",
+  "Marketing",
+  "Science, Technology, Engineering & Mathematics",
+  "Transportation, Distribution & Logistics",
+];
 
 const industrySkillsMap: { [industryOptions: string]: string[] } = {
   "Agriculture, Food & Natural Resources": [
@@ -343,7 +364,6 @@ export default function NewProjectPage() {
     const fetchAvailablePrograms = async () => {
       if (user) {
         const supabase = createClient();
-        if (!supabase) return;
         const { data: orgMemberships } = await supabase
           .from('organization_members')
           .select(`
@@ -352,13 +372,13 @@ export default function NewProjectPage() {
           .eq('user_id', user.id);
         
         const userOrgs = orgMemberships?.map((m: { organizations?: { name: string } }) => m.organizations?.name).filter(Boolean) || [];
-        // Fix: filter out undefined values from userOrgs before filtering for special/regular programs
-        const userOrgsFiltered = (userOrgs as string[]).filter((org): org is string => typeof org === "string");
-        const specialPrograms = userOrgsFiltered.filter(
-          (org) => org === "Aggies Create Incubator" || org === "AggieX Accelerator"
+        // Filter to only include special programs (incubator/accelerator)
+        const specialPrograms = userOrgs.filter((org: string) => 
+          org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
         );
-        const regularOrganizations = userOrgsFiltered.filter(
-          (org) => org !== "Aggies Create Incubator" && org !== "AggieX Accelerator"
+        // Filter to only include regular organizations (non-special programs)
+        const regularOrganizations = userOrgs.filter((org: string) => 
+          org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator'
         );
         setAvailablePrograms(specialPrograms);
         setAvailableOrganizations(regularOrganizations);
@@ -502,6 +522,10 @@ const getAvailableSkills = () => {
 
       if (!formData.description.trim()) {
         throw new Error("Project description is required");
+      }
+
+      if (!formData.estimated_start.trim()) {
+        throw new Error("Start date is required");
       }
 
       // Update form data with selected arrays
@@ -678,11 +702,12 @@ const getAvailableSkills = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="estimated_start">Estimated Start Date</Label>
+                  <Label htmlFor="estimated_start">Estimated Start Date *</Label>
                   <DatePicker
                     selected={selectedStartDate}
                     onSelect={handleStartDateSelect}
                     placeholderText="Select start date"
+                    required
                   />
                 </div>
 
