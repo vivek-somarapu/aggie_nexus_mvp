@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import DateTimePicker from "@/components/DateTimePicker";
-
 import {
   Select,
   SelectContent,
@@ -36,27 +35,8 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
 
 import { createClient } from "@/lib/supabase/client";
+import { industryOptions } from "@/lib/constants";
 
-
-// Industry options
-const industryOptions = [
-  "Agriculture, Food & Natural Resources",
-  "Architecture & Construction",
-  "Arts, A/V Technology & Communications",
-  "Business Management & Administration",
-  "Education & Training",
-  "Finance",
-  "Government & Public Administration",
-  "Health Science",
-  "Human Services",
-  "Hospitality & Tourism",
-  "Information Technology",
-  "Law, Public Safety, Corrections & Security",
-  "Manufacturing",
-  "Marketing",
-  "Science, Technology, Engineering & Mathematics",
-  "Transportation, Distribution & Logistics",
-];
 
 const industrySkillsMap: { [industryOptions: string]: string[] } = {
   "Agriculture, Food & Natural Resources": [
