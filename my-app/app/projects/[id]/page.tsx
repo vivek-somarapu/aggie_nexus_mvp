@@ -264,7 +264,7 @@ export default function ProjectPage() {
     setDeleteSuccess(false);
   };
 
-  // Confirm project deletion
+  // Confirm project deletion -- soft deletion so use PUT to not mess with RLS
   const handleConfirmDelete = async () => {
     if (!project || !currentUser) return;
 
@@ -273,7 +273,14 @@ export default function ProjectPage() {
       setDeleteError(null);
 
       const response = await fetch(`/api/projects/${project.id}`, {
-        method: 'DELETE',
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deleted: true,
+          last_updated: new Date().toISOString(),
+        }),
       });
 
       if (!response.ok) {

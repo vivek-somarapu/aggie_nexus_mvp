@@ -195,7 +195,6 @@ export async function updateProject(id: string, projectData: Partial<Project>): 
       last_updated: new Date().toISOString()
     })
     .eq('id', id)
-    .eq('deleted', false)
     .select()
     .single();
   
@@ -243,7 +242,54 @@ export async function incrementProjectViews(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// DELETE (soft delete)
+// SOFT DELETE - specifically for setting deleted = true
+export async function softDeleteProject(id: string): Promise<boolean> {
+  const supabase = await getSupabase();
+  
+  // First delete bookmarks
+  console.log('Deleting bookmarks for project:', id);
+  const { error: bookmarkError } = await supabase
+    .from('project_bookmarks')
+    .delete()
+    .eq('project_id', id);
+  
+  if (bookmarkError) {
+    console.error('Error deleting bookmarks:', bookmarkError);
+    throw bookmarkError;
+  }
+  
+  // Then soft delete the project (don't try to select it back since it will be deleted)
+  console.log('Attempting to soft delete project:', id);
+  
+  // Get current auth user to verify we're the owner
+  const { data: { user } } = await supabase.auth.getUser();
+  console.log('Current user:', user?.id);
+  
+  const { error, count, status, statusText } = await supabase
+    .from('projects')
+    .update({
+      deleted: true,
+      last_updated: new Date().toISOString()
+    })
+    .eq('id', id)
+    .eq('owner_id', user?.id); // Explicitly filter by owner_id in the query
+  
+  console.log('Soft delete response:', { error, count, status, statusText });
+  
+  if (error) {
+    console.error('Soft delete error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+    throw error;
+  }
+  
+  return true;
+}
+
+// DELETE (hard delete for user-owned projects)
 export async function deleteProject(id: string): Promise<boolean> {
   const supabase = await getSupabase();
   
@@ -255,34 +301,7 @@ export async function deleteProject(id: string): Promise<boolean> {
   
   if (bookmarkError) throw bookmarkError;
   
-  // Then soft delete the project
-  const { data, error } = await supabase
-    .from('projects')
-    .update({
-      deleted: true,
-      last_updated: new Date().toISOString()
-    })
-    .eq('id', id)
-    .select('id');
-  
-  if (error) throw error;
-  
-  return data && data.length > 0;
-}
-
-// Hard delete for admin purposes
-export async function hardDeleteProject(id: string): Promise<boolean> {
-  const supabase = await getSupabase();
-  
-  // First delete bookmarks
-  const { error: bookmarkError } = await supabase
-    .from('project_bookmarks')
-    .delete()
-    .eq('project_id', id);
-  
-  if (bookmarkError) throw bookmarkError;
-  
-  // Then hard delete the project
+  // Then hard delete the project (RLS allows users to delete their own projects)
   const { data, error } = await supabase
     .from('projects')
     .delete()
