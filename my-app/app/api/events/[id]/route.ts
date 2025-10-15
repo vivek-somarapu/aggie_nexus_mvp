@@ -62,6 +62,8 @@ export async function PUT(
     console.log("Updating event", id, "with pending changes");
     
     // Store the updated event data as pending changes
+    // NOTE: We do NOT change the status - the event stays approved
+    // Only the has_pending_changes flag is set to true
     const { data, error } = await supabase
       .from('events')
       .update({ 
