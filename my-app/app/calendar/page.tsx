@@ -34,6 +34,7 @@ import {
   CalendarIcon,
   Link as LinkIcon,
   Filter,
+  Edit,
 } from "lucide-react";
 import { eventService } from "@/lib/services/event-service";
 import { motion, AnimatePresence } from "framer-motion";
@@ -83,6 +84,8 @@ interface Event extends Omit<BaseEvent, "start_time" | "end_time"> {
   start: string;
   end: string;
   color?: string;
+  pending_changes?: any;
+  has_pending_changes?: boolean;
 }
 
 // Type for the processed events
@@ -92,6 +95,8 @@ type ProcessedEvent = FullCalendarEvent & {
   created_by?: string;
   poster_url?: string;
   creator?: { full_name: string; avatar: string | null };
+  pending_changes?: any;
+  has_pending_changes?: boolean;
 };
 
 // It hides the calendar view on mobile and uses a list view instead. The calendar view is only available on desktop screens.
@@ -140,7 +145,28 @@ export default function CalendarPage() {
     isDesktop ? "calendar" : "list"
   );
   const effectiveView = isDesktop ? view : "list";
-  const allEvents = events;
+
+  // Function to merge pending changes with base event for display
+  const mergeEventWithPendingChanges = (event: Event): Event => {
+    if (event.has_pending_changes && event.pending_changes) {
+      return {
+        ...event,
+        title: event.pending_changes.title || event.title,
+        description: event.pending_changes.description || event.description,
+        start_time: event.pending_changes.start_time || event.start_time,
+        end_time: event.pending_changes.end_time || event.end_time,
+        location: event.pending_changes.location || event.location,
+        event_type: event.pending_changes.event_type || event.event_type,
+        industry: event.pending_changes.industry || event.industry,
+        poster_url: event.pending_changes.poster_url || event.poster_url,
+        start: event.pending_changes.start_time || event.start,
+        end: event.pending_changes.end_time || event.end,
+      };
+    }
+    return event;
+  };
+
+  const allEvents = events.map(mergeEventWithPendingChanges);
   const [includeOld, setIncludeOld] = useState(false);
 
   const cutoff = startOfDay(subDays(new Date(), 1));
@@ -660,9 +686,16 @@ export default function CalendarPage() {
                                             </div>
 
                                             {/* Title */}
-                                            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-zinc-100 mb-3">
-                                              {e.title}
-                                            </h3>
+                                            <div className="flex items-center gap-2 mb-3">
+                                              <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-zinc-100">
+                                                {e.title}
+                                              </h3>
+                                              {e.has_pending_changes && (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+                                                  Pending Changes
+                                                </span>
+                                              )}
+                                            </div>
 
                                             {/* Location */}
                                             <div className="flex items-center gap-2 text-xs sm:text-sm dark:text-zinc-300 text-slate-600">
@@ -689,6 +722,24 @@ export default function CalendarPage() {
                                             <p className="text-xs sm:text-sm text-gray-500 mt-2 dark:text-zinc-400 line-clamp-2">
                                               {e.description}
                                             </p>
+
+                                            {/* Edit Button - Only show if user owns the event */}
+                                            {profile?.id === e.created_by && (
+                                              <div className="mt-3">
+                                                <Button
+                                                  onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    router.push(`/calendar/edit/${e.id}`);
+                                                  }}
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="flex items-center gap-1 text-xs"
+                                                >
+                                                  <Edit className="h-3 w-3" />
+                                                  Edit
+                                                </Button>
+                                              </div>
+                                            )}
                                           </div>
 
                                           {/* Poster */}
@@ -747,9 +798,16 @@ export default function CalendarPage() {
                       />
                     )}
                     <div className="pb-2">
-                      <DialogTitle className="text-2xl font-bold dark:text-zinc-100">
-                        {selectedEvent.title}
-                      </DialogTitle>
+                      <div className="flex items-center gap-2">
+                        <DialogTitle className="text-2xl font-bold dark:text-zinc-100">
+                          {selectedEvent.title}
+                        </DialogTitle>
+                        {selectedEvent.has_pending_changes && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+                            Pending Changes
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 pt-2 group">
                         <Link
                           href={`/users/${selectedEvent?.created_by}`}
@@ -1191,6 +1249,22 @@ export default function CalendarPage() {
                           {selectedEvent.description.trimStart()}
                         </p>
                       </div>
+                    </div>
+                  )}
+                  {/* Edit Button - Only show if user owns the event */}
+                  {profile?.id === selectedEvent.created_by && (
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => {
+                          setDialogOpen(false);
+                          router.push(`/calendar/edit/${selectedEvent.id}`);
+                        }}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit Event
+                      </Button>
                     </div>
                   )}
                 </div>

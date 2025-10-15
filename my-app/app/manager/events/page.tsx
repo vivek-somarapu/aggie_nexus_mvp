@@ -24,7 +24,6 @@ import {
   AlertCircle,
   CheckCircle,
   Info,
-  Calendar as CalendarIcon,
   MapPin,
   XCircle,
 } from "lucide-react";
@@ -55,6 +54,8 @@ interface Event {
   poster_url?: string | null;
   created_at: string;
   status: Status;
+  pending_changes?: any;
+  has_pending_changes?: boolean;
 }
 
 const pageVariants = {
@@ -75,7 +76,7 @@ const itemVariants = {
 };
 
 export default function ManagerEventsPage() {
-  const { user, isLoading: authLoading, role } = useAuth();
+  const { authUser, isLoading: authLoading, role } = useAuth();
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -87,7 +88,6 @@ export default function ManagerEventsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Status>("pending");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   // redirect non‑managers
   useEffect(() => {
@@ -106,14 +106,38 @@ export default function ManagerEventsPage() {
           // 1️⃣ fetch lightweight list
           const list = await eventService.getEventsByStatus(activeTab);
 
-          // 2️⃣ fetch full details including .creator & .poster_url
+          // 2️⃣ If on pending tab, also fetch approved events with pending changes
+          let eventsWithChanges: any[] = [];
+          if (activeTab === 'pending') {
+            const { createClient } = await import('@/lib/supabase/client');
+            const supabase = createClient();
+            const { data } = await supabase
+              .from('events')
+              .select('*')
+              .eq('status', 'approved')
+              .eq('has_pending_changes', true);
+            
+            // Transform start_time/end_time to start/end for consistency
+            eventsWithChanges = (data || []).map((e: any) => ({
+              ...e,
+              start: e.start_time,
+              end: e.end_time,
+            }));
+          }
+
+          // 3️⃣ fetch full details including .creator & .poster_url
+          const allItems = [...list, ...eventsWithChanges];
           const enriched = await Promise.all(
-            list.map(async (e) => {
+            allItems.map(async (e) => {
               const full = await eventService.getEvent(e.id);
               return {
                 ...e,
+                start: e.start || e.start_time,
+                end: e.end || e.end_time,
                 creator: full?.creator,
                 poster_url: full?.poster_url,
+                pending_changes: e.pending_changes,
+                has_pending_changes: e.has_pending_changes,
               };
             })
           );
@@ -128,21 +152,66 @@ export default function ManagerEventsPage() {
     }
   }, [activeTab, authLoading, role]);
 
-  const handleChangeStatus = async (id: string, newStatus: Status) => {
+  const handleChangeStatus = async (id: string, newStatus: Status, hasPendingChanges?: boolean) => {
     try {
       setError(null);
-      await eventService.updateEventStatus(id, newStatus);
+      
+      // If this is an approved event with pending changes, apply the changes
+      if (hasPendingChanges && newStatus === "approved") {
+        const event = events.find(e => e.id === id);
+        if (event?.pending_changes) {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          
+          // Apply pending changes to the main event fields
+          await supabase
+            .from('events')
+            .update({
+              title: event.pending_changes.title,
+              description: event.pending_changes.description,
+              start_time: event.pending_changes.start_time,
+              end_time: event.pending_changes.end_time,
+              location: event.pending_changes.location,
+              event_type: event.pending_changes.event_type,
+              poster_url: event.pending_changes.poster_url,
+              pending_changes: null,
+              has_pending_changes: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+        }
+      } else if (hasPendingChanges && newStatus === "rejected") {
+        // If rejecting changes, just clear the pending changes
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        
+        await supabase
+          .from('events')
+          .update({
+            pending_changes: null,
+            has_pending_changes: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+      } else {
+        // Normal status update for new events
+        await eventService.updateEventStatus(id, newStatus);
+      }
 
       setEvents((prev) => prev.filter((e) => e.id !== id));
 
       toast.success(
-        `Event ${
-          newStatus === "approved"
-            ? "Approved ✅"
-            : newStatus === "rejected"
-            ? "Rejected ❌"
-            : "Updated"
-        }`
+        hasPendingChanges
+          ? newStatus === "approved"
+            ? "Event changes approved ✅"
+            : "Event changes rejected ❌"
+          : `Event ${
+              newStatus === "approved"
+                ? "Approved ✅"
+                : newStatus === "rejected"
+                ? "Rejected ❌"
+                : "Updated"
+            }`
       );
     } catch {
       setError("Could not update status. Try again.");
@@ -210,7 +279,7 @@ export default function ManagerEventsPage() {
       <motion.div variants={itemVariants}>
         <h1 className="text-3xl font-bold tracking-tight">Event Management</h1>
         <p className="text-muted-foreground">
-          Review, approve, or reject event submissions
+          Review, approve, or reject event submissions and changes
         </p>
       </motion.div>
 
@@ -304,7 +373,20 @@ export default function ManagerEventsPage() {
                         ? dateB - dateA
                         : dateA - dateB;
                     })
-                    .map((e) => (
+                    .map((e) => {
+                      // If event has pending changes, show the pending version
+                      const displayEvent = e.has_pending_changes && e.pending_changes ? {
+                        ...e,
+                        title: e.pending_changes.title || e.title,
+                        description: e.pending_changes.description || e.description,
+                        start: e.pending_changes.start_time || e.start,
+                        end: e.pending_changes.end_time || e.end,
+                        location: e.pending_changes.location || e.location,
+                        event_type: e.pending_changes.event_type || e.event_type,
+                        poster_url: e.pending_changes.poster_url || e.poster_url,
+                      } : e;
+                      
+                      return (
                       <motion.div
                         key={e.id}
                         variants={itemVariants}
@@ -312,10 +394,17 @@ export default function ManagerEventsPage() {
                       >
                         <Card>
                           <CardHeader>
-                            <div className="flex justify-between items-center">
-                              <Badge variant={getBadgeVariant(e.event_type)}>
-                                {categories[e.event_type] || "Event"}
-                              </Badge>
+                            <div className="flex justify-between items-center flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={getBadgeVariant(displayEvent.event_type)}>
+                                  {categories[displayEvent.event_type] || "Event"}
+                                </Badge>
+                                {e.has_pending_changes && (
+                                  <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                                    Event Changed
+                                  </Badge>
+                                )}
+                              </div>
                               <Badge
                                 variant={
                                   status === "pending"
@@ -329,7 +418,7 @@ export default function ManagerEventsPage() {
                                   status.slice(1)}
                               </Badge>
                             </div>
-                            <CardTitle className="pt-2">{e.title}</CardTitle>
+                            <CardTitle className="pt-2">{displayEvent.title}</CardTitle>
                             {e.creator && (
                               <CardDescription>
                                 <div className="flex items-center gap-2 group">
@@ -370,11 +459,11 @@ export default function ManagerEventsPage() {
                                 </div>
                               </CardDescription>
                             )}
-                            {e.poster_url && (
+                            {displayEvent.poster_url && (
                               <div className="mt-2">
                                 <SquarePoster
-                                  src={e.poster_url}
-                                  alt={e.title}
+                                  src={displayEvent.poster_url}
+                                  alt={displayEvent.title}
                                 />
                               </div>
                             )}
@@ -385,45 +474,45 @@ export default function ManagerEventsPage() {
                               {/* Calendar date icon */}
                               <div className="w-8 h-8 rounded-sm border bg-background text-center overflow-hidden shadow-sm shrink-0">
                                 <div className="bg-muted text-[8px] font-medium py-[3px] leading-none">
-                                  {format(e.start, "MMM").toUpperCase()}
+                                  {format(displayEvent.start, "MMM").toUpperCase()}
                                 </div>
                                 <div className="text-[12px] font-bold text-foreground leading-none pt-[2px]">
-                                  {format(e.start, "d")}
+                                  {format(displayEvent.start, "d")}
                                 </div>
                               </div>
 
                               {/* Date & Time */}
                               <div className="text-[10px] dark:text-slate-100">
                                 <p className="font-semibold text-[14px]">
-                                  {format(e.start, "EEE, MMMM d")}
+                                  {format(displayEvent.start, "EEE, MMMM d")}
                                 </p>
                                 <p className="text-muted-foreground">
-                                  {format(e.start, "h:mm a")} –{" "}
-                                  {format(e.end, "h:mm a")}
+                                  {format(displayEvent.start, "h:mm a")} –{" "}
+                                  {format(displayEvent.end, "h:mm a")}
                                 </p>
                               </div>
 
                               {/* Separator */}
-                              {e.location && (
+                              {displayEvent.location && (
                                 <span className="text-muted-foreground">|</span>
                               )}
 
                               {/* Location */}
-                              {e.location && (
+                              {displayEvent.location && (
                                 <div className="flex items-center gap-1 text-muted-foreground">
                                   <MapPin className="h-3 w-3" />
                                   <span className="truncate max-w-[140px]">
-                                    {/^(https?:\/\/)/i.test(e.location)
+                                    {/^(https?:\/\/)/i.test(displayEvent.location)
                                       ? "Online Event"
-                                      : e.location.split(",")[0]}
+                                      : displayEvent.location.split(",")[0]}
                                   </span>
                                 </div>
                               )}
                             </div>
 
-                            {e.description && (
+                            {displayEvent.description && (
                               <p className="text-sm line-clamp-3">
-                                {e.description}
+                                {displayEvent.description}
                               </p>
                             )}
                           </CardContent>
@@ -432,19 +521,21 @@ export default function ManagerEventsPage() {
                               <Button
                                 variant="outline"
                                 onClick={() =>
-                                  handleChangeStatus(e.id, "rejected")
+                                  handleChangeStatus(e.id, "rejected", e.has_pending_changes)
                                 }
                                 className="flex-1"
                               >
-                                <XCircle className="mr-1 h-4 w-4" /> Reject
+                                <XCircle className="mr-1 h-4 w-4" /> 
+                                {e.has_pending_changes ? "Reject Changes" : "Reject"}
                               </Button>
                               <Button
                                 onClick={() =>
-                                  handleChangeStatus(e.id, "approved")
+                                  handleChangeStatus(e.id, "approved", e.has_pending_changes)
                                 }
                                 className="flex-1"
                               >
-                                <CheckCircle className="mr-1 h-4 w-4" /> Approve
+                                <CheckCircle className="mr-1 h-4 w-4" /> 
+                                {e.has_pending_changes ? "Approve Changes" : "Approve"}
                               </Button>
                             </CardFooter>
                           )}
@@ -476,7 +567,8 @@ export default function ManagerEventsPage() {
                           )}
                         </Card>
                       </motion.div>
-                    ))}
+                    );
+                    })}
                 </div>
               )}
             </TabsContent>

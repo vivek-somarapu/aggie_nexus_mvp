@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SquarePoster } from "@/components/ui/SquarePoster";
 
 // Icons
-import { Check, Loader2, MapPin, ChevronLeft } from "lucide-react";
+import { Check, Loader2, MapPin, ChevronLeft, Edit } from "lucide-react";
 
 // Services
 import { eventService } from "@/lib/services/event-service";
@@ -150,6 +150,20 @@ export default function EventPage({ params }: { params: { id: string } }) {
             </Link>
           )}
         </header>
+
+        {/* Edit Button - Only show if user owns the event */}
+        {profile?.id === event.created_by && (
+          <div className="flex justify-end">
+            <Button
+              onClick={() => router.push(`/calendar/edit/${event.id}`)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              Edit Event
+            </Button>
+          </div>
+        )}
 
         {event.poster_url && (
           <SquarePoster src={event.poster_url} alt={`${event.title} poster`} />

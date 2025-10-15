@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProjectById, updateProject, deleteProject, incrementProjectViews } from "@/lib/models/projects";
+import { getProjectById, updateProject, softDeleteProject, incrementProjectViews, deleteProject } from "@/lib/models/projects";
 import { withAuth } from "@/lib/auth-middleware";
 
 // GET /api/projects/[id] - Get a single project
@@ -31,7 +31,7 @@ export async function GET(
   }
 }
 
-// PATCH /api/projects/[id] - Update a project
+// PATCH /api/projects/[id] - Update a project or soft delete
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -40,8 +40,8 @@ export async function PUT(
     try {
       const { id } = await params;
       const body = await req.json();
-      
-      // Check if the user is the owner of the project
+
+      // Check if the user is the owner of the project first
       const project = await getProjectById(id);
       if (!project) {
         return NextResponse.json(
@@ -55,6 +55,26 @@ export async function PUT(
           { error: "You don't have permission to update this project" },
           { status: 403 }
         );
+      }
+
+      // Check if soft delete is requested
+      if (body.deleted) {
+        console.log('Soft delete requested for project:', id, 'by user:', userId);
+        try {
+          const success = await softDeleteProject(id);
+          console.log('Soft delete completed successfully');
+          return NextResponse.json({ success, deleted: true });
+        } catch (deleteError: any) {
+          console.error('Soft delete failed:', deleteError);
+          return NextResponse.json(
+            { 
+              error: "Failed to delete project", 
+              details: deleteError.message,
+              code: deleteError.code 
+            },
+            { status: 500 }
+          );
+        }
       }
       
       const updatedProject = await updateProject(id, body);
