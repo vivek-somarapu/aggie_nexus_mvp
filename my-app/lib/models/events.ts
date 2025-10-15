@@ -103,7 +103,7 @@ export async function createEvent(eventData: Omit<Event, 'id' | 'created_at' | '
       location: eventData.location,
       created_by: eventData.created_by,
       status: eventData.status || 'pending',
-      event_type: eventData.event_type || 'other',
+      event_type: eventData.event_type as "workshop" | "info_session" | "networking" | "hackathon" | "deadline" | "meeting" | "other" | "personal" || 'other',
       poster_url: eventData.poster_url,
       industry: eventData.industry || []
     })

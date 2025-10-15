@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, notFound, redirect, useRouter } from "next/navigation";
+import { useParams, notFound, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ import {
   Share2,
   User,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { projectService, Project } from "@/lib/services/project-service";
@@ -70,6 +71,12 @@ export default function ProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inquiryError, setInquiryError] = useState<string | null>(null);
   const [inquirySuccess, setInquirySuccess] = useState(false);
+
+  // Delete dialog state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
 
   // Fetch project data - independent of auth state
   useEffect(() => {
@@ -141,9 +148,6 @@ export default function ProjectPage() {
     }
   }, [isAuthReady, currentUser?.id, project?.id]); // Use stable auth ready state
 
-  const handleEdit = async () => {
-    redirect(`/projects/edit/${project?.id}`);
-  };
 
   const handleBookmarkToggle = async () => {
     if (!currentUser || !project) return;
@@ -247,6 +251,49 @@ export default function ProjectPage() {
 
   const isOwner = currentUser?.id === project.owner_id;
 
+  // Handle edit navigation
+  const handleEdit = () => {
+    router.push(`/projects/edit/${project.id}`);
+  };
+
+  // Handle project deletion
+  const handleDelete = () => {
+    if (!project || !currentUser) return;
+    setIsDeleteDialogOpen(true);
+    setDeleteError(null);
+    setDeleteSuccess(false);
+  };
+
+  // Confirm project deletion
+  const handleConfirmDelete = async () => {
+    if (!project || !currentUser) return;
+
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete project');
+      }
+
+      // Success - show success message then redirect
+      setDeleteSuccess(true);
+      setTimeout(() => {
+        router.push('/projects');
+      }, 2000);
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      setDeleteError('Failed to delete project. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -308,15 +355,27 @@ export default function ProjectPage() {
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  {currentUser?.id == owner?.id && 
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={handleEdit}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    <span className="sr-only">Edit project</span>
-                  </Button>}
+                  {currentUser?.id == owner?.id && (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={handleEdit}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        <span className="sr-only">Edit project</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={handleDelete}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete project</span>
+                      </Button>
+                    </>
+                  )}
                   <Button 
                     variant="outline" 
                     size="icon" 
@@ -678,6 +737,83 @@ export default function ProjectPage() {
           </Card>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this project? This action cannot be undone and will permanently remove the project and all its data.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {project && (
+            <div className="py-4">
+              <div className="flex flex-col gap-2 p-4 border rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Flag className="h-5 w-5 text-muted-foreground" />
+                  <p className="font-medium">{project.title}</p>
+                </div>
+                {project.description && (
+                  <p className="text-sm text-muted-foreground ml-7 line-clamp-2">
+                    {project.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 text-xs text-muted-foreground ml-7">
+                  <span>Posted: {formatDate(project.created_at)}</span>
+                  <span>{project.views} views</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+
+          {deleteSuccess && (
+            <Alert className="bg-green-50 border-green-200 text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+              <AlertDescription>
+                Project deleted successfully! Redirecting to projects page...
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setDeleteError(null);
+                setDeleteSuccess(false);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Project
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

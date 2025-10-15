@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/lib";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,7 +60,6 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { eventService } from "@/lib/services/event-service";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
@@ -192,12 +191,28 @@ async function uploadPoster(file: File): Promise<string> {
 /* ------------------------------------------------------------------
   Main Page Component
 -------------------------------------------------------------------*/
-export default function NewEventPage() {
+export default function EditEventPage() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const params = useParams();
+  const eventId = params.id as string;
+  const { profile, authUser } = useAuth();
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [event, setEvent] = useState<{
+    id: string;
+    title: string;
+    description?: string;
+    start_time: string;
+    end_time: string;
+    event_type: string;
+    industry: string[];
+    location: string;
+    poster_url?: string;
+    created_by: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -214,6 +229,73 @@ export default function NewEventPage() {
       description: "",
     },
   });
+
+  // Load event data on component mount
+  useEffect(() => {
+    const loadEvent = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/events/${eventId}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError("Event not found");
+            return;
+          }
+          throw new Error('Failed to load event');
+        }
+        
+        const eventData = await response.json();
+        
+        // Check if user owns the event
+        if (eventData.created_by !== authUser?.id) {
+          setError("You don't have permission to edit this event");
+          return;
+        }
+        
+        setEvent(eventData);
+        
+        // Pre-populate form with event data
+        const eventDate = new Date(eventData.start_time);
+        const startTime = eventData.start_time ? 
+          new Date(eventData.start_time).toLocaleTimeString('en-US', { 
+            hour12: false, 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }) : "";
+        const endTime = eventData.end_time ? 
+          new Date(eventData.end_time).toLocaleTimeString('en-US', { 
+            hour12: false, 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }) : "";
+        
+        form.reset({
+          title: eventData.title || "",
+          event_type: eventData.event_type || "",
+          industry: eventData.industry?.[0] || "",
+          date: eventDate,
+          start_time: startTime,
+          end_time: endTime,
+          is_online: eventData.location?.startsWith('http') || false,
+          location: eventData.location && !eventData.location.startsWith('http') ? eventData.location : "",
+          event_link: eventData.location?.startsWith('http') ? eventData.location : "",
+          description: eventData.description || "",
+        });
+        
+      } catch (err) {
+        console.error("Error loading event:", err);
+        setError("Failed to load event data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (eventId && authUser) {
+      loadEvent();
+    }
+  }, [eventId, authUser, form]);
 
   const isOnline = form.watch("is_online");
   const watchedValues = form.watch();
@@ -295,29 +377,48 @@ export default function NewEventPage() {
       );
 
       // optional poster upload
-      let poster_url: string | null = null;
+      let poster_url: string | null = event?.poster_url || null;
       if (posterFile) {
         poster_url = await uploadPoster(posterFile);
       }
 
-      await eventService.createEvent({
+      // Prepare event data for API
+      const eventData = {
         title: data.title,
         description: data.description || null,
         start_time: startISO,
         end_time: endISO,
-        event_type: data.event_type as "workshop" | "info_session" | "networking" | "hackathon" | "deadline" | "meeting" | "other" | "personal",
+        event_type: data.event_type,
         industry: [data.industry],
         location: data.is_online
           ? (data.event_link as string)
           : (data.location as string),
         poster_url,
-        created_by: profile?.id || "",
-      } as any);
+      };
 
+      // Submit changes to PUT API
+      const response = await fetch(`/api/events/${eventId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit changes');
+      }
+
+      const result = await response.json();
+      console.log("Changes submitted successfully:", result);
+
+      // Show success message and redirect
+      toast.success("Changes submitted for approval! Your event will be updated after manager review.");
       router.push("/calendar");
     } catch (err) {
       console.error(err);
-      form.setError("title", { message: "Failed to create event" });
+      form.setError("title", { message: "Failed to submit changes" });
     } finally {
       setSubmitting(false);
     }
@@ -335,6 +436,43 @@ export default function NewEventPage() {
       if (posterPreview) URL.revokeObjectURL(posterPreview);
     };
   }, [posterPreview]);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="p-2">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Loading event...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-2">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Error</h2>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => router.back()}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Go Back
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* -------------------------------- UI -------------------------------- */
   return (
@@ -360,15 +498,15 @@ export default function NewEventPage() {
 
           {/* page title */}
           <h1 className="text-2xl font-bold text-foreground">
-            New Event Request
+            Edit Event
           </h1>
         </div>
 
         <Alert className="mb-4 bg-blue-50" variant="info">
           <AlertDescription className="text-sm">
-            Please submit your event at least{" "}
-            <strong>1 week before the event date</strong> to allow{" "}
-            <strong>1–2 days</strong> for Nexus Support to review.
+            Your changes will be submitted for approval. The event will be updated{" "}
+            <strong>after manager review</strong>. Changes typically take{" "}
+            <strong>1–2 days</strong> to be approved.
           </AlertDescription>
         </Alert>
 
@@ -672,10 +810,10 @@ export default function NewEventPage() {
                         {submitting ? (
                           <>
                             <div className="animate-spin h-3 w-3 mr-2 border-b-2 border-white rounded-full" />
-                            Creating…
+                            Submitting…
                           </>
                         ) : (
-                          "Create Event"
+                          "Submit Changes"
                         )}
                       </Button>
                     </AlertDialogTrigger>
@@ -719,8 +857,8 @@ export default function NewEventPage() {
                               </Alert>
                             </motion.div>
                           )}
-                          Once you create the event you{" "}
-                          <strong>won&apos;t be able to edit it.</strong>
+                          Once you submit these changes, they will be{" "}
+                          <strong>sent for manager approval.</strong>
                           <br />
                           Double-check all details!
                         </AlertDialogDescription>
@@ -738,12 +876,12 @@ export default function NewEventPage() {
                             form.handleSubmit(async (data) => {
                               await onSubmit(data); // your existing submit fn
                               toast.success(
-                                "Event submitted successfully 🎉 Wait for updates on email!"
+                                "Changes submitted for approval! Your event will be updated after manager review."
                               );
                             })()
                           }
                         >
-                          Double-check&nbsp;and&nbsp;Send&nbsp;anyway
+                          Submit&nbsp;Changes&nbsp;for&nbsp;Approval
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
