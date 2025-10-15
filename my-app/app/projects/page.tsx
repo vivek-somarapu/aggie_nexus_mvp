@@ -34,6 +34,8 @@ import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { industryOptions } from "@/lib/constants";
 
 // Animation variants
 const pageVariants = {
@@ -227,9 +229,7 @@ export default function ProjectsPage() {
   };
 
   // Get all unique industries from projects
-  const industries = Array.from(
-    new Set(projects.flatMap((project) => project.industry))
-  );
+  const industries = industryOptions;
 
   // Filter projects based on filters
   const filteredProjects = projects.filter((project: Project) => {

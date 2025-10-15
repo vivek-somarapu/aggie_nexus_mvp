@@ -51,6 +51,7 @@ import { useAuth } from "@/lib";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createClient } from "@/lib/supabase/client";
 import { IncubatorAcceleratorBadges } from "@/components/ui/incubator-accelerator-badge";
+import { toast } from "sonner";
 
 export default function ProjectPage() {
   const { id } = useParams() as { id: string };
@@ -125,7 +126,7 @@ export default function ProjectPage() {
   useEffect(() => {
     const fetchBookmarkData = async () => {
       if (!currentUser || !project) return;
-      
+
       try {
         setIsBookmarkLoading(true);
         const bookmarks = await bookmarkService.getProjectBookmarks(
@@ -228,6 +229,22 @@ export default function ProjectPage() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!project) return;
+    setDeleteInProgress(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete project");
+      toast.success("Project deleted successfully");
+      router.push("/profile?tab=projects");
+    } catch (err) {
+      toast.error("Failed to delete project");
+    } finally {
+      setDeleteInProgress(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-32">
@@ -318,7 +335,53 @@ export default function ProjectPage() {
       <div className="grid gap-6 md:grid-cols-4">
         {/* Main Content - Left Column */}
         <div className="md:col-span-3 space-y-6">
-          <Card className="shadow-sm">
+          <Card className="relative shadow-sm">
+            <div className="flex gap-2 absolute top-4 right-4 z-10">
+              {isOwner && (
+                <>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => setDeleteDialogOpen(true)}
+                    aria-label="Delete project"
+                    disabled={deleteInProgress}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleEdit}
+                    aria-label="Edit project"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handleBookmarkToggle}
+                disabled={isBookmarkLoading || !currentUser}
+              >
+                {isBookmarkLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Bookmark
+                    className={`h-4 w-4 ${
+                      isBookmarked ? "fill-current" : ""
+                    }`}
+                  />
+                )}
+                <span className="sr-only">
+                  {isBookmarked ? "Remove bookmark" : "Bookmark project"}
+                </span>
+              </Button>
+              <Button variant="outline" size="icon">
+                <Share2 className="h-4 w-4" />
+                <span className="sr-only">Share project</span>
+              </Button>
+            </div>
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
