@@ -1,10 +1,21 @@
 "use client"
 
+import { useEffect } from "react"
 import { AuthForm } from "@/components/auth-form"
 import { useAuth } from "@/lib/auth"
 
 export default function ResetPasswordPage() {
   const { resetPassword, isLoading, error } = useAuth()
+
+  // Prevent auth context from redirecting away from this page
+  useEffect(() => {
+    // Set a flag to prevent redirects during password reset
+    window.isPasswordResetPage = true
+    
+    return () => {
+      window.isPasswordResetPage = false
+    }
+  }, [])
 
   const handleSubmit = async (data: { password: string }) => {
     try {
