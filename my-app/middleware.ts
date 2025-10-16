@@ -63,6 +63,7 @@ export async function middleware(request: NextRequest) {
       '/auth/callback',
       '/auth/waiting',
       '/auth/reset-password',
+      '/auth/forgot-password',
       '/calendar', // Allow unauthenticated users to view calendar
       '/api/events', // Allow fetching events without auth
     ];

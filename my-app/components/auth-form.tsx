@@ -132,7 +132,15 @@ export function AuthForm({ type, onSubmit, loading, error, onOAuthLogin }: AuthF
               <div className="flex justify-between items-center">
                 <Label htmlFor="password">Password</Label>
                 {type === "login" && (
-                  <a href="/auth/forgot-password" className="text-sm text-primary hover:underline">
+                  <a 
+                    href="/auth/forgot-password" 
+                    className="text-sm text-primary hover:underline"
+                    onClick={(e) => {
+                      console.log("Forgot password link clicked");
+                      console.log("Current URL:", window.location.href);
+                      console.log("Target URL:", "/auth/forgot-password");
+                    }}
+                  >
                     Forgot password?
                   </a>
                 )}
