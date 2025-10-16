@@ -434,10 +434,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             authLog("signIn: Email stored in localStorage");
           }
           
-          // Redirect to waiting page instead of showing error
-          authLog("signIn: Redirecting to /auth/waiting");
+        // Redirect to waiting page instead of showing error
+        authLog("signIn: Redirecting to /auth/waiting");
+        if (!(window as any).isPasswordResetPage) {
           router.push("/auth/waiting");
-          return false;
+        }
+        return false;
         } else if (error.message.includes("Invalid login credentials")) {
           setError("Invalid email or password. Please check your credentials and try again.");
         } else {
@@ -489,7 +491,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Redirect to waiting page
         authLog("signIn: Redirecting to waiting page");
-        router.push("/auth/waiting");
+        if (!(window as any).isPasswordResetPage) {
+          router.push("/auth/waiting");
+        }
         return true;
       }
 
@@ -525,10 +529,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userProfile.full_name === "User"
       ) {
         authLog("signIn: Profile incomplete, redirecting to setup");
-        router.push("/profile/setup");
+        if (!(window as any).isPasswordResetPage) {
+          router.push("/profile/setup");
+        }
       } else {
         authLog("signIn: Profile complete, redirecting to home");
-        router.push("/");
+        if (!(window as any).isPasswordResetPage) {
+          router.push("/");
+        }
       }
 
       return true;
@@ -766,7 +774,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const supabase = createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
       });
 
       if (error) {

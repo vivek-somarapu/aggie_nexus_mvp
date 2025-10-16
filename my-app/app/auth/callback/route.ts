@@ -58,6 +58,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Handle password recovery flow
+    if (type === 'recovery') {
+      callbackLog('Password recovery callback detected, redirecting to reset password page');
+      return NextResponse.redirect(new URL('/auth/reset-password', requestUrl.origin))
+    }
+
     if (type === 'signup' || type === 'invite') {
       callbackLog('Email verification callback detected.');
       const { data: { user }, error: userErr } = await supabase.auth.getUser()
