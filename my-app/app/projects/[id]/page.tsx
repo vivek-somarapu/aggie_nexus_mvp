@@ -336,52 +336,6 @@ export default function ProjectPage() {
         {/* Main Content - Left Column */}
         <div className="md:col-span-3 space-y-6">
           <Card className="relative shadow-sm">
-            <div className="flex gap-2 absolute top-4 right-4 z-10">
-              {isOwner && (
-                <>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    onClick={() => setDeleteDialogOpen(true)}
-                    aria-label="Delete project"
-                    disabled={deleteInProgress}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleEdit}
-                    aria-label="Edit project"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={handleBookmarkToggle}
-                disabled={isBookmarkLoading || !currentUser}
-              >
-                {isBookmarkLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Bookmark
-                    className={`h-4 w-4 ${
-                      isBookmarked ? "fill-current" : ""
-                    }`}
-                  />
-                )}
-                <span className="sr-only">
-                  {isBookmarked ? "Remove bookmark" : "Bookmark project"}
-                </span>
-              </Button>
-              <Button variant="outline" size="icon">
-                <Share2 className="h-4 w-4" />
-                <span className="sr-only">Share project</span>
-              </Button>
-            </div>
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
