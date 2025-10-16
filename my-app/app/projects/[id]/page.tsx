@@ -344,7 +344,7 @@ export default function ProjectPage() {
                     size="icon"
                     onClick={() => setDeleteDialogOpen(true)}
                     aria-label="Delete project"
-                    disabled={deleteInProgress}
+                    disabled={isDeleting}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
