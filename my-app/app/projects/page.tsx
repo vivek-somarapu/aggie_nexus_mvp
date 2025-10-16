@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { IndustryBadges } from "@/components/ui/industry-badges";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -259,6 +260,8 @@ export default function ProjectsPage() {
       })
     : filteredProjects;
 
+  
+
   return (
     <motion.div
       className="space-y-6"
@@ -449,7 +452,7 @@ export default function ProjectsPage() {
                     whileHover={{ y: -5, transition: { duration: 0.2 } }}
                   >
                     <Link href={`/projects/${project.id}`}>
-                      <Card className="h-full overflow-hidden hover:shadow-md transition-shadow">
+                      <Card className="h-full flex flex-col overflow-hidden hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">
                           <div className="flex justify-between items-start">
                             <CardTitle className="line-clamp-1">
@@ -530,7 +533,7 @@ export default function ProjectsPage() {
                             </Badge>
                           )}
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="flex-grow">
                           <p className="text-muted-foreground line-clamp-3 mb-4">
                             {project.description}
                           </p>
@@ -561,22 +564,11 @@ export default function ProjectsPage() {
                             </div>
                           )}
                         </CardContent>
-                        <CardFooter className="border-t pt-4 flex flex-wrap gap-2">
-                          {project.industry.slice(0, 3).map((ind: string, indIndex: number) => (
-                            <Badge
-                              key={`${project.id}-industry-${indIndex}`}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {ind}
-                            </Badge>
-                          ))}
-                          {project.industry.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{project.industry.length - 3}
-                            </Badge>
-                          )}
-                          
+                        <CardFooter className="border-t pt-4">
+                          <IndustryBadges 
+                            className="w-full"
+                            items={project.industry}
+                            defaultVariant="secondary"/>
                         </CardFooter>
                       </Card>
                     </Link>
