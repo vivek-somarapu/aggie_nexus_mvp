@@ -121,11 +121,10 @@ export async function middleware(request: NextRequest) {
     }
     
     // List of routes that should redirect to home if already authenticated
+    // Note: forgot-password and reset-password should be accessible to everyone
     const authRoutes = [
       '/auth/login',
       '/auth/signup',
-      '/auth/forgot-password',
-      '/auth/reset-password',
     ];
     
     // Check if the user is already authenticated but trying to access auth routes

@@ -65,7 +65,6 @@ export default function RootLayout({
               <RootCodeRedirect>{children}</RootCodeRedirect>
             </ClientLayout>
             <Toaster />
-            <AuthDebug />
             <AuthStateSync />
             <Analytics />
           </AuthProvider>
