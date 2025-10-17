@@ -53,6 +53,32 @@ import { createClient } from "@/lib/supabase/client";
 import { IncubatorAcceleratorBadges } from "@/components/ui/incubator-accelerator-badge";
 import { toast } from "sonner";
 
+/**
+ * Blur email address before the @ symbol for privacy
+ * Example: john.doe@example.com -> •••••••@example.com
+ */
+function blurEmail(email: string): string {
+  if (!email || !email.includes('@')) return email;
+  
+  const [localPart, domain] = email.split('@');
+  // Replace each character with a bullet point (•)
+  const blurred = '•'.repeat(localPart.length);
+  return `${blurred}@${domain}`;
+}
+
+/**
+ * Blur phone number, showing only last 4 digits
+ * Example: +1 (555) 123-4567 -> ••••••••••4567
+ */
+function blurPhone(phone: string): string {
+  if (!phone || phone.length < 4) return phone;
+  
+  // Keep only the last 4 characters, blur everything else
+  const lastFour = phone.slice(-4);
+  const blurred = '•'.repeat(phone.length - 4);
+  return `${blurred}${lastFour}`;
+}
+
 export default function ProjectPage() {
   const { id } = useParams() as { id: string };
   const { authUser: currentUser, isAuthReady } = useAuth();
@@ -706,23 +732,45 @@ export default function ProjectPage() {
               {/* Only show contact info, not contact buttons */}
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{project.contact_info.email}</span>
+                <span className="text-sm">
+                  {(() => {
+                    console.log('Email blur check:', {
+                      isOwner,
+                      currentUserId: currentUser?.id,
+                      projectOwnerId: project.owner_id,
+                      originalEmail: project.contact_info.email,
+                      blurredEmail: blurEmail(project.contact_info.email)
+                    });
+                    return isOwner 
+                      ? project.contact_info.email 
+                      : blurEmail(project.contact_info.email);
+                  })()}
+                </span>
               </div>
               {project.contact_info.phone && (
                 <div className="flex items-center gap-2">
                   <Globe className="h-4 w-4 text-muted-foreground" />
-                  <span>{project.contact_info.phone}</span>
+                  <span className="text-sm">
+                    {isOwner 
+                      ? project.contact_info.phone 
+                      : blurPhone(project.contact_info.phone)}
+                  </span>
                 </div>
               )}
               {!isOwner && (
-                <Button
-                  className="w-full"
-                  onClick={() => setIsInquiryOpen(true)}
-                  disabled={!currentUser}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Inquire About Project
-                </Button>
+                <>
+                  <p className="text-xs text-muted-foreground italic">
+                    Full Contact information is hidden. Send an inquiry instead.
+                  </p>
+                  <Button
+                    className="w-full"
+                    onClick={() => setIsInquiryOpen(true)}
+                    disabled={!currentUser}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Inquire About Project
+                  </Button>
+                </>
               )}
             </CardContent>
           </Card>
