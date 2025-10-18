@@ -94,6 +94,7 @@ export default function ProjectPage() {
 
   // Inquiry dialog state
   const [inquiryNote, setInquiryNote] = useState("");
+  const [preferredContact, setPreferredContact] = useState("");
   const [isInquiryOpen, setIsInquiryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inquiryError, setInquiryError] = useState<string | null>(null);
@@ -205,6 +206,11 @@ export default function ProjectPage() {
       return;
     }
 
+    if (!preferredContact) {
+      setInquiryError("Please select your preferred form of contact");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setInquiryError(null);
@@ -231,6 +237,7 @@ export default function ProjectPage() {
         project_id: project.id,
         user_id: currentUser.id,
         note: inquiryNote,
+        preferred_contact: preferredContact,
         status: "pending",
       });
 
@@ -239,6 +246,7 @@ export default function ProjectPage() {
       // Show success message and reset form
       setInquirySuccess(true);
       setInquiryNote("");
+      setPreferredContact("");
 
       // Close dialog after a delay
       setTimeout(() => {
@@ -575,7 +583,7 @@ export default function ProjectPage() {
                       Inquire About Project
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-2xl w-full min-h-[50vh] max-h-[90vh]">
                     <DialogHeader>
                       <DialogTitle>Inquire About {project.title}</DialogTitle>
                       <DialogDescription>
@@ -600,6 +608,19 @@ export default function ProjectPage() {
                           </Alert>
                         )}
 
+                        <div className="mb-4">
+                          <label htmlFor="preferredContact" className="block text-sm font-medium mb-1">Preferred Form of Contact <span className="text-red-500">*</span></label>
+                          <input
+                            id="preferredContact"
+                            type="text"
+                            className="w-full border rounded px-3 py-2"
+                            value={preferredContact}
+                            onChange={e => setPreferredContact(e.target.value)}
+                            placeholder="Enter your preferred form of contact (e.g., Email, Phone, LinkedIn, etc.)"
+                            required
+                          />
+                        </div>
+
                         <Textarea
                           placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
                           value={inquiryNote}
@@ -621,6 +642,7 @@ export default function ProjectPage() {
                             disabled={
                               isSubmitting ||
                               !inquiryNote.trim() ||
+                              !preferredContact ||
                               !currentUser
                             }
                           >
