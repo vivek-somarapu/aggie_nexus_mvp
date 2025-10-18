@@ -286,50 +286,54 @@ export default function Navbar() {
                 )}
               </Button>
               <Dialog open={inboxOpen} onOpenChange={setInboxOpen}>
-                <DialogContent className="max-w-lg w-full">
-                  <DialogHeader>
-                    <DialogTitle>Inbox</DialogTitle>
-                  </DialogHeader>
-                  <Tabs value={inboxTab} onValueChange={v => setInboxTab(v as 'received' | 'sent')}>
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="received">Received</TabsTrigger>
-                      <TabsTrigger value="sent">Sent</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="received">
-                      {inquiriesLoading ? (
-                        <div className="py-8 text-center">Loading...</div>
-                      ) : receivedInquiries.length === 0 ? (
-                        <div className="py-8 text-center text-muted-foreground">No received inquiries.</div>
-                      ) : (
-                        <ul className="space-y-2 max-h-80 overflow-y-auto">
-                          {receivedInquiries.map(inq => (
-                            <li key={inq.id} className="border rounded p-2">
-                              <div className="font-semibold">{inq.project_title}</div>
-                              <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
-                              <div className="text-sm mt-1">{inq.note}</div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </TabsContent>
-                    <TabsContent value="sent">
-                      {inquiriesLoading ? (
-                        <div className="py-8 text-center">Loading...</div>
-                      ) : sentInquiries.length === 0 ? (
-                        <div className="py-8 text-center text-muted-foreground">No sent inquiries.</div>
-                      ) : (
-                        <ul className="space-y-2 max-h-80 overflow-y-auto">
-                          {sentInquiries.map(inq => (
-                            <li key={inq.id} className="border rounded p-2">
-                              <div className="font-semibold">{inq.project_title}</div>
-                              <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
-                              <div className="text-sm mt-1">{inq.note}</div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </TabsContent>
-                  </Tabs>
+                <DialogContent className="max-w-4xl w-full min-h-[60vh] max-h-[90vh]">
+                  <div className="absolute left-8 top-8 flex items-center gap-4">
+                    <DialogTitle className="text-2xl font-bold">Inbox</DialogTitle>
+                    <Tabs value={inboxTab} onValueChange={v => setInboxTab(v as 'received' | 'sent')}>
+                      <TabsList className="ml-2">
+                        <TabsTrigger value="received">Received</TabsTrigger>
+                        <TabsTrigger value="sent">Sent</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                  <div className="pt-24">
+                    <Tabs value={inboxTab} onValueChange={v => setInboxTab(v as 'received' | 'sent')}>
+                      <TabsContent value="received">
+                        {inquiriesLoading ? (
+                          <div className="py-8 text-center">Loading...</div>
+                        ) : receivedInquiries.length === 0 ? (
+                          <div className="py-8 text-center text-muted-foreground">No received inquiries.</div>
+                        ) : (
+                          <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {receivedInquiries.map(inq => (
+                              <li key={inq.id} className="border rounded p-2">
+                                <div className="font-semibold">{inq.project_title}</div>
+                                <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
+                                <div className="text-sm mt-1">{inq.note}</div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </TabsContent>
+                      <TabsContent value="sent">
+                        {inquiriesLoading ? (
+                          <div className="py-8 text-center">Loading...</div>
+                        ) : sentInquiries.length === 0 ? (
+                          <div className="py-8 text-center text-muted-foreground">No sent inquiries.</div>
+                        ) : (
+                          <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {sentInquiries.map(inq => (
+                              <li key={inq.id} className="border rounded p-2">
+                                <div className="font-semibold">{inq.project_title}</div>
+                                <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
+                                <div className="text-sm mt-1">{inq.note}</div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </div>
                 </DialogContent>
               </Dialog>
               {/* Create Project Button */}

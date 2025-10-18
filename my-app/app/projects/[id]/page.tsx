@@ -508,7 +508,7 @@ export default function ProjectPage() {
                       Inquire About Project
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-2xl w-full min-h-[50vh] max-h-[90vh]">
                     <DialogHeader>
                       <DialogTitle>Inquire About {project.title}</DialogTitle>
                       <DialogDescription>
@@ -535,18 +535,15 @@ export default function ProjectPage() {
 
                         <div className="mb-4">
                           <label htmlFor="preferredContact" className="block text-sm font-medium mb-1">Preferred Form of Contact <span className="text-red-500">*</span></label>
-                          <select
+                          <input
                             id="preferredContact"
+                            type="text"
                             className="w-full border rounded px-3 py-2"
                             value={preferredContact}
                             onChange={e => setPreferredContact(e.target.value)}
+                            placeholder="Enter your preferred form of contact (e.g., Email, Phone, LinkedIn, etc.)"
                             required
-                          >
-                            <option value="" disabled>Select an option</option>
-                            <option value="Email">Email</option>
-                            <option value="Phone">Phone</option>
-                            <option value="LinkedIn">LinkedIn</option>
-                          </select>
+                          />
                         </div>
 
                         <Textarea
