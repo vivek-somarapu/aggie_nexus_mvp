@@ -540,7 +540,7 @@ export default function Home() {
               >
                 AggieX was formed to connect entrepreneurial students, faculty, 
                 and alumni across all disciplines and industries. For the Founders, 
-                Funders, and Builders at Texas A&M..
+                Funders, and Builders at Texas A&M.
               </p>
             </div>
 
