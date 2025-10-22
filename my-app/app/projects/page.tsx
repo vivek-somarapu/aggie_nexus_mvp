@@ -454,10 +454,38 @@ export default function ProjectsPage() {
                     <Link href={`/projects/${project.id}`}>
                       <Card className="h-full flex flex-col overflow-hidden hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">
-                          <div className="flex justify-between items-start">
-                            <CardTitle className="line-clamp-1">
-                              {project.title}
-                            </CardTitle>
+                          <div className="flex justify-between">
+                            <div className="flex items-center gap-3">
+                              {/* project logo */}
+                              <div className="border h-[50px] w-[50px] rounded-full flex items-center justify-center text-lg font-semibold bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 flex-shrink-0">
+                                {project.title.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col gap-2">
+                                <CardTitle className="line-clamp-1">
+                                  {project.title}
+                                </CardTitle>
+                                <div className="flex gap-2">
+                                  {project.is_idea ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-yellow-100 text-black"
+                                    >
+                                      Idea
+                                    </Badge>
+                                  ) : (
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-green-100 text-black"
+                                    >
+                                      Project
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline">
+                                    {project.project_status}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
                             <motion.div
                               whileTap={buttonVariants.tap}
                               onClick={(e) =>
@@ -487,33 +515,33 @@ export default function ProjectsPage() {
                               </Button>
                             </motion.div>
                           </div>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {project.is_idea ? (
-                              <Badge
-                                variant="outline"
-                                className="bg-yellow-100 text-black"
-                              >
-                                Idea
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="bg-green-100 text-black"
-                              >
-                                Project
-                              </Badge>
-                            )}
-                            <Badge variant="outline">
-                              {project.project_status}
-                            </Badge>
-                            {project.organizations && project.organizations.length > 0 && (
+                        </CardHeader>
+                        <CardContent className="flex-grow space-y-2 -mt-4">
+                          <p className="text-sm font-semibold">Industries</p>
+                          <IndustryBadges 
+                            className="w-full"
+                            items={project.industry}
+                            defaultVariant="secondary"/>
+                          {project.required_skills && project.required_skills.length > 0 && (
+                            <>
+                              <p className="text-sm font-semibold">Skills</p>
+                              <IndustryBadges 
+                                className="w-full"
+                                items={project.required_skills}
+                                defaultVariant="outline"
+                              />
+                            </>
+                          )}
+                          <p className="text-sm text-muted-foreground line-clamp-3 mt-4">
+                            {project.description}
+                          </p>
+                          {project.organizations && project.organizations.length > 0 && (
                               project.organizations.some(org => 
                                 org === 'Aggies Create Incubator' || org === 'AggieX Accelerator'
                               ) && (
                                 <IncubatorAcceleratorBadges organizations={project.organizations} size="sm" maxDisplay={2}/>
                               )
                             )}
-                          </div>
                           {/* Organization Tags */}
                           {project.organizations && project.organizations
                             .filter((org: string) => org !== 'Aggies Create Incubator' && org !== 'AggieX Accelerator')
@@ -522,9 +550,11 @@ export default function ProjectsPage() {
                               <Badge
                                 key={`${project.id}-org-${orgIndex}`}
                                 variant="outline"
-                                className="text-xs"
+                                className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
                               >
-                                {org}
+                                <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
+                                  {org}
+                                </span>
                               </Badge>
                             ))}
                           {project.organizations && project.organizations.length > 2 && (
@@ -532,29 +562,6 @@ export default function ProjectsPage() {
                               +{project.organizations.length - 2}
                             </Badge>
                           )}
-                        </CardHeader>
-                        <CardContent className="flex-grow">
-                          <p className="text-muted-foreground line-clamp-3 mb-4">
-                            {project.description}
-                          </p>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <MapPin className="h-3 w-3" />
-                              <span>{project.location_type}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
-                              <span>{formatDate(project.estimated_start)}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Users className="h-3 w-3" />
-                              <span>{project.recruitment_status}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Eye className="h-3 w-3" />
-                              <span>{project.views} views</span>
-                            </div>
-                          </div>
                           
                           {/* Funding Information */}
                           {project.funding_received !== null && project.funding_received !== undefined && project.funding_received > 0 && (
@@ -565,10 +572,24 @@ export default function ProjectsPage() {
                           )}
                         </CardContent>
                         <CardFooter className="border-t pt-4">
-                          <IndustryBadges 
-                            className="w-full"
-                            items={project.industry}
-                            defaultVariant="secondary"/>
+                          <div className="flex gap-4 text-sm">
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span>{project.location_type}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Users className="h-3 w-3" />
+                              <span>{project.recruitment_status}</span>
+                            </div>
+                            {/* <div className="flex items-center gap-1 text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              <span>{formatDate(project.estimated_start)}</span>
+                            </div> */}
+                            {/* <div className="flex items-center gap-1 text-muted-foreground">
+                              <Eye className="h-3 w-3" />
+                              <span>{project.views} views</span>
+                            </div> */}
+                          </div>
                         </CardFooter>
                       </Card>
                     </Link>

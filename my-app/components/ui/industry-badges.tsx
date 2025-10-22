@@ -16,7 +16,7 @@ export function IndustryBadges({
   items,
   className,
   gapPx = 8,
-  badgeClassName = "text-xs",
+  badgeClassName = "text-xs max-w-[100px] truncate",
   defaultVariant = "secondary",
   variantMap,
 }: IndustryBadgesProps) {
@@ -24,26 +24,9 @@ export function IndustryBadges({
   const measureRef = useRef<HTMLDivElement | null>(null);
   const [visibleCount, setVisibleCount] = useState(items.length);
 
-  // shorten stem bc overflow
-  const formatLabel = (s: string) => {
-    const normalized = s.replace(/\s+/g, " ").trim().toLowerCase();
-    if (
-      normalized === "science, technology, engineering & mathematics" ||
-      normalized === "science, technology, engineering and mathematics" ||
-      normalized === "science technology engineering & mathematics" ||
-      normalized === "science technology engineering and mathematics"
-    ) {
-      return "STEM";
-    }
-    return s;
-  };
-
   const getVariantFor = (item: string) => {
-    // look up by original item first, then by formatted label, then fall back to defaultVariant
     if (variantMap) {
       if (variantMap[item]) return variantMap[item];
-      const formatted = formatLabel(item);
-      if (variantMap[formatted]) return variantMap[formatted];
     }
     return defaultVariant;
   };
@@ -88,8 +71,6 @@ export function IndustryBadges({
   }, [items]);
 
   const remaining = Math.max(0, items.length - visibleCount);
-  // if only one and long do ... instead of +1
-  const singleLongAndClipped = items.length === 1 && visibleCount === 0;
 
   return (
     <>
@@ -99,19 +80,16 @@ export function IndustryBadges({
             <Badge
               key={ind + "-" + i}
               variant={getVariantFor(ind)}
-              className={badgeClassName}
+              className="max-w-[200px] text-xs px-2 py-0.5"
             >
-              {formatLabel(ind)}
+              <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
+                {ind}
+              </span>
             </Badge>
           ))}
           {remaining > 0 && (
             <Badge variant={defaultVariant} className={badgeClassName}>
               +{remaining}
-            </Badge>
-          )}
-          {singleLongAndClipped && (
-            <Badge variant={getVariantFor(items[0])} className={badgeClassName}>
-              {formatLabel(items[0])}
             </Badge>
           )}
         </div>
@@ -123,8 +101,12 @@ export function IndustryBadges({
         className="absolute invisible pointer-events-none h-0 overflow-hidden whitespace-nowrap"
       >
         {items.map((ind, i) => (
-          <Badge key={`m-${ind}-${i}`} variant={getVariantFor(ind)} className={badgeClassName}>
-            {formatLabel(ind)}
+          <Badge 
+            key={`m-${ind}-${i}`} 
+            variant={getVariantFor(ind)} 
+            className={badgeClassName}
+          >
+            {ind}
           </Badge>
         ))}
         <Badge variant={defaultVariant} className={badgeClassName}>
