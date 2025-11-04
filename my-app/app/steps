@@ -32,7 +32,7 @@ After connecting users-view to the database, these updates will follow:
 * Viewing project details
 ⸻
 ⚠️ Mock Data Usage
-Components currently still using mock data (primarily from lib/utils.ts and components/navbar.tsx) must transition to real data fetching from Supabase via MCP tools.
+Components currently still using mock data (primarily from lib/utils.ts and components/.tsx) must transition to real data fetching from Supabase via MCP tools.
 ⸻
 🧑‍🎨 Design & Technical Stack
 * Fonts: Montserrat, Playfair Display, Inter (Google Fonts)
@@ -49,7 +49,7 @@ Components currently still using mock data (primarily from lib/utils.ts and comp
 ❌ Areas Still Missing or Incomplete
 Authentication UI
 * Login/signup/password reset pages not yet implemented
-* Navbar currently shows mock user data
+*  currently shows mock user data
 User Management
 * Profile page and editing incomplete
 * User search still using mock data
@@ -119,11 +119,11 @@ AGN-002: Implement Authentication Pages
 * Signup page with required user information
 * Password reset flow
 * Connect to existing Supabase auth framework
-AGN-003: Update Navbar User Profile
+AGN-003: Update  User Profile
 * Priority: High
-* Description: Replace mock user data in navbar with authenticated user data
+* Description: Replace mock user data in  with authenticated user data
 * Acceptance Criteria:
-* Navbar displays current user info from Supabase
+*  displays current user info from Supabase
 * Login/Logout functionality works
 * Proper state management for auth changes
 AGN-004: Implement User Profile Page

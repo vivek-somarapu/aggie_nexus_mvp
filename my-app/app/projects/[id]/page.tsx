@@ -546,13 +546,24 @@ export default function ProjectPage() {
                           />
                         </div>
 
-                        <Textarea
-                          placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
-                          value={inquiryNote}
-                          onChange={(e) => setInquiryNote(e.target.value)}
-                          rows={5}
-                          className="resize-none"
-                        />
+                        <div className="space-y-2">
+                          <label htmlFor="inquiryNote" className="block text-sm font-medium mb-1">Message <span className="text-red-500">*</span></label>
+                          <Textarea
+                            placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
+                            value={inquiryNote}
+                            onChange={(e) => {
+                              const words = e.target.value.trim().split(/\s+/).filter(w => w.length > 0);
+                              if (words.length <= 200) {
+                                setInquiryNote(e.target.value);
+                              }
+                            }}
+                            rows={5}
+                            className="resize-none"
+                          />
+                          <div className="text-xs text-muted-foreground text-right">
+                            {inquiryNote.trim().split(/\s+/).filter(w => w.length > 0).length} / 200 words
+                          </div>
+                        </div>
 
                         <DialogFooter>
                           <Button

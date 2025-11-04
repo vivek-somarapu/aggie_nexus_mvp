@@ -13,6 +13,8 @@ export interface ProjectInquiry {
   applicant_email: string;
   applicant_avatar: string | null;
   applicant_bio: string | null;
+  preferred_contact?: string | null;
+  read_inquiry?: boolean | null;
 }
 
 export const inquiryService = {
@@ -21,6 +23,8 @@ export const inquiryService = {
     try {
       console.log("getReceivedInquiries called with userId:", userId);
       const supabase = createClient();
+      // Ensure Supabase client is initialized before making queries
+      if (!supabase) throw new Error("Supabase client is not initialized");
 
       // First, get all projects that the user owns and their general user info
       console.log("Fetching user info...");
@@ -60,7 +64,7 @@ export const inquiryService = {
         .from('project_applications')
         .select('*')
         .in('project_id', projectIds)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as { data: Array<{ id: string, project_id: string, user_id: string, note: string, status: string, created_at: string, preferred_contact?: string, read_inquiry?: boolean }>, error: any };
       
       console.log("Inquiries query result:", { data, error });
 
@@ -72,20 +76,40 @@ export const inquiryService = {
       console.log("Successfully fetched inquiries:", data?.length || 0);
       
       // Transform the data to match ProjectInquiry interface
-      const transformedData = data?.map(inquiry => ({
-        id: inquiry.id,
-        project_id: inquiry.project_id,
-        project_title: 'Project', // Will be populated later if needed
-        user_id: inquiry.user_id,
-        note: inquiry.note,
-        status: inquiry.status,
-        created_at: inquiry.created_at,
-        project_owner_id: userId, // The current user is the project owner
-        applicant_name: userData?.full_name || 'Unknown User', // Will be populated later if needed
-        applicant_email: userData?.email || '', // Will be populated later if needed
-        applicant_avatar: userData?.avatar || null,
-        applicant_bio: userData?.bio || null
-      })) || [];
+      const transformedData = await Promise.all(
+        (data || []).map(async (inquiry) => {
+          // Fetch applicant info for each inquiry
+          const { data: applicant } = await supabase
+            .from('users')
+            .select('full_name, email, avatar, bio')
+            .eq('id', inquiry.user_id)
+            .single();
+
+          // Fetch project title
+          const { data: project } = await supabase
+            .from('projects')
+            .select('title')
+            .eq('id', inquiry.project_id)
+            .single();
+
+          return {
+            id: inquiry.id,
+            project_id: inquiry.project_id,
+            project_title: project?.title || 'Unknown Project',
+            user_id: inquiry.user_id,
+            note: inquiry.note,
+            status: inquiry.status,
+            created_at: inquiry.created_at,
+            project_owner_id: userId, // The current user is the project owner
+            applicant_name: applicant?.full_name || 'Unknown User',
+            applicant_email: applicant?.email || '',
+            applicant_avatar: applicant?.avatar || null,
+            applicant_bio: applicant?.bio || null,
+            preferred_contact: inquiry.preferred_contact || null,
+            read_inquiry: inquiry.read_inquiry || false
+          };
+        })
+      );
       
       return transformedData;
     } catch (err: any) {
@@ -98,30 +122,45 @@ export const inquiryService = {
   getSentInquiries: async (userId: string): Promise<ProjectInquiry[]> => {
     try {
       const supabase = createClient();
+      // Ensure Supabase client is initialized before making queries
+      if (!supabase) throw new Error("Supabase client is not initialized");
       
       const { data, error } = await supabase
         .from('project_applications')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as { data: Array<{ id: string, project_id: string, user_id: string, note: string, status: string, created_at: string, preferred_contact?: string, read_inquiry?: boolean }>, error: any };
       
       if (error) throw error;
       
       // Transform the data to match ProjectInquiry interface
-      const transformedData = data?.map(inquiry => ({
-        id: inquiry.id,
-        project_id: inquiry.project_id,
-        project_title: 'Project', // Will be populated later if needed
-        user_id: inquiry.user_id,
-        note: inquiry.note,
-        status: inquiry.status,
-        created_at: inquiry.created_at,
-        project_owner_id: '', // Will be populated later if needed
-        applicant_name: '', // Not needed for sent inquiries
-        applicant_email: '', // Not needed for sent inquiries
-        applicant_avatar: null,
-        applicant_bio: null
-      })) || [];
+      const transformedData = await Promise.all(
+        (data || []).map(async (inquiry) => {
+          // Fetch project title for sent inquiries
+          const { data: project } = await supabase
+            .from('projects')
+            .select('title')
+            .eq('id', inquiry.project_id)
+            .single();
+
+          return {
+            id: inquiry.id,
+            project_id: inquiry.project_id,
+            project_title: project?.title || 'Unknown Project',
+            user_id: inquiry.user_id,
+            note: inquiry.note,
+            status: inquiry.status,
+            created_at: inquiry.created_at,
+            project_owner_id: '', // Will be populated later if needed
+            applicant_name: '', // Not needed for sent inquiries
+            applicant_email: '', // Not needed for sent inquiries
+            applicant_avatar: null,
+            applicant_bio: null,
+            preferred_contact: inquiry.preferred_contact || null,
+            read_inquiry: inquiry.read_inquiry || false
+          };
+        })
+      );
       
       return transformedData;
     } catch (err: any) {
@@ -134,6 +173,8 @@ export const inquiryService = {
   submitInquiry: async (projectId: string, userId: string, note: string): Promise<void> => {
     try {
       const supabase = createClient();
+      // Ensure Supabase client is initialized before making queries
+      if (!supabase) throw new Error("Supabase client is not initialized");
       
       // Check if user already applied to this project
       const { data: existingApplications } = await supabase
@@ -168,6 +209,8 @@ export const inquiryService = {
   updateInquiryStatus: async (inquiryId: string, status: 'accepted' | 'rejected'): Promise<void> => {
     try {
       const supabase = createClient();
+      // Ensure Supabase client is initialized before making queries
+      if (!supabase) throw new Error("Supabase client is not initialized");
       
       const { error } = await supabase
         .from('project_applications')
@@ -185,6 +228,8 @@ export const inquiryService = {
   deleteInquiry: async (inquiryId: string): Promise<void> => {
     try {
       const supabase = createClient();
+      // Ensure Supabase client is initialized before making queries
+      if (!supabase) throw new Error("Supabase client is not initialized");
       
       const { error } = await supabase
         .from('project_applications')
@@ -202,6 +247,8 @@ export const inquiryService = {
   getPendingInquiriesCount: async (userId: string): Promise<number> => {
     try {
       const supabase = createClient();
+      // Ensure Supabase client is initialized before making queries
+      if (!supabase) throw new Error("Supabase client is not initialized");
       
       // First get projects owned by the user
       const { data: ownedProjects, error: projectsError } = await supabase
@@ -217,14 +264,21 @@ export const inquiryService = {
 
       const projectIds = ownedProjects.map(project => project.id);
       
-      // Then count pending inquiries for those projects
+      // Then count pending inquiries for those projects that are unread (false or null)
       const { count, error } = await supabase
         .from('project_applications')
         .select('*', { count: 'exact', head: true })
         .in('project_id', projectIds)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .or('read_inquiry.eq.false,read_inquiry.is.null');
       
-      if (error) throw error;
+      console.log('getPendingInquiriesCount - projectIds:', projectIds);
+      console.log('getPendingInquiriesCount - count:', count);
+      
+      if (error) {
+        console.error('Error in getPendingInquiriesCount:', error);
+        throw error;
+      }
       
       return count || 0;
     } catch (err: any) {
@@ -232,4 +286,4 @@ export const inquiryService = {
       return 0;
     }
   }
-}; 
+};
