@@ -593,13 +593,23 @@ export default function UserPage() {
                         </Alert>
                       )}
                       
-                      <Textarea
-                        placeholder="Write your message here. Introduce yourself and explain why you're reaching out..."
-                        value={messageNote}
-                        onChange={(e) => setMessageNote(e.target.value)}
-                        rows={5}
-                        className="resize-none"
-                      />
+                      <div className="space-y-2">
+                        <Textarea
+                          placeholder="Write your message here. Introduce yourself and explain why you're reaching out..."
+                          value={messageNote}
+                          onChange={(e) => {
+                            const words = e.target.value.trim().split(/\s+/).filter(w => w.length > 0);
+                            if (words.length <= 200) {
+                              setMessageNote(e.target.value);
+                            }
+                          }}
+                          rows={5}
+                          className="resize-none"
+                        />
+                        <div className="text-xs text-muted-foreground text-right">
+                          {messageNote.trim().split(/\s+/).filter(w => w.length > 0).length} / 200 words
+                        </div>
+                      </div>
                       
                       <DialogFooter>
                         <Button 
