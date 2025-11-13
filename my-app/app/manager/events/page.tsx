@@ -163,7 +163,11 @@ export default function ManagerEventsPage() {
           const { createClient } = await import('@/lib/supabase/client');
           const supabase = createClient();
           
+          // Get current user (manager) to set approved_by
+          const { data: { user } } = await supabase.auth.getUser();
+          
           // Apply pending changes to the main event fields
+          // IMPORTANT: Keep status as 'approved' and set approved_by/approved_at
           await supabase
             .from('events')
             .update({
@@ -176,6 +180,9 @@ export default function ManagerEventsPage() {
               poster_url: event.pending_changes.poster_url,
               pending_changes: null,
               has_pending_changes: false,
+              status: 'approved', // Explicitly maintain approved status
+              approved_by: user?.id || null,
+              approved_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
             .eq('id', id);

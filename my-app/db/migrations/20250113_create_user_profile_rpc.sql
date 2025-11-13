@@ -11,18 +11,28 @@ CREATE OR REPLACE FUNCTION public.create_user_profile(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, auth
 AS $$
 DECLARE
   v_profile jsonb;
+  v_auth_uid uuid;
 BEGIN
-  -- Validate that the authenticated user is creating their own profile
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'User must be authenticated to create a profile';
-  END IF;
+  -- Get the authenticated user ID (may be NULL during signup flow)
+  v_auth_uid := auth.uid();
   
-  IF auth.uid() != p_user_id THEN
-    RAISE EXCEPTION 'Users can only create their own profile';
+  -- If we have an authenticated user, validate they're creating their own profile
+  -- If auth.uid() is NULL (during signup), we'll allow it but only if the user_id
+  -- matches a valid auth user (validated by checking auth.users table)
+  IF v_auth_uid IS NOT NULL THEN
+    IF v_auth_uid != p_user_id THEN
+      RAISE EXCEPTION 'Users can only create their own profile';
+    END IF;
+  ELSE
+    -- During signup, auth.uid() might be NULL, so we validate by checking
+    -- if the user_id exists in auth.users table
+    IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_user_id) THEN
+      RAISE EXCEPTION 'Invalid user ID: user does not exist in auth system';
+    END IF;
   END IF;
   
   -- Check if profile already exists
