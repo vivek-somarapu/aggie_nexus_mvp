@@ -10,6 +10,12 @@ export async function PATCH(
     const { id } = await params;
     const supabase = await createClient();
 
+    // Get authenticated user (manager)
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Get request body
     const body = await request.json();
     
@@ -20,12 +26,27 @@ export async function PATCH(
       );
     }
 
-    console.log("Updating event", id, "to status:", body.status);
+    console.log("Updating event", id, "to status:", body.status, "by manager:", user.id);
     
-    // Simple update - just change the status
+    // Prepare update data
+    const updateData: any = { 
+      status: body.status,
+      updated_at: new Date().toISOString()
+    };
+    
+    // If approving, set approved_by and approved_at
+    if (body.status === 'approved') {
+      updateData.approved_by = user.id;
+      updateData.approved_at = new Date().toISOString();
+    } else {
+      // For other statuses, clear approval info
+      updateData.approved_by = null;
+      updateData.approved_at = null;
+    }
+    
     const { data, error } = await supabase
       .from('events')
-      .update({ status: body.status })
+      .update(updateData)
       .eq('id', id)
       .select()
 

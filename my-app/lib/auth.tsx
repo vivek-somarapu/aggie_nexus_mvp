@@ -600,6 +600,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.user) {
         authLog("signUp: Creating user profile in users table via RPC");
         try {
+          // Wait a brief moment to ensure session is established
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Get session to ensure it's available
+          const { data: sessionData } = await supabase.auth.getSession();
+          authLog("signUp: Session check before RPC", { hasSession: !!sessionData.session });
+          
           const { data: profileData, error: profileError } = await supabase.rpc('create_user_profile', {
             p_user_id: data.user.id,
             p_email: data.user.email || email,
