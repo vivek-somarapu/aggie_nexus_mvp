@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 
 export async function PATCH(
@@ -14,6 +15,17 @@ export async function PATCH(
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Verify user is a manager
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!userProfile || (userProfile.role !== 'manager' && userProfile.role !== 'admin')) {
+      return NextResponse.json({ error: "Only managers can update event status" }, { status: 403 });
     }
 
     // Get request body
@@ -44,18 +56,39 @@ export async function PATCH(
       updateData.approved_at = null;
     }
     
-    const { data, error } = await supabase
+    // Use service role client to bypass RLS for manager operations
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+    
+    // Update and fetch the event using service role (bypasses RLS)
+    const { data, error } = await serviceClient
       .from('events')
       .update(updateData)
       .eq('id', id)
       .select()
+      .single();
 
     if (error) {
       console.error("Error updating event:", error);
       console.error("Error details:", JSON.stringify(error, null, 2));
       return NextResponse.json(
-        { error: "Failed to update event" },
+        { error: "Failed to update event", details: error.message },
         { status: 500 }
+      );
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        { error: "Event not found" },
+        { status: 404 }
       );
     }
 
