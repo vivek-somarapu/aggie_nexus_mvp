@@ -134,37 +134,29 @@ async function fetchUserProfile(userId: string, userFullName: string, userEmail:
     if (error) {
       authError("fetchUserProfile: Database error", { error: error.message, code: error.code });
       
-      // If user not found, create a new profile in the database
+      // If user not found, create a new profile in the database using RPC function
       if (error.code === 'PGRST116') {
-        authLog("fetchUserProfile: User not found in database, creating new profile");
+        authLog("fetchUserProfile: User not found in database, creating new profile via RPC");
         
         try {
-          const { error: createError } = await supabase
-            .from('users')
-            .insert({
-              id: userId,
-              email: userEmail,
-              full_name: userFullName || 'User',
-              email_verified: isVerifiedEmail,
-              industry: [],
-              skills: [],
-              contact: { email: userEmail },
-              views: 0,
-              is_texas_am_affiliate: false,
-              deleted: false,
-              last_login_at: new Date().toISOString(),
-              profile_setup_completed: false,
-              profile_setup_skipped: false
-            });
+          const { data: profileData, error: createError } = await supabase.rpc('create_user_profile', {
+            p_user_id: userId,
+            p_email: userEmail,
+            p_full_name: userFullName || 'User',
+            p_email_verified: isVerifiedEmail
+          } as any);
           
           if (createError) {
             authError("fetchUserProfile: Failed to create user profile", createError);
             return null;
           }
           
-          authLog("fetchUserProfile: User profile created successfully");
+          if (profileData) {
+            authLog("fetchUserProfile: User profile created successfully");
+            return profileData as Profile;
+          }
           
-          // Fetch the newly created profile
+          // If RPC didn't return data, fetch it manually
           const { data: newData, error: fetchError } = await supabase
             .from("users")
             .select("*")
@@ -603,27 +595,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId: data.user?.id 
       });
 
-      // If we have user data, create profile in users table
+      // If we have user data, create profile in users table using RPC function
+      // This bypasses RLS by using a SECURITY DEFINER function
       if (data.user) {
-        authLog("signUp: Creating user profile in users table");
+        authLog("signUp: Creating user profile in users table via RPC");
         try {
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert({
-              id: data.user.id,
-              email: data.user.email,
-              full_name: fullName || 'User',
-              email_verified: !!data.user.email_confirmed_at,
-              industry: [],
-              skills: [],
-              contact: { email: data.user.email },
-              views: 0,
-              is_texas_am_affiliate: false,
-              deleted: false,
-              last_login_at: new Date().toISOString(),
-              profile_setup_completed: false,
-              profile_setup_skipped: false
-            });
+          const { data: profileData, error: profileError } = await supabase.rpc('create_user_profile', {
+            p_user_id: data.user.id,
+            p_email: data.user.email || email,
+            p_full_name: fullName || 'User',
+            p_email_verified: !!data.user.email_confirmed_at
+          } as any);
 
           if (profileError) {
             authError("signUp: Failed to create user profile", profileError);
@@ -631,7 +613,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return false;
           }
 
-          authLog("signUp: User profile created successfully");
+          authLog("signUp: User profile created successfully", { hasProfile: !!profileData });
         } catch (profileErr: any) {
           authError("signUp: Exception creating user profile", profileErr);
           setError(`Account created but profile setup failed: ${profileErr.message}`);
