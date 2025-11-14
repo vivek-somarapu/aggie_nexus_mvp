@@ -7,7 +7,6 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ["gkzwxaiflfimhfikwfol.supabase.co"],
     remotePatterns: [
       {
         protocol: "https",
@@ -18,6 +17,12 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "gkzwxaiflfimhfikwfol.supabase.co",
+        port: "",
+        pathname: "/storage/v1/object/public/**",
+      },
+      {
+        protocol: "https",
+        hostname: "yqbxndlsxfjqhcfodvph.supabase.co",
         port: "",
         pathname: "/storage/v1/object/public/**",
       },

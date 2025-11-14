@@ -22,6 +22,8 @@ export type Project = {
   funding_received?: number;
   technical_requirements?: string[];
   soft_requirements?: string[];
+  logo_url?: string | null;
+  images?: string[];
 };
 
 // Helper function to get Supabase client
@@ -105,7 +107,8 @@ export async function getProjectById(id: string): Promise<Project | null> {
       *,
       project_organizations(
         organizations(name)
-      )
+      ),
+      project_images(id, url, position, image_type)
     `)
     .eq('id', id)
     .eq('deleted', false)
@@ -116,10 +119,19 @@ export async function getProjectById(id: string): Promise<Project | null> {
     throw error;
   }
   
+  // Process project images
+  const projectImages = (data.project_images || []) as Array<{ id: string; url: string; position: number; image_type: string }>;
+  const logoImage = projectImages.find((img) => img.image_type === 'logo');
+  const generalImages = projectImages
+    .filter((img) => img.image_type === 'general')
+    .sort((a, b) => a.position - b.position);
+  
   return {
     ...data,
     organizations: data.project_organizations?.map((po: { organizations?: { name: string } }) => po.organizations?.name).filter(Boolean) || [],
-    contact_info: data.contact_info || {}
+    contact_info: data.contact_info || {},
+    logo_url: (data.logo_url as string | null) || logoImage?.url || null,
+    images: generalImages.map((img) => img.url) || []
   };
 }
 

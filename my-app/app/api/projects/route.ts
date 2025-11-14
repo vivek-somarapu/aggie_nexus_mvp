@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
           funding_received: projectData.funding_received || 0,
           technical_requirements: projectData.technical_requirements || [],
           soft_requirements: projectData.soft_requirements || [],
+          logo_url: projectData.logo_url || null,
           views: 0,
           deleted: false
         })
