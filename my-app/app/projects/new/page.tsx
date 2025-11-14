@@ -876,23 +876,15 @@ const getAvailableSkills = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="estimated_start">Estimated Start Date</Label>
-                  <Form {...datePickerForm}>
-                    <DatePicker />
-                  </Form>
-                </div>
-
-                {/*<div className="space-y-2">
-                  <Label htmlFor="estimated_end">Estimated End Date</Label>
                   <DatePicker
-                    selected={selectedEndDate}
-                    onSelect={handleEndDateSelect}
-                    placeholderText="Select end date"
-                    minDate={selectedStartDate}
+                    selected={selectedStartDate}
+                    onSelect={handleStartDateSelect}
+                    placeholderText="Select start date"
                   />
-                </div>*/}
+                </div>
               </div>
             </CardContent>
           </Card>
