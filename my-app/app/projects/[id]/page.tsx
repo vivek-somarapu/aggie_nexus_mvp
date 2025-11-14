@@ -4,6 +4,14 @@ import { useState, useEffect } from "react";
 import { useParams, notFound, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Image from "next/image";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -372,45 +380,56 @@ export default function ProjectPage() {
           <Card className="relative shadow-sm">
             <CardHeader>
               <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {project.is_idea ? (
-                      <Badge variant="outline">Idea</Badge>
-                    ) : (
-                      <Badge variant="outline">Project</Badge>
-                    )}
-                    <Badge variant="outline">{project.project_status}</Badge>
-                    <Badge variant="outline">
-                      {project.recruitment_status}
-                    </Badge>
-                    {/* Incubator/Accelerator Badges */}
-                    {project.organizations &&
-                      (() => {
-                        // Filter for only the specific incubator/accelerator programs
-                        const incubatorOrgs = project.organizations.filter(
-                          (org) =>
-                            org === "Aggies Create Incubator" ||
-                            org === "AggieX Accelerator"
-                        );
-                        // Only render the component if any were found
-                        return (
-                          incubatorOrgs.length > 0 && (
-                            <IncubatorAcceleratorBadges
-                              organizations={incubatorOrgs}
-                              size="sm"
-                            />
-                          )
-                        );
-                      })()}
+                <div className="flex items-start gap-4 flex-1">
+                  {/* Project Logo */}
+                  {project.logo_url && (
+                    <Avatar className="h-20 w-20 shrink-0 ring-2 ring-background/50 shadow-md">
+                      <AvatarImage src={project.logo_url} alt={`${project.title} logo`} />
+                      <AvatarFallback className="text-xl font-semibold bg-background/90">
+                        {project.title.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  <div className="flex-1">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {project.is_idea ? (
+                        <Badge variant="outline">Idea</Badge>
+                      ) : (
+                        <Badge variant="outline">Project</Badge>
+                      )}
+                      <Badge variant="outline">{project.project_status}</Badge>
+                      <Badge variant="outline">
+                        {project.recruitment_status}
+                      </Badge>
+                      {/* Incubator/Accelerator Badges */}
+                      {project.organizations &&
+                        (() => {
+                          // Filter for only the specific incubator/accelerator programs
+                          const incubatorOrgs = project.organizations.filter(
+                            (org) =>
+                              org === "Aggies Create Incubator" ||
+                              org === "AggieX Accelerator"
+                          );
+                          // Only render the component if any were found
+                          return (
+                            incubatorOrgs.length > 0 && (
+                              <IncubatorAcceleratorBadges
+                                organizations={incubatorOrgs}
+                                size="sm"
+                              />
+                            )
+                          );
+                        })()}
+                    </div>
+                    <CardTitle className="text-2xl">{project.title}</CardTitle>
+                    <CardDescription className="flex items-center gap-2 mt-2">
+                      <Calendar className="h-4 w-4" />
+                      Posted on {formatDate(project.created_at)}
+                      <Separator orientation="vertical" className="h-4" />
+                      <Eye className="h-4 w-4" />
+                      {project.views} views
+                    </CardDescription>
                   </div>
-                  <CardTitle className="text-2xl">{project.title}</CardTitle>
-                  <CardDescription className="flex items-center gap-2 mt-2">
-                    <Calendar className="h-4 w-4" />
-                    Posted on {formatDate(project.created_at)}
-                    <Separator orientation="vertical" className="h-4" />
-                    <Eye className="h-4 w-4" />
-                    {project.views} views
-                  </CardDescription>
                 </div>
                 <div className="flex gap-2">
                   {currentUser?.id == owner?.id && (
@@ -842,6 +861,42 @@ export default function ProjectPage() {
           </Card>
         </div>
       </div>
+
+      {/* Project Images Carousel - At the bottom */}
+      {project.images && project.images.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>Project Images</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              <Carousel className="w-full">
+                <CarouselContent className="-ml-2 md:-ml-4">
+                  {project.images.map((imageUrl, index) => (
+                    <CarouselItem
+                      key={`project-image-${index}`}
+                      className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3"
+                    >
+                      <div className="relative h-[400px] w-full rounded-lg border shadow-sm overflow-hidden flex items-center justify-center bg-muted/20">
+                        <Image
+                          src={imageUrl}
+                          alt={`${project.title} - Image ${index + 1}`}
+                          fill
+                          className="object-contain"
+                          quality={95}
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        />
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2" />
+                <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2" />
+              </Carousel>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

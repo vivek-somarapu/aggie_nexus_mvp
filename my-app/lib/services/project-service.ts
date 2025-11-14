@@ -24,6 +24,8 @@ export type Project = {
   funding_received?: number;
   technical_requirements?: string[];
   soft_requirements?: string[];
+  logo_url?: string | null;
+  images?: string[];
 };
 
 export interface ProjectOrganizationClaim {
@@ -151,6 +153,70 @@ export const projectService = {
     }
     
     return response.json();
+  },
+
+  //------------------------------------------------------------
+  // Logo handling (bucket: project-logos)
+  //------------------------------------------------------------
+  uploadLogo: async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch("/api/upload/project-logos", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      throw new Error(error || "Logo upload failed");
+    }
+    return (await res.json()).publicUrl as string;
+  },
+
+  deleteLogo: async (publicUrl: string): Promise<void> => {
+    const res = await fetch("/api/upload/project-logos", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: publicUrl }),
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      throw new Error(error || "Logo deletion failed");
+    }
+  },
+
+  //------------------------------------------------------------
+  // Image handling (bucket: project-images)
+  //------------------------------------------------------------
+  uploadImage: async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch("/api/upload/project-images", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      throw new Error(error || "Image upload failed");
+    }
+    return (await res.json()).publicUrl as string;
+  },
+
+  deleteImage: async (publicUrl: string): Promise<void> => {
+    const res = await fetch("/api/upload/project-images", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: publicUrl }),
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      throw new Error(error || "Image deletion failed");
+    }
   },
 
   // Update an existing project
