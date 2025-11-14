@@ -1,24 +1,16 @@
-"use client";
+"use client"
 
-import React, { useState, useMemo, useEffect } from "react";
-import { useFormContext } from "react-hook-form";
-import { DayPicker } from "react-day-picker";
+import * as React from "react"
+import { DayPicker } from "react-day-picker"
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Popover,
-  PopoverTrigger,
   PopoverContent,
-} from "@/components/ui/popover";
-import {
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "@/components/ui/form";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { isToday } from "date-fns";
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { isToday } from "date-fns"
 
 /* ------------------------------------------------------------------ */
 /*  constants                                                         */
@@ -49,8 +41,7 @@ const defaultClassNames = {
     "group-[.range-start:not(.range-end)]:rounded-e-none group-[.range-end:not(.range-start)]:rounded-s-none " +
     "group-[.range-middle]:rounded-none",
   day: "group size-9 px-0 text-sm",
-  /* the rest of the keys are unchanged … */
-};
+}
 
 const Chevron = ({
   orientation,
@@ -60,89 +51,83 @@ const Chevron = ({
     <ChevronLeft size={16} strokeWidth={2} {...props} aria-hidden="true" />
   ) : (
     <ChevronRight size={16} strokeWidth={2} {...props} aria-hidden="true" />
-  );
+  )
 
-const rangeClass =
-  "bg-muted text-muted-foreground hover:bg-muted pointer-events-none";
+interface DatePickerProps {
+  selected?: Date
+  onSelect: (date: Date | undefined) => void
+  placeholderText?: string
+  minDate?: Date
+  maxDate?: Date
+  disabled?: boolean
+}
 
-/* ------------------------------------------------------------------ */
-/*  component                                                         */
-/* ------------------------------------------------------------------ */
-export default function DatePicker({ error }: { error?: boolean }) {
-  const form = useFormContext(); // pulls RHF context from parent <Form>
-
-  const dateValue = form.watch("date");
-
-  const triggerLabel = useMemo(() => {
-    if (!dateValue) return "Select date";
-    const datePart = dateValue.toLocaleDateString(undefined, {
+export function DatePicker({
+  selected,
+  onSelect,
+  placeholderText = "Pick a date",
+  minDate,
+  maxDate,
+  disabled = false,
+}: DatePickerProps) {
+  const triggerLabel = React.useMemo(() => {
+    if (!selected) return placeholderText
+    return selected.toLocaleDateString(undefined, {
       weekday: "short",
       month: "long",
       day: "numeric",
       year: "numeric",
-    });
-    return datePart;
-  }, [dateValue]);
+    })
+  }, [selected, placeholderText])
 
-  /* markup -------------------------------------------------------- */
   return (
-    <FormField
-      name="date"
-      control={form.control}
-      render={({ field }) => (
-        <FormItem>
-          <Popover>
-            <PopoverTrigger asChild>
-              <FormControl>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "h-10 w-full text-left font-normal",
-                    !field.value && "text-muted-foreground",
-                    error && "border-red-300 focus:border-red-500",
-                    "dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {triggerLabel}
-                </Button>
-              </FormControl>
-            </PopoverTrigger>
-
-            <PopoverContent
-              sideOffset={8}
-              align="start"
-              className=" p-0 dark:bg-zinc-900 dark:text-zinc-200 dark:border dark:border-zinc-700"
-            >
-              <div className="flex">
-                {/* calendar */}
-                <DayPicker
-                  mode="single"
-                  selected={field.value}
-                  onSelect={field.onChange}
-                  // disabled={(d) => d < new Date()}
-                  showOutsideDays
-                  className="p-6"
-                  classNames={{
-                    ...defaultClassNames,
-                    day_button: cn(
-                      defaultClassNames.day_button,
-                      "hover:bg-accent dark:hover:bg-zinc-800"
-                    ),
-                  }}
-                  components={{ Chevron }}
-                  modifiers={{
-                    today: (date) => isToday(date),
-                  }}
-                  initialFocus
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "h-10 w-full text-left font-normal",
+            !selected && "text-muted-foreground",
+            "dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700"
+          )}
+          disabled={disabled}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {triggerLabel}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        sideOffset={8}
+        align="start"
+        className="p-0 dark:bg-zinc-900 dark:text-zinc-200 dark:border dark:border-zinc-700"
+      >
+        <div className="flex">
+          <DayPicker
+            mode="single"
+            selected={selected}
+            onSelect={onSelect}
+            showOutsideDays
+            className="p-6"
+            classNames={{
+              ...defaultClassNames,
+              day_button: cn(
+                defaultClassNames.day_button,
+                "hover:bg-accent dark:hover:bg-zinc-800"
+              ),
+            }}
+            components={{ Chevron }}
+            modifiers={{
+              today: (date) => isToday(date),
+            }}
+            disabled={(date) => {
+              const isMinDateDisabled = minDate ? date < minDate : false
+              const isMaxDateDisabled = maxDate ? date > maxDate : false
+              return isMinDateDisabled || isMaxDateDisabled
+            }}
+            initialFocus
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
 }
