@@ -540,7 +540,7 @@ export default function Home() {
               >
                 AggieX was formed to connect entrepreneurial students, faculty, 
                 and alumni across all disciplines and industries. For the Founders, 
-                Funders, and Builders at Texas A&M..
+                Funders, and Builders at Texas A&M.
               </p>
             </div>
 
@@ -975,14 +975,14 @@ export default function Home() {
           >
             Contact
           </a>
-            {/* <span className="text-muted-foreground">•</span>
+            <span className="text-muted-foreground">•</span>
             <Link href="/terms" className="text-sm hover:underline">
               Terms
             </Link>
             <span className="text-muted-foreground">•</span>
             <Link href="/privacy" className="text-sm hover:underline">
               Privacy
-            </Link> */}
+            </Link>
           </div>
           <p className="text-sm">© 2025 Howdy Nexus. All rights reserved.</p>
         </div>

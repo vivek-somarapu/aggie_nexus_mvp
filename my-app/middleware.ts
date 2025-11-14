@@ -66,6 +66,8 @@ export async function middleware(request: NextRequest) {
       '/auth/forgot-password',
       '/calendar', // Allow unauthenticated users to view calendar
       '/api/events', // Allow fetching events without auth
+      '/privacy', // Public privacy policy (required for OAuth)
+      '/terms', // Public terms of service (required for OAuth)
     ];
 
     // Check if current route is public or an API route

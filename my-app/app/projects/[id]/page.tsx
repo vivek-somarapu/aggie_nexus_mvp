@@ -61,6 +61,32 @@ import { createClient } from "@/lib/supabase/client";
 import { IncubatorAcceleratorBadges } from "@/components/ui/incubator-accelerator-badge";
 import { toast } from "sonner";
 
+/**
+ * Blur email address before the @ symbol for privacy
+ * Example: john.doe@example.com -> •••••••@example.com
+ */
+function blurEmail(email: string): string {
+  if (!email || !email.includes('@')) return email;
+  
+  const [localPart, domain] = email.split('@');
+  // Replace each character with a bullet point (•)
+  const blurred = '•'.repeat(localPart.length);
+  return `${blurred}@${domain}`;
+}
+
+/**
+ * Blur phone number, showing only last 4 digits
+ * Example: +1 (555) 123-4567 -> ••••••••••4567
+ */
+function blurPhone(phone: string): string {
+  if (!phone || phone.length < 4) return phone;
+  
+  // Keep only the last 4 characters, blur everything else
+  const lastFour = phone.slice(-4);
+  const blurred = '•'.repeat(phone.length - 4);
+  return `${blurred}${lastFour}`;
+}
+
 export default function ProjectPage() {
   const { id } = useParams() as { id: string };
   const { authUser: currentUser, isAuthReady } = useAuth();
@@ -76,6 +102,7 @@ export default function ProjectPage() {
 
   // Inquiry dialog state
   const [inquiryNote, setInquiryNote] = useState("");
+  const [preferredContact, setPreferredContact] = useState("");
   const [isInquiryOpen, setIsInquiryOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inquiryError, setInquiryError] = useState<string | null>(null);
@@ -187,6 +214,11 @@ export default function ProjectPage() {
       return;
     }
 
+    if (!preferredContact) {
+      setInquiryError("Please select your preferred form of contact");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setInquiryError(null);
@@ -213,6 +245,7 @@ export default function ProjectPage() {
         project_id: project.id,
         user_id: currentUser.id,
         note: inquiryNote,
+        preferred_contact: preferredContact,
         status: "pending",
       });
 
@@ -221,6 +254,7 @@ export default function ProjectPage() {
       // Show success message and reset form
       setInquirySuccess(true);
       setInquiryNote("");
+      setPreferredContact("");
 
       // Close dialog after a delay
       setTimeout(() => {
@@ -568,7 +602,7 @@ export default function ProjectPage() {
                       Inquire About Project
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-2xl w-full min-h-[50vh] max-h-[90vh]">
                     <DialogHeader>
                       <DialogTitle>Inquire About {project.title}</DialogTitle>
                       <DialogDescription>
@@ -593,13 +627,37 @@ export default function ProjectPage() {
                           </Alert>
                         )}
 
-                        <Textarea
-                          placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
-                          value={inquiryNote}
-                          onChange={(e) => setInquiryNote(e.target.value)}
-                          rows={5}
-                          className="resize-none"
-                        />
+                        <div className="mb-4">
+                          <label htmlFor="preferredContact" className="block text-sm font-medium mb-1">Preferred Form of Contact <span className="text-red-500">*</span></label>
+                          <input
+                            id="preferredContact"
+                            type="text"
+                            className="w-full border rounded px-3 py-2"
+                            value={preferredContact}
+                            onChange={e => setPreferredContact(e.target.value)}
+                            placeholder="Enter your preferred form of contact (e.g., Email, Phone, LinkedIn, etc.)"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label htmlFor="inquiryNote" className="block text-sm font-medium mb-1">Message <span className="text-red-500">*</span></label>
+                          <Textarea
+                            placeholder="Describe why you're interested in this project, your relevant skills, or any questions you have..."
+                            value={inquiryNote}
+                            onChange={(e) => {
+                              const words = e.target.value.trim().split(/\s+/).filter(w => w.length > 0);
+                              if (words.length <= 200) {
+                                setInquiryNote(e.target.value);
+                              }
+                            }}
+                            rows={5}
+                            className="resize-none"
+                          />
+                          <div className="text-xs text-muted-foreground text-right">
+                            {inquiryNote.trim().split(/\s+/).filter(w => w.length > 0).length} / 200 words
+                          </div>
+                        </div>
 
                         <DialogFooter>
                           <Button
@@ -614,6 +672,7 @@ export default function ProjectPage() {
                             disabled={
                               isSubmitting ||
                               !inquiryNote.trim() ||
+                              !preferredContact ||
                               !currentUser
                             }
                           >
@@ -713,6 +772,57 @@ export default function ProjectPage() {
                 <p className="text-muted-foreground text-center">
                   Owner information not available
                 </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Only show contact info, not contact buttons */}
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">
+                  {(() => {
+                    console.log('Email blur check:', {
+                      isOwner,
+                      currentUserId: currentUser?.id,
+                      projectOwnerId: project.owner_id,
+                      originalEmail: project.contact_info.email,
+                      blurredEmail: blurEmail(project.contact_info.email)
+                    });
+                    return isOwner 
+                      ? project.contact_info.email 
+                      : blurEmail(project.contact_info.email);
+                  })()}
+                </span>
+              </div>
+              {project.contact_info.phone && (
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    {isOwner 
+                      ? project.contact_info.phone 
+                      : blurPhone(project.contact_info.phone)}
+                  </span>
+                </div>
+              )}
+              {!isOwner && (
+                <>
+                  <p className="text-xs text-muted-foreground italic">
+                    Full Contact information is hidden. Send an inquiry instead.
+                  </p>
+                  <Button
+                    className="w-full"
+                    onClick={() => setIsInquiryOpen(true)}
+                    disabled={!currentUser}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Inquire About Project
+                  </Button>
+                </>
               )}
             </CardContent>
           </Card>

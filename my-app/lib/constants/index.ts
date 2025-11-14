@@ -133,23 +133,23 @@ export const eventCardVariants = {
 // ---------- Select Options ----------
 
 export const industryOptions = [
-  "Technology",
-  "Transportation",
-  "Healthcare",
-  "Media",
-  "Education",
-  "Real Estate",
-  "Finance",
+  "Agriculture",
   "Construction",
   "Consumer Goods",
-  "Agriculture",
-  "Food and Beverage",
-  "Manufacturing",
+  "Education",
   "Energy",
+  "Finance",
+  "Food and Beverage",
+  "Healthcare",
+  "Law",
   "Logistics",
-  "Services",
+  "Manufacturing",
+  "Media",
   "Nonprofit",
-  "Law"
+  "Real Estate",
+  "Services",
+  "Technology",
+  "Transportation"
 ];
 
 export const skillOptions = [

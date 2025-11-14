@@ -31,9 +31,12 @@ import {
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { inquiryService } from "@/lib/services/inquiry-service";
+import { inquiryService, ProjectInquiry } from "@/lib/services/inquiry-service";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import InquiryDetailDialog from "./InquiryDetailDialog";
 
-export default function Navbar() {
+export default function () {
   const pathname = usePathname();
   const router = useRouter();
   const { authUser, profile, signOut, isLoading, role } = useAuth();
@@ -43,19 +46,29 @@ export default function Navbar() {
     setOpenNavigation(!openNavigation);
   };
 
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxTab, setInboxTab] = useState<'received' | 'sent'>('received');
+  const [receivedInquiries, setReceivedInquiries] = useState<ProjectInquiry[]>([]);
+  const [sentInquiries, setSentInquiries] = useState<ProjectInquiry[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [selectedInquiry, setSelectedInquiry] = useState<ProjectInquiry | null>(null);
+
   // Load pending inquiries
   useEffect(() => {
     if (!authUser) return;
     const supabase = createClient();
+    if (!supabase) return;
 
     const fetchCount = async () => {
       try {
+        console.log('Fetching pending inquiries count...');
         const count = await inquiryService.getPendingInquiriesCount(
           authUser.id
         );
+        console.log('Setting pending inquiries to:', count);
         setPendingInquiries(count);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching pending inquiries:', err);
       }
     };
 
@@ -70,9 +83,69 @@ export default function Navbar() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [authUser]);
+
+  // Load inquiries for inbox popup
+  useEffect(() => {
+    if (!authUser || !inboxOpen) return;
+    
+    const loadInquiries = () => {
+      setInquiriesLoading(true);
+      Promise.all([
+        inquiryService.getReceivedInquiries(authUser.id),
+        inquiryService.getSentInquiries(authUser.id),
+      ]).then(([received, sent]) => {
+        setReceivedInquiries(received);
+        setSentInquiries(sent);
+      }).finally(() => setInquiriesLoading(false));
+    };
+    
+    loadInquiries();
+    
+    // Reload inquiries when one is marked as read
+    const handleInquiryReadInList = () => {
+      console.log('Reloading inquiries list after marking as read');
+      loadInquiries();
+    };
+    window.addEventListener('inquiryMarkedAsRead', handleInquiryReadInList);
+    
+    return () => {
+      window.removeEventListener('inquiryMarkedAsRead', handleInquiryReadInList);
+    };
+  }, [authUser, inboxOpen]);
+
+  useEffect(() => {
+    function handleCloseDialog() {
+      if (selectedInquiry && !selectedInquiry.read_inquiry) {
+        setPendingInquiries(prev => Math.max(0, prev - 1));
+      }
+      setSelectedInquiry(null);
+      setInboxOpen(false); // Also close the inbox popup
+    }
+    
+    function handleInquiryMarkedAsRead() {
+      // Refresh the pending inquiries count when an inquiry is marked as read
+      console.log('handleInquiryMarkedAsRead triggered in navbar');
+      if (authUser) {
+        inquiryService.getPendingInquiriesCount(authUser.id).then(count => {
+          console.log('Updated pending inquiries count:', count);
+          setPendingInquiries(count);
+        });
+      }
+    }
+    
+    window.addEventListener('closeInquiryDialog', handleCloseDialog);
+    window.addEventListener('inquiryMarkedAsRead', handleInquiryMarkedAsRead);
+    
+    return () => {
+      window.removeEventListener('closeInquiryDialog', handleCloseDialog);
+      window.removeEventListener('inquiryMarkedAsRead', handleInquiryMarkedAsRead);
+    };
+  }, [selectedInquiry, authUser]);
 
   const handleLogout = async () => {
     setOpenNavigation(false);
@@ -80,6 +153,14 @@ export default function Navbar() {
     await signOut();
 
     router.push("/");
+  };
+
+  // Truncate long inquiry messages for inbox list
+  const truncateInquiryNote = (note: string, maxWords: number = 50) => {
+    if (!note) return '';
+    const words = note.trim().split(/\s+/);
+    if (words.length <= maxWords) return note;
+    return words.slice(0, maxWords).join(' ') + '...';
   };
 
   // Common routes for signed-in users
@@ -98,7 +179,7 @@ export default function Navbar() {
     return null; // or a full-screen spinner if you prefer
   }
 
-  // AUTHENTICATED navbar
+  // AUTHENTICATED 
   return (
     <>
       {/* ---------- TOP BAR ---------- */}
@@ -244,6 +325,103 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="flex flex-1 items-center justify-end space-x-4">
+              {/* Inbox Icon Popup */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                onClick={() => setInboxOpen(true)}
+                aria-label="Inbox"
+              >
+                <MessageSquare className="h-6 w-6" />
+                {pendingInquiries > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-1 -right-1 px-1 py-0 h-5 min-w-5 flex items-center justify-center rounded-full"
+                  >
+                    {pendingInquiries}
+                  </Badge>
+                )}
+              </Button>
+              {/* Only refetch pending inquiries count when inbox is opened */}
+              <Dialog open={inboxOpen} onOpenChange={(open) => {
+                setInboxOpen(open);
+                if (open && authUser) {
+                  inquiryService.getPendingInquiriesCount(authUser.id).then(setPendingInquiries);
+                }
+              }}>
+                <DialogContent className="max-w-4xl w-full min-h-[60vh] max-h-[90vh]">
+                  <div className="absolute left-8 top-8 flex items-center gap-4">
+                    <DialogTitle className="text-2xl font-bold">Inbox</DialogTitle>
+                    <Tabs value={inboxTab} onValueChange={v => setInboxTab(v as 'received' | 'sent')}>
+                      <TabsList className="ml-2">
+                        <TabsTrigger value="received">Received</TabsTrigger>
+                        <TabsTrigger value="sent">Sent</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                  <div className="pt-24">
+                    <Tabs value={inboxTab} onValueChange={v => setInboxTab(v as 'received' | 'sent')}>
+                      <TabsContent value="received">
+                        {inquiriesLoading ? (
+                          <div className="py-8 text-center">Loading...</div>
+                        ) : receivedInquiries.length === 0 ? (
+                          <div className="py-8 text-center text-muted-foreground">No received inquiries.</div>
+                        ) : (
+                          <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {receivedInquiries.map(inq => {
+                              const wordCount = inq.note.trim().split(/\s+/).filter(w => w.length > 0).length;
+                              const isLongNote = wordCount > 50;
+                              return (
+                                <li key={inq.id} className="border rounded p-2 cursor-pointer hover:bg-accent transition-colors" onClick={() => setSelectedInquiry(inq)}>
+                                  <div className="font-semibold">{inq.project_title}</div>
+                                  <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
+                                  <div className="text-xs text-muted-foreground">From: {inq.applicant_name || "Unknown"}</div>
+                                  <div className="text-sm mt-1">
+                                    {truncateInquiryNote(inq.note)}
+                                    {isLongNote && <span className="text-primary ml-1 font-medium">Read more</span>}
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </TabsContent>
+                      <TabsContent value="sent">
+                        {inquiriesLoading ? (
+                          <div className="py-8 text-center">Loading...</div>
+                        ) : sentInquiries.length === 0 ? (
+                          <div className="py-8 text-center text-muted-foreground">No sent inquiries.</div>
+                        ) : (
+                          <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
+                            {sentInquiries.map(inq => {
+                              const wordCount = inq.note.trim().split(/\s+/).filter(w => w.length > 0).length;
+                              const isLongNote = wordCount > 50;
+                              return (
+                                <li key={inq.id} className="border rounded p-2">
+                                  <div className="font-semibold">{inq.project_title}</div>
+                                  <div className="text-xs text-muted-foreground">{new Date(inq.created_at).toLocaleString()}</div>
+                                  <div className="text-sm mt-1">
+                                    {truncateInquiryNote(inq.note)}
+                                    {isLongNote && <span className="text-muted-foreground ml-1 text-xs">(truncated)</span>}
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              {/* Inquiry Details Popup */}
+              <InquiryDetailDialog
+                inquiry={selectedInquiry}
+                open={!!selectedInquiry}
+                onCloseAction={() => setSelectedInquiry(null)}
+              />
+              {/* Create Project Button */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -291,25 +469,6 @@ export default function Navbar() {
                     <Link href="/profile" className="cursor-pointer">
                       <UserIcon className="mr-2 h-4 w-4" />
                       Profile
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href="/profile?tab=inquiries"
-                      className="cursor-pointer flex items-center justify-between"
-                    >
-                      <div className="flex items-center">
-                        <MessageSquare className="mr-4 h-4 w-4" />
-                        Project Inquiries
-                      </div>
-                      {pendingInquiries > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 px-1 py-0 h-5 min-w-5 flex items-center justify-center rounded-full"
-                        >
-                          {pendingInquiries}
-                        </Badge>
-                      )}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
