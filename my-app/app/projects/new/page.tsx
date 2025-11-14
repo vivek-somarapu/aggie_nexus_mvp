@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useState, useEffect, useCallback } from "react";
-import { X, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { projectService } from "@/lib/services/project-service";
@@ -31,11 +29,9 @@ import { ChevronLeft, Loader2, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
-import DatePicker from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/ui/date-picker";
 import { TagSelector } from "@/components/ui/search-tag-selector";
 import Image from "next/image";
-import { useForm } from "react-hook-form";
-import { Form } from "@/components/ui/form";
 
 import { createClient } from "@/lib/supabase/client";
 import { industryOptions } from "@/lib/constants";
@@ -316,11 +312,6 @@ export default function NewProjectPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [generalImages, setGeneralImages] = useState<File[]>([]);
   const [generalImagePreviews, setGeneralImagePreviews] = useState<string[]>([]);
-  const datePickerForm = useForm<{ date: Date | undefined }>({
-    defaultValues: {
-      date: undefined,
-    },
-  });
 
   const [formData, setFormData] = useState({
     title: "",
@@ -568,27 +559,6 @@ const getAvailableSkills = () => {
       estimated_start: date ? date.toISOString() : "",
     }));
   }, []);
-
-  useEffect(() => {
-    const subscription = datePickerForm.watch((values) => {
-      const newDate = values?.date;
-      const currentDate = selectedStartDate;
-
-      const isSame =
-        (!newDate && !currentDate) ||
-        (newDate &&
-          currentDate &&
-          newDate.getTime() === currentDate.getTime());
-
-      if (isSame) {
-        return;
-      }
-
-      handleStartDateSelect(newDate);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [datePickerForm, selectedStartDate, handleStartDateSelect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
