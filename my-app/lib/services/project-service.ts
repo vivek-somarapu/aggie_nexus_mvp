@@ -50,6 +50,9 @@ export interface ProjectSearchParams {
   skill?: string;
   tamu?: boolean;
   is_idea?: boolean;
+  sort?: string; // e.g., 'created_at', 'views', 'funding_received', 'title'
+  order?: 'asc' | 'desc'; // 'asc' for ascending, 'desc' for descending
+  algorithm?: string; // e.g., 'recommended' - uses custom recommendation algorithm
 }
 
 export const projectService = {
@@ -63,6 +66,9 @@ export const projectService = {
       if (params.skill) searchParams.append('skill', params.skill);
       if (params.tamu !== undefined) searchParams.append('tamu', params.tamu.toString());
       if (params.is_idea !== undefined) searchParams.append('is_idea', params.is_idea.toString());
+      if (params.sort) searchParams.append('sort', params.sort);
+      if (params.order) searchParams.append('order', params.order);
+      if (params.algorithm) searchParams.append('algorithm', params.algorithm);
       
       if (searchParams.toString()) {
         url += `?${searchParams.toString()}`;
