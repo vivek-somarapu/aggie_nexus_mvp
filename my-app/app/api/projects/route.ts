@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
     const tamuParam = searchParams.get('tamu');
     const isIdeaParam = searchParams.get('is_idea');
     const ownerIdParam = searchParams.get('owner_id');
+    const sortParam = searchParams.get('sort');
+    const orderParam = searchParams.get('order');
+    const useCustomAlgorithm = searchParams.get('algorithm') === 'recommended';
     
     // Create a query builder
             let query = supabase
@@ -67,8 +70,18 @@ export async function GET(request: NextRequest) {
       query = query.eq('is_idea', isIdea);
     }
     
-    // Order by creation date
-    query = query.order('created_at', { ascending: false });
+    // Apply sorting (skip if using custom algorithm - we'll sort after fetching)
+    if (!useCustomAlgorithm) {
+      // Valid sort fields to prevent SQL injection
+      const validSortFields = ['created_at', 'views', 'funding_received', 'title', 'estimated_start', 'last_updated'];
+      const sortField = sortParam && validSortFields.includes(sortParam) ? sortParam : 'created_at';
+      const ascending = orderParam === 'asc';
+      
+      // Default to descending for created_at if no order specified
+      const shouldAscend = sortParam ? ascending : false;
+      
+      query = query.order(sortField, { ascending: shouldAscend });
+    }
     
     const { data: projects, error } = await query;
     
@@ -77,8 +90,54 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch projects: ' + error.message }, { status: 500 });
     }
     
+    // Custom recommendation algorithm scoring function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const calculateRecommendationScore = (project: any): number => {
+      let score = 0;
+      
+      // 1. Recency boost (newer projects get higher score)
+      const daysSinceCreation = (Date.now() - new Date(project.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const recencyScore = Math.max(0, 100 - daysSinceCreation * 2); // Decay over time
+      score += recencyScore * 0.1; // 10% weight
+
+      // 2. Incubator or Accelerator boost (projects in incubator or accelerator are more relevant)
+      const incubatorScore = project.organizations.includes('Aggies Create Incubator') ? 10 : 0;
+      score += incubatorScore * 0.1; // 10% weight
+      const acceleratorScore = project.organizations.includes('AggieX Accelerator') ? 30 : 0;
+      score += acceleratorScore * 0.1; // 10% weight
+      
+      // 2. Popularity boost (views)
+      const viewsScore = Math.log10((project.views || 0) + 1) * 20; // Logarithmic to prevent skewing
+      score += viewsScore * 0.05; // 5% weight
+      
+      // 3. Funding boost (projects with funding are more established)
+      const fundingScore = Math.log10((project.funding_received || 0) + 1) * 15;
+      score += fundingScore * 0.35; // 35% weight
+      
+      // 4. Active recruitment boost (actively recruiting projects are more relevant)
+      if (project.recruitment_status === 'Actively Recruiting') {
+        score += 30 * 0.25; // 25% weight
+      } else if (project.recruitment_status === 'Open to Applications') {
+        score += 15 * 0.25;
+      } else if (project.recruitment_status === 'Not Recruiting') {
+        score -= 10 * 0.25; // deduct if not recruiting
+      }
+      
+      // 5. Status boost (ongoing projects are more relevant than completed/not started)
+      if (project.project_status === 'Ongoing') {
+        score += 20 * 0.1; // 10% weight
+      } else if (project.project_status === 'Idea Phase') {
+        score += 10 * 0.1;
+      }
+
+      // 6. A little luck
+      score += Math.random() * 15; 
+      
+      return score;
+    };
+    
     // Process projects to ensure consistent format
-    const processedProjects = (projects || []).map(project => {
+    let processedProjects = (projects || []).map(project => {
       // Show approved organizations and pending claims separately
       const approvedOrgs = project.project_organizations?.map((po: { organizations?: { name: string } }) => po.organizations?.name).filter(Boolean) || [];
       const pendingOrgs = project.project_organization_claims?.filter((claim: { status: string }) => claim.status === 'pending')
@@ -96,6 +155,16 @@ export async function GET(request: NextRequest) {
         soft_requirements: project.soft_requirements || []
       };
     });
+    
+    // Apply custom recommendation algorithm if requested
+    if (useCustomAlgorithm) {
+      processedProjects = processedProjects
+        .map(project => ({
+          ...project,
+          recommendationScore: calculateRecommendationScore(project)
+        }))
+        .sort((a, b) => b.recommendationScore - a.recommendationScore); // Sort by score descending
+    }
     
     console.log(`Fetched ${processedProjects.length} projects successfully`);
     return NextResponse.json(processedProjects);

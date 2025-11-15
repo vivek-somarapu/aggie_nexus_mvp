@@ -118,6 +118,8 @@ export default function ProjectsPage() {
   const [projectTypeFilter, setProjectTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [sortBy, setSortBy] = useState<string>("created_at");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Inquiry dialog state
   const [inquiryDialogOpen, setInquiryDialogOpen] = useState<Record<string, boolean>>({});
@@ -136,7 +138,11 @@ export default function ProjectsPage() {
         setIsLoading(true);
         setError(null);
 
-        const searchParams: ProjectSearchParams = {};
+        const searchParams: ProjectSearchParams = {
+          sort: sortBy,
+          order: sortOrder,
+          algorithm: 'recommended', // Use custom recommendation algorithm
+        };
 
         if (tamuFilter === "tamu") {
           searchParams.tamu = true;
@@ -175,7 +181,7 @@ export default function ProjectsPage() {
     };
 
     fetchProjects();
-  }, [searchQuery, tamuFilter, projectTypeFilter, currentUser, authLoading]);
+  }, [searchQuery, tamuFilter, projectTypeFilter, sortBy, sortOrder, currentUser, authLoading]);
 
   // Fetch bookmarked projects if user is logged in
   useEffect(() => {
@@ -356,19 +362,8 @@ export default function ProjectsPage() {
     return isMatch;
   });
 
-  // Sort: titles that start with searchQuery first, then those that contain it elsewhere
-  const sortedProjects = searchQuery
-    ? [...filteredProjects].sort((a, b) => {
-        const query = searchQuery.toLowerCase();
-        const aTitle = a.title.toLowerCase();
-        const bTitle = b.title.toLowerCase();
-        const aStarts = aTitle.startsWith(query);
-        const bStarts = bTitle.startsWith(query);
-        if (aStarts && !bStarts) return -1;
-        if (!aStarts && bStarts) return 1;
-        return 0;
-      })
-    : filteredProjects;
+  // Projects are already sorted by the backend API
+  const sortedProjects = filteredProjects;
 
   return (
     <motion.div
