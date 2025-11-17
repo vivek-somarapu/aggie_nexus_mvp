@@ -34,6 +34,7 @@ export async function GET(
         avatar,
         email,
         bio,
+        industry,
         organization_members!organization_members_user_id_fkey!inner(org_id)
       `)
       .eq('organization_members.org_id', id)
@@ -55,7 +56,8 @@ export async function GET(
       full_name: member.full_name,
       avatar: member.avatar,
       email: member.email,
-      bio: member.bio
+      bio: member.bio,
+      industry: member.industry || []
     }));
     
     return NextResponse.json(processedMembers);
