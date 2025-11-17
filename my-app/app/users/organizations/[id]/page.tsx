@@ -551,7 +551,7 @@ export default function OrganizationPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-1 text-base sm:text-lg">
                 <Crown className="justify-self-start h-5 w-5" /> 
-                Executive Team
+                Leadership
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -689,69 +689,66 @@ export default function OrganizationPage() {
         </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3 max-w-full">
-        {/* Left Column - Main Content */}
-        <div className="lg:col-span-2 space-y-6 min-w-0 max-w-full">
-
-          {/* Organization Images Gallery */}
-          {organization.images && organization.images.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Photo Gallery</CardTitle>
-                <CardDescription>Images showcasing {organization.name}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {organization.images.map((imageUrl, index) => (
-                    <div key={index} className="relative w-full aspect-video rounded-lg overflow-hidden border hover:opacity-90 transition-opacity">
-                      <Image
-                        src={imageUrl}
-                        alt={`${organization.name} image ${index + 1}`}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                      />
-                    </div>
-                  ))}
+      {/* Organization Images Gallery */}
+      {organization.images && organization.images.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Photo Gallery</CardTitle>
+            <CardDescription>Images showcasing {organization.name}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {organization.images.map((imageUrl, index) => (
+                <div key={index} className="relative w-full aspect-video rounded-lg overflow-hidden border hover:opacity-90 transition-opacity">
+                  <Image
+                    src={imageUrl}
+                    alt={`${organization.name} image ${index + 1}`}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 50vw, 33vw"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-          {/* Projects Section - Carousel */}
-          {organizationProjects.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5" />
-                  Projects
-                </CardTitle>
-                <CardDescription>
-                  {organizationProjects.length} {organizationProjects.length === 1 ? 'project' : 'projects'} associated with {organization.name}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingProjects ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="ml-2">Loading projects...</span>
-                  </div>
-                ) : (
-                  <div className="w-full overflow-hidden">
-                    <Carousel
-                      opts={{ loop: true }}
-                      plugins={[
-                        Autoplay({ delay: 5000, stopOnInteraction: false }),
-                      ]}
-                      className="w-full relative"
-                    >
-                      <CarouselContent className="-ml-2 md:-ml-4">
-                        {organizationProjects.map((project) => (
-                          <CarouselItem
-                            key={project.id}
-                            className="pl-2 md:pl-4 max-w-full sm:max-w-[350px] basis-full sm:basis-1/2"
-                          >
+      {/* Projects and Members Grid - Equal Width 2 Columns */}
+      <div className="grid gap-6 lg:grid-cols-2 max-w-full">
+        {/* Projects Section - Carousel */}
+        {organizationProjects.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Projects
+              </CardTitle>
+              <CardDescription>
+                {organizationProjects.length} {organizationProjects.length === 1 ? 'project' : 'projects'} associated with {organization.name}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingProjects ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="ml-2">Loading projects...</span>
+                </div>
+              ) : (
+                <div className="w-full overflow-hidden">
+                  <Carousel
+                    opts={{ loop: true }}
+                    plugins={[
+                      Autoplay({ delay: 5000, stopOnInteraction: false }),
+                    ]}
+                    className="w-full relative"
+                  >
+                    <CarouselContent className="-ml-2 md:-ml-4">
+                      {organizationProjects.map((project) => (
+                        <CarouselItem
+                          key={project.id}
+                          className="pl-2 md:pl-4 max-w-full sm:max-w-[350px] basis-full sm:basis-1/2"
+                        >
                           <Link href={`/projects/${project.id}`}>
                             <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
                               <CardContent className="pt-6">
@@ -772,52 +769,47 @@ export default function OrganizationPage() {
                           </Link>
                         </CarouselItem>
                       ))}
-                      </CarouselContent>
-                      <CarouselPrevious className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
-                      <CarouselNext className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
-                    </Carousel>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Right Column - Sidebar */}
-        <div className="space-y-6 min-w-0 max-w-full">
-
-          {/* Members Section - Carousel */}
-          {organizationMembers.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Members ({organizationMembers.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingMembers ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span className="ml-2">Loading members...</span>
-                  </div>
-                ) : (
-                  <div className="w-full overflow-hidden">
-                    <Carousel
-                      opts={{ loop: true }}
-                      plugins={[
-                        Autoplay({ delay: 5000, stopOnInteraction: false }),
-                      ]}
-                      className="w-full relative"
-                    >
-                      <CarouselContent className="-ml-2 md:-ml-4">
-                        {organizationMembers.map((member) => (
-                          <CarouselItem
-                            key={member.id}
-                            className="pl-2 md:pl-4 max-w-full sm:max-w-[280px] basis-full sm:basis-1/2"
-                          >
+                    </CarouselContent>
+                    <CarouselPrevious className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+                    <CarouselNext className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+                  </Carousel>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        {/* Members Section - Carousel */}
+        {organizationMembers.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Members ({organizationMembers.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingMembers ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="ml-2">Loading members...</span>
+                </div>
+              ) : (
+                <div className="w-full overflow-hidden">
+                  <Carousel
+                    opts={{ loop: true }}
+                    plugins={[
+                      Autoplay({ delay: 5000, stopOnInteraction: false }),
+                    ]}
+                    className="w-full relative"
+                  >
+                    <CarouselContent className="-ml-2 md:-ml-4">
+                      {organizationMembers.map((member) => (
+                        <CarouselItem
+                          key={member.id}
+                          className="pl-2 md:pl-4 max-w-full sm:max-w-[280px] basis-full sm:basis-1/2"
+                        >
                           <Link href={`/users/${member.id}`}>
-                            <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+                            <Card className="flex flex-row h-full hover:shadow-md transition-shadow cursor-pointer p-2 ml-12">
                               <CardContent className="pt-6">
                                 <div className="flex items-center gap-3 mb-3">
                                   <Avatar className="h-12 w-12">
@@ -826,7 +818,7 @@ export default function OrganizationPage() {
                                   </Avatar>
                                   <div className="flex-1 min-w-0">
                                     <p className="font-medium text-sm truncate">{member.full_name}</p>
-                                    <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{member.bio}</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -834,16 +826,15 @@ export default function OrganizationPage() {
                           </Link>
                         </CarouselItem>
                       ))}
-                      </CarouselContent>
-                      <CarouselPrevious className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
-                      <CarouselNext className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
-                    </Carousel>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                    </CarouselContent>
+                    <CarouselPrevious className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+                    <CarouselNext className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+                  </Carousel>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

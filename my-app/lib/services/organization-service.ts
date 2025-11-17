@@ -95,6 +95,7 @@ export const organizationService = {
     full_name: string;
     avatar: string | null;
     email: string;
+    bio: string | null;
   }>> => {
     const response = await fetch(`/api/organizations/${id}/members`);
     if (!response.ok) {
