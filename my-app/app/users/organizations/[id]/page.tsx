@@ -738,9 +738,9 @@ export default function OrganizationPage() {
         </Card>
       )}
 
-      {/* Projects and Members Grid - Equal Width 2 Columns */}
-      <div className="grid gap-3 lg:grid-cols-2 max-w-full">
-        {/* Projects Section - Grid */}
+      {/* Projects and Members - Carousels */}
+      <div className="grid gap-6 lg:grid-cols-2 max-w-full">
+        {/* Projects Section - Carousel */}
         {organizationProjects.length > 0 && (
           <Card>
             <CardHeader>
@@ -756,50 +756,64 @@ export default function OrganizationPage() {
                   <span className="ml-2">Loading projects...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {organizationProjects.map((project) => (
-                    <Link key={project.id} href={`/projects/${project.id}`}>
-                      <Card className="flex flex-row h-full hover:shadow-md transition-shadow cursor-pointer p-2">
-                        <CardContent className="pt-6 overflow-hidden">
-                          <div className="flex items-center gap-3 mb-3">
-                            {project.logo_url ? (
-                              <div className="relative h-12 w-12 rounded-lg overflow-hidden border-2 flex-shrink-0">
-                                <Image
-                                  src={project.logo_url}
-                                  alt={`${project.title} logo`}
-                                  fill
-                                  className="object-cover"
-                                  sizes="48px"
-                                />
-                              </div>
-                            ) : (
-                              <Avatar className="h-12 w-12 flex-shrink-0">
-                                <AvatarFallback>{project.title.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{project.title}</p>
-                              <p className="text-xs text-muted-foreground line-clamp-2">{project.description}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {project.is_idea ? (
-                              <Badge variant="outline" className="text-xs px-1.5 py-0">Idea</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs px-1.5 py-0">Project</Badge>
-                            )}
-                            <Badge variant="outline" className="text-xs px-1.5 py-0">{project.project_status}</Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
+                <div className="w-full px-8">
+                  <Carousel
+                    opts={{ 
+                      loop: true,
+                      align: "start",
+                    }}
+                    plugins={[
+                      Autoplay({ delay: 5000, stopOnInteraction: false }),
+                    ]}
+                    className="w-full"
+                  >
+                    <CarouselContent className="-ml-2 md:-ml-4">
+                      {organizationProjects.map((project) => (
+                        <CarouselItem
+                          key={project.id}
+                          className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3"
+                        >
+                          <Link href={`/projects/${project.id}`}>
+                            <Card className="flex flex-row h-full hover:shadow-md transition-shadow cursor-pointer p-2">
+                              <CardContent className="pt-6 overflow-hidden">
+                                <div className="flex items-center gap-3 mb-3">
+                                  {project.logo_url ? (
+                                    <div className="relative h-12 w-12 rounded-lg overflow-hidden border-2 flex-shrink-0">
+                                      <Image
+                                        src={project.logo_url}
+                                        alt={`${project.title} logo`}
+                                        fill
+                                        className="object-cover"
+                                        sizes="48px"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <Avatar className="h-12 w-12 flex-shrink-0">
+                                      <AvatarFallback>{project.title.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm truncate">{project.title}</p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{project.description}</p>
+                                  </div>
+                                </div>
+                                
+                              </CardContent>
+                            </Card>
+                          </Link>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious  />
+                    <CarouselNext />
+                  </Carousel>
                 </div>
               )}
             </CardContent>
           </Card>
         )}
-        {/* Members Section - Grid */}
+        
+        {/* Members Section - Carousel */}
         {organizationMembers.length > 0 && (
           <Card>
             <CardHeader>
@@ -815,25 +829,45 @@ export default function OrganizationPage() {
                   <span className="ml-2">Loading members...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {organizationMembers.map((member) => (
-                    <Link key={member.id} href={`/users/${member.id}`}>
-                      <Card className="flex flex-row h-full hover:shadow-md transition-shadow cursor-pointer p-2">
-                        <CardContent className="pt-6 overflow-hidden">
-                          <div className="flex items-center gap-3 mb-3">
-                            <Avatar className="h-12 w-12 flex-shrink-0">
-                              <AvatarImage src={member.avatar || undefined} alt={member.full_name} />
-                              <AvatarFallback>{member.full_name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{member.full_name}</p>
-                              <p className="text-xs text-muted-foreground line-clamp-2">{member.bio}</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
+                <div className="w-full px-8">
+                  <Carousel
+                    opts={{ 
+                      loop: true,
+                      align: "start",
+                    }}
+                    plugins={[
+                      Autoplay({ delay: 5000, stopOnInteraction: false }),
+                    ]}
+                    className="w-full"
+                  >
+                    <CarouselContent className="-ml-2 md:-ml-4">
+                      {organizationMembers.map((member) => (
+                        <CarouselItem
+                          key={member.id}
+                          className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3"
+                        >
+                          <Link href={`/users/${member.id}`}>
+                            <Card className="flex flex-row h-full hover:shadow-md transition-shadow cursor-pointer p-2">
+                              <CardContent className="pt-6 overflow-hidden">
+                                <div className="flex items-center gap-3 mb-3">
+                                  <Avatar className="h-12 w-12 flex-shrink-0">
+                                    <AvatarImage src={member.avatar || undefined} alt={member.full_name} />
+                                    <AvatarFallback>{member.full_name.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm truncate">{member.full_name}</p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{member.bio}</p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </Link>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    <CarouselPrevious  />
+                    <CarouselNext  />
+                  </Carousel>
                 </div>
               )}
             </CardContent>
