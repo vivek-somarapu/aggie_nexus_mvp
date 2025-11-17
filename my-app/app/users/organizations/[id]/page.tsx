@@ -74,6 +74,7 @@ export default function OrganizationPage() {
     full_name: string;
     avatar: string | null;
     email: string;
+    bio: string | null;
   }>>([])
   const [organizationManagers, setOrganizationManagers] = useState<Array<{
     id: string;
@@ -810,7 +811,7 @@ export default function OrganizationPage() {
                         >
                           <Link href={`/users/${member.id}`}>
                             <Card className="flex flex-row h-full hover:shadow-md transition-shadow cursor-pointer p-2 ml-12">
-                              <CardContent className="pt-6">
+                              <CardContent className="pt-6 overflow-hidden">
                                 <div className="flex items-center gap-3 mb-3">
                                   <Avatar className="h-12 w-12">
                                     <AvatarImage src={member.avatar || undefined} alt={member.full_name} />
