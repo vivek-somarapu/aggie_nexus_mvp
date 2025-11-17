@@ -9,7 +9,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -25,7 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Loader2, Trash2 } from "lucide-react";
+import { ChevronLeft, Loader2, ImageIcon, X } from "lucide-react";
+import Image from "next/image";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
@@ -89,7 +89,7 @@ export default function EditProjectPage({
   const { authUser: user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [project, setProject] = useState<any>(null);
+  const [, setProject] = useState<unknown>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
@@ -124,6 +124,15 @@ export default function EditProjectPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
 
+  // Image upload state
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
+  const [generalImages, setGeneralImages] = useState<File[]>([]);
+  const [generalImagePreviews, setGeneralImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<Array<{ id: string; url: string; position: number }>>([]);
+  const [imagesToDelete, setImagesToDelete] = useState<string[]>([]); // URLs of images to delete
+
   // Fetch project data when component mounts
   useEffect(() => {
     const fetchProject = async () => {
@@ -147,6 +156,25 @@ export default function EditProjectPage({
         }
 
         setProject(projectData);
+
+        // Initialize image data
+        setExistingLogoUrl(projectData.logo_url || null);
+        if (projectData.images && Array.isArray(projectData.images)) {
+          // Fetch full image records with IDs from project_images table
+          const supabase = createClient();
+          if (supabase) {
+            const { data: imageRecords } = await supabase
+              .from('project_images')
+              .select('id, url, position')
+              .eq('project_id', projectId)
+              .eq('image_type', 'general')
+              .order('position', { ascending: true });
+            
+            if (imageRecords) {
+              setExistingImages(imageRecords);
+            }
+          }
+        }
 
         // Initialize form data with project data
         setFormData({
@@ -299,6 +327,99 @@ export default function EditProjectPage({
     }));
   };
 
+  // Handle logo file selection
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setLogoFile(null);
+      setLogoPreview(null);
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (JPG, PNG, etc.)");
+      e.target.value = "";
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo file size must be less than 5MB");
+      e.target.value = "";
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setLogoFile(file);
+    setLogoPreview(preview);
+  };
+
+  // Handle general images file selection
+  const handleGeneralImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Limit to 5 additional images
+    const remainingSlots = 5 - (generalImages.length + existingImages.length - imagesToDelete.length);
+    const filesToAdd = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      toast.warning(`Only ${remainingSlots} more image(s) can be added (max 5 total)`);
+    }
+
+    const newPreviews = filesToAdd.map((file) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`${file.name} is not an image file`);
+        return null;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} is too large (max 5MB)`);
+        return null;
+      }
+      return URL.createObjectURL(file);
+    }).filter(Boolean) as string[];
+
+    setGeneralImages((prev) => [...prev, ...filesToAdd]);
+    setGeneralImagePreviews((prev) => [...prev, ...newPreviews]);
+
+    // Reset input
+    e.target.value = "";
+  };
+
+  // Remove a general image (new upload)
+  const removeGeneralImage = (index: number) => {
+    URL.revokeObjectURL(generalImagePreviews[index]);
+    setGeneralImages((prev) => prev.filter((_, i) => i !== index));
+    setGeneralImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Remove an existing image
+  const removeExistingImage = (imageId: string, imageUrl: string) => {
+    setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
+    setImagesToDelete((prev) => [...prev, imageUrl]);
+  };
+
+  // Clear logo
+  const clearLogo = () => {
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+    }
+    setLogoFile(null);
+    setLogoPreview(null);
+    setExistingLogoUrl(null);
+    const input = document.getElementById("logo-input") as HTMLInputElement;
+    if (input) input.value = "";
+  };
+
+  // Cleanup preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (logoPreview) URL.revokeObjectURL(logoPreview);
+      generalImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+    };
+  }, [logoPreview, generalImagePreviews]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -334,13 +455,55 @@ export default function EditProjectPage({
         return;
       }
 
-      // Update form data with selected arrays
+      // Handle logo upload/update
+      let logoUrl: string | null = existingLogoUrl;
+      if (logoFile) {
+        // If there's an existing logo, delete it first
+        if (existingLogoUrl) {
+          try {
+            await projectService.deleteLogo(existingLogoUrl);
+          } catch (err) {
+            console.error("Error deleting old logo:", err);
+            // Continue anyway
+          }
+        }
+        logoUrl = await projectService.uploadLogo(logoFile);
+      } else if (!existingLogoUrl) {
+        // User cleared the logo
+        logoUrl = null;
+      }
+
+      // Delete images that were marked for deletion
+      for (const imageUrl of imagesToDelete) {
+        try {
+          await projectService.deleteImage(imageUrl);
+          // Also delete from database
+          const supabase = createClient();
+          if (supabase) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const table = supabase.from('project_images') as any;
+            await table.delete().eq('url', imageUrl);
+          }
+        } catch (err) {
+          console.error("Error deleting image:", err);
+        }
+      }
+
+      // Upload new general images
+      const generalImageUrls: string[] = [];
+      for (const imageFile of generalImages) {
+        const imageUrl = await projectService.uploadImage(imageFile);
+        generalImageUrls.push(imageUrl);
+      }
+
+      // Update form data with selected arrays and logo
       const projectData = {
         ...formData,
         industry: selectedIndustries,
         required_skills: selectedSkills,
         organizations: selectedOrganizations,
         funding_received: formData.funding_received,
+        logo_url: logoUrl,
         // Handle empty date strings - convert to undefined for database
         estimated_start: formData.estimated_start || undefined,
         estimated_end: formData.estimated_end || undefined,
@@ -352,11 +515,45 @@ export default function EditProjectPage({
         await projectService.updateProject(projectId, projectData);
       }
 
+      // Save new general images to project_images table
+      if (generalImageUrls.length > 0) {
+        const supabase = createClient();
+        if (supabase) {
+          // Get the highest position number from existing images
+          const maxPosition = existingImages.length > 0 
+            ? Math.max(...existingImages.map(img => img.position))
+            : -1;
+          
+          const imageRecords = generalImageUrls.map((url, index) => ({
+            project_id: projectId,
+            url: url,
+            position: maxPosition + index + 1,
+            image_type: 'general',
+          }));
+
+          // Insert images one by one
+          try {
+            for (const record of imageRecords) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const table = supabase.from('project_images') as any;
+              const { error } = await table.insert(record);
+              if (error) {
+                console.error("Error saving image:", error);
+              }
+            }
+          } catch (imageSaveError) {
+            console.error("Error saving project images:", imageSaveError);
+            toast.warning("Project updated but some images may not have been saved");
+          }
+        }
+      }
+
       toast.success("Project updated successfully!");
       router.push(`/projects/${projectId}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error updating project:", err);
-      setError(err.message || "Failed to update project. Please try again.");
+      const errorMessage = err instanceof Error ? err.message : "Failed to update project. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -369,7 +566,7 @@ export default function EditProjectPage({
       if (!res.ok) throw new Error("Failed to delete project");
       toast.success("Project deleted successfully");
       router.push("/profile?tab=projects");
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete project");
     } finally {
       setDeleteInProgress(false);
@@ -401,7 +598,7 @@ export default function EditProjectPage({
       <div className="container py-8">
         <Alert className="mb-6">
           <AlertDescription>
-            Project not found. The project may have been deleted or you don't
+            Project not found. The project may have been deleted or you don&apos;t
             have access to it.
             <Link href="/projects" className="ml-2 underline">
               Browse projects
@@ -418,7 +615,7 @@ export default function EditProjectPage({
       <div className="container py-8">
         <Alert className="mb-6">
           <AlertDescription>
-            You don't have permission to edit this project. Only the project
+            You don&apos;t have permission to edit this project. Only the project
             owner can edit it.
             <Link href={`/projects/${projectId}`} className="ml-2 underline">
               View project
@@ -471,6 +668,146 @@ export default function EditProjectPage({
       )}
       
       <form onSubmit={handleSubmit}>
+        <Card className="mb-6">
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+            <CardHeader className="md:col-span-1 p-0">
+              <CardTitle>Images & Logo</CardTitle>
+              <CardDescription>
+                Upload a logo and showcase images for your project
+              </CardDescription>
+            </CardHeader>
+
+            <div className="md:col-span-2 space-y-4">
+              {/* Logo Upload Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="logo-input">Project Logo</Label>
+                  <span className="text-xs text-muted-foreground">(optional)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="logo-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="h-10 flex-1"
+                  />
+                  {(logoPreview || existingLogoUrl) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={clearLogo}
+                      className="h-10"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  JPG, PNG (max 5MB)
+                </p>
+                {(logoPreview || existingLogoUrl) && (
+                  <div className="mt-2">
+                    <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
+                      <Image
+                        src={logoPreview || existingLogoUrl || ""}
+                        alt="Logo preview"
+                        fill
+                        className="object-cover"
+                        sizes="128px"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Project Images Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="general-images-input">Project Images</Label>
+                  <span className="text-xs text-muted-foreground">(optional)</span>
+                </div>
+                <Input
+                  id="general-images-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleGeneralImagesChange}
+                  disabled={(generalImages.length + existingImages.length - imagesToDelete.length) >= 5}
+                  className="h-10"
+                />
+                <p className="text-xs text-muted-foreground">
+                  JPG, PNG (max 5MB each, up to 5 images total)
+                </p>
+                
+                {/* Existing Images */}
+                {existingImages.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                    {existingImages.map((image) => (
+                      <div key={image.id} className="relative group">
+                        <div className="relative w-full aspect-video border rounded-lg overflow-hidden">
+                          <Image
+                            src={image.url}
+                            alt={`Project image ${image.position + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 50vw, 33vw"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeExistingImage(image.id, image.url)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New Image Previews */}
+                {generalImagePreviews.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                    {generalImagePreviews.map((preview, index) => (
+                      <div key={index} className="relative group">
+                        <div className="relative w-full aspect-video border rounded-lg overflow-hidden">
+                          <Image
+                            src={preview}
+                            alt={`New project image ${index + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 50vw, 33vw"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => removeGeneralImage(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <hr className="pt-6"></hr>
+
         <Card className="mb-6">
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
             <CardHeader className="md:col-span-1 p-0">
@@ -728,7 +1065,7 @@ export default function EditProjectPage({
                 </Select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="estimated_start">Estimated Start Date</Label>
                   <DatePicker
@@ -736,13 +1073,7 @@ export default function EditProjectPage({
                     onSelect={handleStartDateSelect}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="estimated_end">Estimated End Date</Label>
-                  <DatePicker
-                    selected={selectedEndDate}
-                    onSelect={handleEndDateSelect}
-                  />
-                </div>
+                
               </div>
             </div>
           </CardContent>

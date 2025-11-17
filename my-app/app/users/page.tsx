@@ -9,15 +9,26 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bookmark, GraduationCap, Loader2, Info } from "lucide-react"
+import { Bookmark, GraduationCap, Loader2, Info, Building2, ExternalLink, UsersIcon, Filter } from "lucide-react"
 import { User } from "@/lib/models/users"
 import { userService, UserSearchParams } from "@/lib/services/user-service"
 import { bookmarkService } from "@/lib/services/bookmark-service"
+import { organizationService, Organization } from "@/lib/services/organization-service"
 import { useAuth } from "@/lib"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import type { Variants } from "framer-motion"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from "@/components/ui/carousel"
+import Autoplay from "embla-carousel-autoplay"
+import { CardTitle } from "@/components/ui/card"
+import { industryOptions } from "@/lib/constants"
 
 // Animation variants
 const pageVariants = {
@@ -73,6 +84,25 @@ export default function UsersPage() {
   const [industryFilter, setIndustryFilter] = useState("all")
   const [skillFilter, setSkillFilter] = useState("all")
   const [tamuFilter, setTamuFilter] = useState("all")
+  const [filtersOpen, setFiltersOpen] = useState(true)
+
+  // Organizations state for carousel
+  const [allOrganizations, setAllOrganizations] = useState<Organization[]>([])
+
+  // Fetch organizations for carousel
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        const orgs = await organizationService.getOrganizations({ sort: 'name', order: 'asc' });
+        setAllOrganizations(orgs);
+      } catch (err) {
+        console.error("Error fetching organizations:", err);
+        // Don't show error for organizations, just log it
+      }
+    };
+
+    fetchOrganizations();
+  }, []);
 
   // Fetch users once auth state is resolved
   useEffect(() => {
@@ -82,9 +112,9 @@ export default function UsersPage() {
     // Check if we already fetched data
     if (dataFetched) return;
     
-    const fetchUsers = async () => {
+    const fetchUsersAndOrganizations = async () => {
       try {
-        console.log("Fetching users data...");
+        console.log("Fetching users and organizations data...");
         setIsLoading(true);
         setError(null);
         
@@ -116,7 +146,7 @@ export default function UsersPage() {
       }
     };
     
-    fetchUsers();
+    fetchUsersAndOrganizations();
   }, [authLoading, dataFetched, searchQuery, tamuFilter, skillFilter]);
   
   // Re-fetch when filters change
@@ -124,9 +154,9 @@ export default function UsersPage() {
     // Skip if auth is still loading or we haven't done initial data fetch
     if (authLoading || !dataFetched) return;
     
-    const fetchFilteredUsers = async () => {
+    const fetchFilteredData = async () => {
       try {
-        console.log("Fetching filtered users data...");
+        console.log("Fetching filtered users and organizations data...");
         setIsLoading(true);
         setError(null);
         
@@ -148,15 +178,28 @@ export default function UsersPage() {
         
         const fetchedUsers = await userService.getUsers(searchParams);
         setUsers(fetchedUsers);
+        
+        // Filter organizations
+        const orgSearchParams: { search?: string; sort?: string; order?: 'asc' | 'desc' } = {
+          sort: 'name',
+          order: 'asc'
+        };
+        
+        if (searchQuery) {
+          orgSearchParams.search = searchQuery;
+        }
+        
+        const fetchedOrgs = await organizationService.getOrganizations(orgSearchParams);
+        setAllOrganizations(fetchedOrgs);
       } catch (err) {
-        console.error("Error fetching users with filters:", err);
+        console.error("Error fetching data with filters:", err);
         setError("Failed to apply filters. Please try again.");
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchFilteredUsers();
+    fetchFilteredData();
   }, [searchQuery, tamuFilter, skillFilter, authLoading, dataFetched]);
   
   // Fetch bookmarked users if user is logged in
@@ -205,7 +248,7 @@ export default function UsersPage() {
   };
 
   // Get all unique industries and skills from users
-  const industries = Array.from(new Set(users.flatMap((user) => user.industry || [])));
+  const industries = industryOptions;
   const skills = Array.from(new Set(users.flatMap((user) => user.skills || [])));
 
   // Filter users based on filters
@@ -215,9 +258,23 @@ export default function UsersPage() {
       industryFilter === "all" || 
       (user.industry && user.industry.includes(industryFilter));
     
-    // No longer filter by user type since we removed that UI
-    // Just match by industry
     return matchesIndustry;
+  });
+
+  // Filter organizations based on filters
+  const filteredOrganizations = allOrganizations.filter((org: Organization) => {
+    // Filter by TAMU affiliation
+    const matchesTamu = 
+      tamuFilter === "all" || 
+      (tamuFilter === "tamu" && org.is_texas_am_affiliate) ||
+      (tamuFilter === "non-tamu" && !org.is_texas_am_affiliate);
+    
+    // Filter by industry
+    const matchesIndustry = 
+      industryFilter === "all" || 
+      (org.industry && org.industry.includes(industryFilter));
+    
+    return matchesTamu && matchesIndustry;
   });
   
   // Log filtering results for debugging
@@ -295,67 +352,178 @@ export default function UsersPage() {
         </motion.div>
       )}
 
-      <motion.div 
-        className="space-y-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.4 }}
+      {/* Filters Section - Collapsible and Prominent */}
+      <motion.div
+        className="mb-6"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.5 }}
       >
-        <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <Tabs value={tamuFilter} onValueChange={setTamuFilter}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="tamu">TAMU</TabsTrigger>
-                <TabsTrigger value="non-tamu">Non-TAMU</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </div>
+        <Card className="border-l-4 border-blue-200 dark:border-blue-800">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <CardTitle className="text-lg">Filters</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFiltersOpen(!filtersOpen)}
+                className="h-8"
+              >
+                {filtersOpen ? "Hide" : "Show"} Filters
+              </Button>
+            </div>
+          </CardHeader>
+          {filtersOpen && (
+            <CardContent className="space-y-4 pt-0">
+              {/* Search Bar */}
+              <div>
+                <Input
+                  placeholder="Search community, users, and organizations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full"
+                />
+              </div>
 
-        <motion.div 
-          className="flex flex-col md:flex-row gap-4 mb-6 p-4 rounded-lg border-l-4 border-blue-200 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/10"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.4 }}
-        >
-          <div className="flex-1">
-            <Input
-              placeholder="Search community..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <Select value={industryFilter} onValueChange={setIndustryFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Industry" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Industries</SelectItem>
-              {industries.map((industry: string, index: number) => (
-                <SelectItem key={`industry-filter-${index}`} value={industry}>
-                  {industry}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={skillFilter} onValueChange={setSkillFilter}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Skill" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Skills</SelectItem>
-              {skills.map((skill: string, index: number) => (
-                <SelectItem key={`skill-filter-${index}`} value={skill}>
-                  {skill}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </motion.div>
+              {/* Filter Row 1: Affiliation */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Affiliation</label>
+                  <Tabs value={tamuFilter} onValueChange={setTamuFilter}>
+                    <TabsList className="w-full">
+                      <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
+                      <TabsTrigger value="tamu" className="flex-1">TAMU</TabsTrigger>
+                      <TabsTrigger value="non-tamu" className="flex-1">Non-TAMU</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </div>
 
-        <div className="mt-0">
+              {/* Filter Row 2: Industry and Skill */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Industry</label>
+                  <Select value={industryFilter} onValueChange={setIndustryFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Industries" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Industries</SelectItem>
+                      {industries.map((industry: string, index: number) => (
+                        <SelectItem key={`${industry}-${index}`} value={industry}>
+                          {industry}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium mb-2 block">Skill</label>
+                  <Select value={skillFilter} onValueChange={setSkillFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Skills" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Skills</SelectItem>
+                      {skills.map((skill: string, index: number) => (
+                        <SelectItem key={`${skill}-${index}`} value={skill}>
+                          {skill}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      </motion.div>
+
+      {/* Organizations Carousel */}
+      {filteredOrganizations.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+            className="mb-6 rounded-lg p-[2px] bg-gradient-to-b from-blue-200 via-blue-100 to-blue-200 dark:from-blue-900/40 dark:via-blue-950/20 dark:to-blue-900/40"
+          >
+            <div className="bg-background dark:bg-background rounded-lg p-4">
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                <CardTitle className="text-2xl">Organizations</CardTitle>
+              </div>
+              <p className="text-muted-foreground text-sm">
+                Explore organizations and connect with their members
+              </p>
+            </div>
+            <Carousel
+              opts={{ loop: true }}
+              plugins={[
+                Autoplay({ delay: 5000, stopOnInteraction: false }),
+              ]}
+              className="w-full relative"
+            >
+              <CarouselContent className="-ml-2 md:-ml-4">
+                {filteredOrganizations.map((org) => (
+                  <CarouselItem
+                    key={org.id}
+                    className="pl-2 md:pl-4 max-w-[400px] basis-full sm:basis-1/2 rounded-lg p-4"
+                  >
+                    <Link href={`/users/organizations/${org.id}`}>
+                      <Card className="h-full overflow-hidden hover:shadow-md transition-shadow bg-red-50/30 dark:bg-red-950/10">
+                        <CardHeader className="pb-0 pt-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <Avatar className={`h-10 w-10 ${org.logo_url ? "" : ""}`}>
+                              <AvatarImage src={org.logo_url ?? ''} alt={org.name} />
+                              <AvatarFallback>{org.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold text-base">{org.name}</h3>
+                              {org.is_texas_am_affiliate && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <GraduationCap className="h-3 w-3" />
+                                  <span>TAMU</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="py-2 px-4">
+                          {org.description && (
+                            <p className="text-muted-foreground text-sm line-clamp-3 mb-2">{org.description}</p>
+                          )}
+                          {org.website_url && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <ExternalLink className="w-4 h-4" />
+                              <span className="truncate">{org.website_url}</span>
+                            </div>
+                          )}
+                        </CardContent>
+                        <CardFooter className="border-t pt-2 pb-2 px-4 flex flex-wrap gap-1">
+                          {org.industry?.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs px-1.5 py-0">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </CardFooter>
+                      </Card>
+                    </Link>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+              <CarouselNext className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border shadow-md" />
+            </Carousel>
+            </div>
+          </motion.div>
+      )}
+
+      <div className="mt-0 rounded-lg p-[2px] bg-gradient-to-b from-blue-200 via-blue-100 to-blue-200 dark:from-blue-900/40 dark:via-blue-950/20 dark:to-blue-900/40">
+        <div className="bg-background dark:bg-background rounded-lg p-4">
           <AnimatePresence mode="wait">
             {isLoading || authLoading ? (
               <motion.div 
@@ -383,13 +551,25 @@ export default function UsersPage() {
                     <p className="text-muted-foreground">Try adjusting your filters or search criteria</p>
                   </motion.div>
                 ) : (
-                  <motion.div 
+                  <>
+                    <div className="mb-10">
+                      <div className="flex items-center gap-2">
+                        <UsersIcon className="h-5 w-5 text-primary" />
+                        <CardTitle className="text-2xl">Talent</CardTitle>
+                      </div>
+                      <p className="text-muted-foreground text-sm">
+                        Explore talented Aggies and connect with them
+                      </p>
+                    </div>
+
+                    <motion.div 
                     key="users"
-                    className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+                    className="mb-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4 w-full"
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
                   >
+              
                     {filteredUsers.map((user: User, index: number) => (
                       <motion.div 
                         key={user.id}
@@ -473,12 +653,13 @@ export default function UsersPage() {
                       </motion.div>
                     ))}
                   </motion.div>
+                  </>
                 )}
               </>
             )}
           </AnimatePresence>
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   )
 }

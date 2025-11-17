@@ -243,45 +243,46 @@ export const inquiryService = {
     }
   },
 
-  // Get count of pending inquiries
-  getPendingInquiriesCount: async (userId: string): Promise<number> => {
+  // Submit an organization inquiry
+  submitOrganizationInquiry: async (orgId: string, userId: string, note: string, preferredContact?: string): Promise<void> => {
     try {
-      const supabase = createClient();
-      // Ensure Supabase client is initialized before making queries
-      if (!supabase) throw new Error("Supabase client is not initialized");
-      
-      // First get projects owned by the user
-      const { data: ownedProjects, error: projectsError } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('owner_id', userId);
+      const response = await fetch(`/api/organizations/${orgId}/inquiries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          note,
+          preferred_contact: preferredContact || null,
+        }),
+      });
 
-      if (projectsError) throw projectsError;
-
-      if (!ownedProjects || ownedProjects.length === 0) {
-        return 0;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit inquiry');
       }
+    } catch (err: unknown) {
+      console.error("Error submitting organization inquiry:", err);
+      throw new Error(err instanceof Error ? err.message : "Failed to submit inquiry");
+    }
+  },
 
-      const projectIds = ownedProjects.map(project => project.id);
+  // Get count of pending inquiries
+  getPendingInquiriesCount: async (_userId: string): Promise<number> => {
+    try {
+      const response = await fetch('/api/inquiries/pending-count');
       
-      // Then count pending inquiries for those projects that are unread (false or null)
-      const { count, error } = await supabase
-        .from('project_applications')
-        .select('*', { count: 'exact', head: true })
-        .in('project_id', projectIds)
-        .eq('status', 'pending')
-        .or('read_inquiry.eq.false,read_inquiry.is.null');
-      
-      console.log('getPendingInquiriesCount - projectIds:', projectIds);
-      console.log('getPendingInquiriesCount - count:', count);
-      
-      if (error) {
-        console.error('Error in getPendingInquiriesCount:', error);
-        throw error;
+      if (!response.ok) {
+        // If unauthorized, return 0 (user not logged in)
+        if (response.status === 401) {
+          return 0;
+        }
+        throw new Error(`Failed to fetch pending inquiries count: ${response.statusText}`);
       }
       
-      return count || 0;
-    } catch (err: any) {
+      const data = await response.json();
+      return data.count || 0;
+    } catch (err: unknown) {
       console.error("Error fetching pending inquiries count:", err);
       return 0;
     }

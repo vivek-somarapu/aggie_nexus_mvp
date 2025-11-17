@@ -14,6 +14,13 @@ export type ProjectBookmark = {
   saved_at: string;
 };
 
+export type OrganizationBookmark = {
+  id: string;
+  user_id: string;
+  org_id: string;
+  saved_at: string;
+};
+
 export async function getUserBookmarks(userId: string): Promise<UserBookmark[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

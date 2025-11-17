@@ -52,6 +52,20 @@ export async function GET(
       );
     }
     
+    // Get organization bookmarks
+    const { data: organizationBookmarks, error: organizationBookmarksError } = await supabase
+      .from('organization_bookmarks')
+      .select('id, org_id, saved_at')
+      .eq('user_id', id);
+      
+    if (organizationBookmarksError) {
+      console.error('Error fetching organization bookmarks:', organizationBookmarksError);
+      return NextResponse.json(
+        { error: 'Failed to fetch organization bookmarks' },
+        { status: 500 }
+      );
+    }
+    
     // Fetch all bookmarked users
     const bookmarkedUserIds = userBookmarks?.map(bookmark => bookmark.bookmarked_user_id) || [];
     let bookmarkedUsers: any[] = [];
@@ -86,9 +100,27 @@ export async function GET(
       }
     }
     
+    // Fetch all bookmarked organizations
+    const bookmarkedOrgIds = organizationBookmarks?.map(bookmark => bookmark.org_id) || [];
+    let bookmarkedOrganizations: any[] = [];
+    
+    if (bookmarkedOrgIds.length > 0) {
+      const { data: organizations, error: organizationsError } = await supabase
+        .from('organizations')
+        .select('*')
+        .in('id', bookmarkedOrgIds);
+        
+      if (organizationsError) {
+        console.error('Error fetching bookmarked organizations:', organizationsError);
+      } else {
+        bookmarkedOrganizations = organizations || [];
+      }
+    }
+    
     return NextResponse.json({
       users: bookmarkedUsers,
-      projects: bookmarkedProjects
+      projects: bookmarkedProjects,
+      organizations: bookmarkedOrganizations
     });
   } catch (error) {
     console.error('Error fetching user bookmarks:', error);

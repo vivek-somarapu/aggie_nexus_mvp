@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
-const ALLOWED = ["avatars", "resumes", "project-logos", "project-images", "event-posters"];
+const ALLOWED = ["avatars", "resumes", "project-logos", "project-images", "event-posters", "organization-logos", "organization-images"];
 const storage = createStorageClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
