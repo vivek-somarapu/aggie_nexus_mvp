@@ -96,6 +96,7 @@ export const organizationService = {
     avatar: string | null;
     email: string;
     bio: string | null;
+    industry: string[];
   }>> => {
     const response = await fetch(`/api/organizations/${id}/members`);
     if (!response.ok) {
