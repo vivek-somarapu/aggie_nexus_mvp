@@ -681,28 +681,28 @@ export default function Home() {
         <div className="h-6 md:h-8"></div>
 
         {/* Project Highlights section */}
-        <motion.section
+        {/* <motion.section
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.3 }}
           variants={scaleIn}
           className="relative bg-gray-100 py-10 md:py-12 overflow-hidden dark:bg-zinc-900"
-        >
-          <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6">
+        > */}
+          {/* <div className="container mx-auto flex flex-col lg:flex-row gap-8 px-6"> */}
             {/* ── TEXT COLUMN ─────────────────────────────────────── */}
-            <div className="flex-1 grid grid-rows-[auto_1fr_auto] text-center lg:text-left">
+            {/* <div className="flex-1 grid grid-rows-[auto_1fr_auto] text-center lg:text-left"> */}
               {/* row-1 : title (stays top-left) */}
-              <motion.h2
+              {/* <motion.h2
                 variants={fadeIn}
                 initial="hidden"
                 whileInView="visible"
                 className="text-3xl md:text-4xl font-semibold pb-3 text-gray-900 dark:text-zinc-100"
               >
                 Project Highlight
-              </motion.h2>
+              </motion.h2> */}
 
               {/* row-3 : subtitle + copy (sticks bottom-right) */}
-              <div className="row-start-3 place-self-center lg:place-self-start text-center lg:text-left max-w-2xl mx-auto lg:mx-0 space-y-4">
+              {/* <div className="row-start-3 place-self-center lg:place-self-start text-center lg:text-left max-w-2xl mx-auto lg:mx-0 space-y-4">
                 <div className="space-y-3">
                   <div className="flex flex-wrap justify-center lg:justify-start gap-2 mb-3">
                     <Badge className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-1">
@@ -777,21 +777,21 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* ── IMAGE COLUMN ────────────────────────────────────── */}
-            <div className="flex-shrink-0 flex flex-col md:flex-row md:justify-center lg:flex-col lg:justify-start gap-4 w-full lg:w-80">
+            {/* <div className="flex-shrink-0 flex flex-col md:flex-row md:justify-center lg:flex-col lg:justify-start gap-4 w-full lg:w-80"> */}
               {/* Image placeholder 1 - Plasma torch visualization */}
-              <div className="aspect-square h-48 md:h-60 rounded-lg overflow-hidden shadow-sm">
+              {/* <div className="aspect-square h-48 md:h-60 rounded-lg overflow-hidden shadow-sm">
                 <img
                   src="/images/PETRA_First_Ignition.png"
                   alt="PETRA First Ignition - Laboratory setup showing plasma torch with bright purple plasma flame"
                   className="w-full h-full object-cover"
                 />
-              </div>
+              </div> */}
 
               {/* Image placeholder 2 - Titanium production process */}
-              <div className="aspect-square h-64 md:h-60 rounded-lg overflow-hidden shadow-sm bg-gray-50 dark:bg-zinc-800 flex items-center justify-center p-4">
+              {/* <div className="aspect-square h-64 md:h-60 rounded-lg overflow-hidden shadow-sm bg-gray-50 dark:bg-zinc-800 flex items-center justify-center p-4">
                 <img
                   src="/images/PETRA_Reaction_Chamber.png"
                   alt="PETRA Reaction Chamber - 3D technical rendering of plasma torch component"
@@ -800,7 +800,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </motion.section>
+        </motion.section> */}
 
         {/* calendar section */}
         <motion.section
@@ -919,32 +919,32 @@ export default function Home() {
         </motion.section>
 
         {/* Our mission section */}
-        <motion.section
+        {/* <motion.section
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
           variants={fadeUpSlow}
           className="relative w-screen -mx-2 h-[60vh] overflow-hidden"
-        >
+        > */}
           {/* background image (sits behind, covers whole section) */}
-          <Image
+          {/* <Image
             src="/images/design-center.jpg"
             alt="Campus innovation workshop"
             fill
             className="object-cover z-[-1]"
             priority
-          />
+          /> */}
 
           {/* dark overlay */}
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] z-0" />
+          {/* <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] z-0" /> */}
 
           {/* ────────────────────────────────
             WRAPPER: takes full height, full width
             flex column on mobile, row on ≥md
         ──────────────────────────────── */}
-          <div className="relative z-10 flex h-full flex-col md:flex-row">
+          {/* <div className="relative z-10 flex h-full flex-col md:flex-row"> */}
             {/* text block */}
-            <div className="flex-[2] max-w-lg p-8 md:p-12 text-white">
+            {/* <div className="flex-[2] max-w-lg p-8 md:p-12 text-white">
               <motion.h2
                 variants={fadeIn}
                 initial="hidden"
@@ -958,8 +958,8 @@ export default function Home() {
                 Contact us to set up an organization profile.
               </p>
             </div>
-          </div>
-        </motion.section>
+          </div> */}
+        {/* </motion.section> */}
 
         {/* Footer */}
         <div className="container py-8 text-center dark:text-white/60 text-muted-foreground border-t">
