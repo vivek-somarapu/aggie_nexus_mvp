@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 // GET /api/organizations/[id]/managers - Get all managers for an organization
 export async function GET(
@@ -23,20 +24,37 @@ export async function GET(
       }, { status: 404 });
     }
     
-    // Fetch managers through organization_managers join table
-    // Query from users and filter by organization_managers
+    // First get user IDs from organization_managers join table
+    // Use service role client to bypass RLS restrictions on the join table
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    const { data: orgManagers, error: orgManagersError } = await serviceClient
+      .from('organization_managers')
+      .select('user_id')
+      .eq('org_id', id);
+    
+    if (orgManagersError) {
+      console.error('Error fetching organization managers:', orgManagersError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch organization managers',
+        details: orgManagersError.message 
+      }, { status: 500 });
+    }
+    
+    const managerIds = (orgManagers || []).map((om: { user_id: string }) => om.user_id);
+    
+    if (managerIds.length === 0) {
+      return NextResponse.json([]);
+    }
+    
+    // Now fetch managers by IDs (this respects the public users RLS policy)
     const { data: managers, error: managersError } = await supabase
       .from('users')
-      .select(`
-        id,
-        full_name,
-        avatar,
-        email,
-        bio,
-        is_texas_am_affiliate,
-        organization_managers!inner(org_id)
-      `)
-      .eq('organization_managers.org_id', id)
+      .select('id, full_name, avatar, email, bio, is_texas_am_affiliate')
+      .in('id', managerIds)
       .eq('deleted', false)
       .order('full_name');
     
