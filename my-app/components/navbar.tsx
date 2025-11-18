@@ -18,6 +18,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   LogOut,
   Settings,
   User as UserIcon,
@@ -262,15 +267,43 @@ export default function () {
           {/* Center nav (md+) */}
           {!authUser ? (
             <nav className="absolute left-1/2 -translate-x-1/2 hidden md:block">
-              <Link
-                href="/calendar"
-                className={cn(
-                  "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
-                  "text-muted-foreground dark:text-white dark:hover:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground"
-                )}
-              >
-                Events
-              </Link>
+              <ul className="flex gap-6">
+                <li>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50">
+                        Projects
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Sign up or log in to access Projects</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </li>
+                <li>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50">
+                        Community
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Sign up or log in to access Community</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </li>
+                <li>
+                  <Link
+                    href="/calendar"
+                    className={cn(
+                      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+                      "text-muted-foreground dark:text-white dark:hover:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground"
+                    )}
+                  >
+                    Events
+                  </Link>
+                </li>
+              </ul>
             </nav>
           ) : (
             <nav className="absolute left-1/2 -translate-x-1/2 hidden md:block">
@@ -572,20 +605,46 @@ export default function () {
           <nav className="flex flex-1 items-center justify-center">
             <ul className="flex flex-col items-center gap-8 text-lg">
               {!authUser ? (
-                <li key="/calendar">
-                  <Link
-                    href="/calendar"
-                    className={cn(
-                      "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1",
-                      pathname === "/calendar"
-                        ? "bg-accent text-accent-foreground dark:bg-[#262626] dark:text-white"
-                        : "text-muted-foreground dark:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground dark:hover:text-white"
-                    )}
-                    onClick={() => setOpenNavigation(false)}
-                  >
-                    Events
-                  </Link>
-                </li>
+                <>
+                  <li key="projects-disabled">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="px-6 py-3 rounded-md font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50">
+                          Projects
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Sign up or log in to access Projects</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </li>
+                  <li key="community-disabled">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="px-6 py-3 rounded-md font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50">
+                          Community
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Sign up or log in to access Community</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </li>
+                  <li key="/calendar">
+                    <Link
+                      href="/calendar"
+                      className={cn(
+                        "px-6 py-3 rounded-md font-medium transition-colors hover:text-primary focus:outline-none focus:ring-1",
+                        pathname === "/calendar"
+                          ? "bg-accent text-accent-foreground dark:bg-[#262626] dark:text-white"
+                          : "text-muted-foreground dark:text-white hover:bg-accent dark:hover:bg-[#1a1a1a] hover:text-accent-foreground dark:hover:text-white"
+                      )}
+                      onClick={() => setOpenNavigation(false)}
+                    >
+                      Events
+                    </Link>
+                  </li>
+                </>
               ) : (
                 <>
                   <li key="create-project">
