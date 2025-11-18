@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 // GET /api/organizations/[id]/members - Get all members for an organization
 export async function GET(
@@ -23,21 +24,37 @@ export async function GET(
       }, { status: 404 });
     }
     
-    // Fetch members through organization_members join table
-    // Query from users and filter by organization_members
-    // Use explicit foreign key to avoid ambiguity (user_id relationship, not verified_by)
+    // First get user IDs from organization_members join table
+    // Use service role client to bypass RLS restrictions on the join table
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    const { data: orgMembers, error: orgMembersError } = await serviceClient
+      .from('organization_members')
+      .select('user_id')
+      .eq('org_id', id);
+    
+    if (orgMembersError) {
+      console.error('Error fetching organization members:', orgMembersError);
+      return NextResponse.json({ 
+        error: 'Failed to fetch organization members',
+        details: orgMembersError.message 
+      }, { status: 500 });
+    }
+    
+    const userIds = (orgMembers || []).map((om: { user_id: string }) => om.user_id);
+    
+    if (userIds.length === 0) {
+      return NextResponse.json([]);
+    }
+    
+    // Now fetch users by IDs (this respects the public users RLS policy)
     const { data: members, error: membersError } = await supabase
       .from('users')
-      .select(`
-        id,
-        full_name,
-        avatar,
-        email,
-        bio,
-        industry,
-        organization_members!organization_members_user_id_fkey!inner(org_id)
-      `)
-      .eq('organization_members.org_id', id)
+      .select('id, full_name, avatar, email, bio, industry')
+      .in('id', userIds)
       .eq('deleted', false)
       .order('full_name');
     
