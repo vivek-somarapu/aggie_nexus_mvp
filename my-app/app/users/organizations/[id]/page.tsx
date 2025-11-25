@@ -522,10 +522,15 @@ export default function OrganizationPage() {
                       href={organization.website_url} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-xs sm:text-sm"
+                      className="pt-5 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-xs sm:text-sm"
+                      title={organization.website_url}
                     >
-                      <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="truncate max-w-[200px] sm:max-w-none">{organization.website_url}</span>
+                      <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {organization.website_url.length > 20 
+                          ? `${organization.website_url.substring(0, 20)}...` 
+                          : organization.website_url}
+                      </span>
                     </a>
                   )}
                 </div>
