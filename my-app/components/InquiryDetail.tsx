@@ -44,7 +44,7 @@ export default function InquiryDetail({ inquirer, preferredContact, message }: I
         </Link>
       </div>
       
-      <div className="text-sm text-gray-600 truncate overflow-hidden whitespace-nowrap">{truncateBio(inquirer.bio)}</div>
+      <div className="text-sm text-gray-600 dark:text-gray-400 truncate overflow-hidden whitespace-nowrap">{truncateBio(inquirer.bio)}</div>
       
       <div className="space-y-3">
         <div>
@@ -55,7 +55,7 @@ export default function InquiryDetail({ inquirer, preferredContact, message }: I
         </div>
         <div>
           <span className="font-bold">Message:</span>
-          <div className={isLongMessage ? "mt-2 max-h-40 overflow-y-auto pr-2 text-sm whitespace-pre-wrap border rounded-md p-3 bg-gray-50" : "mt-1 text-sm whitespace-pre-wrap"}>
+          <div className={isLongMessage ? "mt-2 max-h-40 overflow-y-auto pr-2 text-sm whitespace-pre-wrap border rounded-md p-3 bg-gray-50 dark:bg-black dark:border-gray-900 dark:text-white" : "mt-1 text-sm whitespace-pre-wrap"}>
             {message}
           </div>
         </div>
