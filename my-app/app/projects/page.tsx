@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bookmark, Calendar, MapPin, Users, Eye, Loader2, Grid3x3, List, Filter, MessageSquare } from "lucide-react";
+import { Bookmark, Calendar, MapPin, Users, Loader2, Grid3x3, List, Filter, MessageSquare, Tag } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { IncubatorAcceleratorBadges } from "@/components/ui/incubator-accelerator-badge";
 import {
@@ -941,7 +941,7 @@ export default function ProjectsPage() {
               // List View - Existing horizontal layout
               <motion.div
                 key="projects-list"
-                className="grid gap-6 md:grid-cols-2 lg:grid-cols-1"
+                className="grid gap-3 md:grid-cols-2 lg:grid-cols-1"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -959,11 +959,11 @@ export default function ProjectsPage() {
                   let fundingDisplay = null;
                   if (project.funding_received !== undefined && project.funding_received !== 0) {
                     fundingDisplay = (
-                      <div className="text-center shrink-0 bg-background/85 backdrop-blur-md px-4 py-2 rounded-lg border shadow-lg">
-                        <div className="text-xs text-muted-foreground mb-1 font-medium">
+                      <div className="text-center shrink-0 bg-background/85 backdrop-blur-md px-3 py-1.5 rounded-lg border shadow-lg">
+                        <div className="text-xs text-muted-foreground mb-0.5 font-medium">
                           Funding
                         </div>
-                        <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                        <div className="text-lg font-bold text-green-600 dark:text-green-400">
                           ${project.funding_received.toLocaleString()}
                         </div>
                       </div>
@@ -975,7 +975,7 @@ export default function ProjectsPage() {
                     key={project.id}
                     variants={cardVariants}
                     custom={index}
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                    whileHover={{ y: -2, transition: { duration: 0.2 } }}
                   >
                         <Card
                           className={cn(
@@ -1041,11 +1041,11 @@ export default function ProjectsPage() {
                           )}
                           <div className="relative z-10">
                             <Link href={`/projects/${project.id}`} className="block">
-                              <CardHeader className="pb-3 pt-4 px-4 cursor-pointer">
+                              <CardHeader className="px-3 cursor-pointer">
                                 {/* Top Row: Logo + Name + Funding */}
-                                <div className="flex items-start justify-between gap-4 mb-3">
+                                <div className="flex items-start justify-between gap-3">
                                   {/* Left: Logo + Name */}
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
                                     <motion.div
                                       whileHover={{ scale: 1.05 }}
                                       transition={{
@@ -1054,18 +1054,18 @@ export default function ProjectsPage() {
                                         damping: 10,
                                       }}
                                     >
-                                      <Avatar className="h-20 w-20 shrink-0 ring-2 ring-background/50 shadow-sm">
+                                      <Avatar className="h-14 w-14 shrink-0 ring-2 ring-background/50 shadow-sm">
                                         <AvatarImage
                                           src={project.logo_url ?? ""}
                                           alt={`${project.title} logo`}
                                         />
-                                        <AvatarFallback className="text-lg font-semibold bg-background/90">
+                                        <AvatarFallback className="text-base font-semibold bg-background/90">
                                           {project.title.charAt(0).toUpperCase()}
                                         </AvatarFallback>
                                       </Avatar>
                                     </motion.div>
                                     <div className="flex-1 min-w-0">
-                                      <CardTitle className="text-xl font-bold line-clamp-2 text-foreground drop-shadow-md">
+                                      <CardTitle className="text-lg font-bold line-clamp-2 text-foreground drop-shadow-md">
                                         {project.title}
                                       </CardTitle>
                                     </div>
@@ -1076,7 +1076,7 @@ export default function ProjectsPage() {
                                 </div>
 
                                 {/* Status Tags: Idea/Project + Status */}
-                                <div className="flex flex-wrap gap-2 mb-3">
+                                <div className="flex flex-wrap gap-1.5 mb-2">
                                   {project.is_idea ? (
                               <Badge
                                 variant="outline"
@@ -1111,73 +1111,50 @@ export default function ProjectsPage() {
                         </CardHeader>
 
                               {/* Content: Description + Metrics */}
-                              <CardContent className="px-4 pb-3 cursor-pointer">
+                              <CardContent className="px-3 pb-2 cursor-pointer">
                                 {/* Description */}
-                                <p className="text-foreground/95 text-lg line-clamp-3 mb-6 font-medium drop-shadow-md bg-background/40 backdrop-blur-sm px-3 py-2 rounded-lg">
+                                <p className="text-foreground/95 text-base line-clamp-1 mb-3 font-medium drop-shadow-md bg-background/40 backdrop-blur-sm px-2 py-1.5 rounded-lg overflow-hidden max-w-[95%] truncate">
                             {project.description}
                           </p>
 
                                 {/* Metrics Grid */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                                  <div className="flex items-center gap-2 text-foreground/90 bg-background/60 backdrop-blur-sm px-3 py-2 rounded-lg border shadow-sm">
-                                    <MapPin className="h-4 w-4 shrink-0" />
-                                    <span className="truncate font-medium">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                  <div className="flex items-center gap-1.5 text-foreground/90 bg-background/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border shadow-sm">
+                                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate font-medium text-xs">
                                       {project.location_type}
                                     </span>
                             </div>
-                                  <div className="flex items-center gap-2 text-foreground/90 bg-background/60 backdrop-blur-sm px-3 py-2 rounded-lg border shadow-sm">
-                                    <Calendar className="h-4 w-4 shrink-0" />
-                                    <span className="truncate font-medium">
+                                  <div className="flex items-center gap-1.5 text-foreground/90 bg-background/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border shadow-sm">
+                                    <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate font-medium text-xs">
                                       {formatDate(project.estimated_start)}
                                     </span>
                             </div>
-                                  <div className="flex items-center gap-2 text-foreground/90 bg-background/60 backdrop-blur-sm px-3 py-2 rounded-lg border shadow-sm">
-                                    <Users className="h-4 w-4 shrink-0" />
-                                    <span className="truncate font-medium">
+                                  <div className="flex items-center gap-1.5 text-foreground/90 bg-background/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border shadow-sm">
+                                    <Users className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate font-medium text-xs">
                                       {project.recruitment_status}
                                     </span>
                             </div>
-                                  <div className="flex items-center gap-2 text-foreground/90 bg-background/60 backdrop-blur-sm px-3 py-2 rounded-lg border shadow-sm">
-                                    <Eye className="h-4 w-4 shrink-0" />
-                                    <span className="font-medium">{project.views} views</span>
+                                  <div className="flex items-center gap-1.5 text-foreground/90 bg-background/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border shadow-sm">
+                                    <Tag className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate font-medium text-xs">
+                                      {project.industry && project.industry.length > 0
+                                        ? project.industry.slice(0, 2).join(", ") + (project.industry.length > 2 ? "..." : "")
+                                        : "No industries"}
+                                    </span>
                             </div>
                           </div>
                         </CardContent>
                             </Link>
 
                             {/* Footer: Industry Tags, Bookmark, and Contact/Manage Buttons */}
-                            <CardFooter className="border-t border-border/50 pt-3 px-4 pb-4">
-                              <div className="flex flex-col gap-3 w-full">
-                                {/* Top Row: Industry Tags */}
-                                <div className="flex flex-wrap gap-2">
-                                  {project.industry.slice(0, 5).map(
-                                    (ind: string, indIndex: number) => (
-                            <Badge
-                              key={`${project.id}-industry-${indIndex}`}
-                              variant="secondary"
-                                        className="text-xs bg-background/70 backdrop-blur-sm border shadow-sm"
-                            >
-                              {ind}
-                            </Badge>
-                                    )
-                                  )}
-                                  {project.industry.length > 5 && (
-                                    <Badge 
-                                      variant="secondary" 
-                                      className="text-xs bg-background/70 backdrop-blur-sm border shadow-sm"
-                                    >
-                                      +{project.industry.length - 5} more
-                            </Badge>
-                          )}
-                                  {project.industry.length === 0 && (
-                                    <span className="text-xs text-foreground/70">
-                                      No industries specified
-                                    </span>
-                                  )}
-                                </div>
+                            <CardFooter className="border-t border-border/50 pt-2 px-3">
+                              <div className="flex flex-col gap-2 w-full">
                                 
                                 {/* Bottom Row: Bookmark and Contact/Manage Buttons */}
-                                <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center justify-between gap-3">
                                   {/* Left: Bookmark Button */}
                                   <motion.div
                                     whileTap={buttonVariants.tap}
@@ -1188,21 +1165,21 @@ export default function ProjectsPage() {
                                   >
                                     <Button
                                       variant="ghost"
-                                      size="lg"
-                                      className="h-10 gap-2 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
+                                      size="sm"
+                                      className="h-8 gap-1.5 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
                                       disabled={isBookmarkLoading}
                                     >
                                       {isBookmarkLoading ? (
-                                        <Loader2 className="h-7 w-7 animate-spin" />
+                                        <Loader2 className="h-4 w-4 animate-spin" />
                                       ) : (
                                         <>
-                                          <span className="text-sm font-medium">
+                                          <span className="text-xs font-medium">
                                             {bookmarkedProjects.includes(project.id)
                                               ? "I'm Interested."
                                               : "Interested?"}
                                           </span>
                                           <Bookmark
-                                            className={`h-7 w-7 ${
+                                            className={`h-4 w-4 ${
                                               bookmarkedProjects.includes(
                                                 project.id
                                               )
@@ -1242,16 +1219,16 @@ export default function ProjectsPage() {
                                         <DialogTrigger asChild>
                                           <Button
                                             variant="outline"
-                                            size="lg"
-                                            className="h-10 gap-2 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
+                                            size="sm"
+                                            className="h-8 gap-1.5 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
                                             onClick={(e) => handleOpenInquiry(project.id, e)}
                                             onMouseDown={(e) => {
                                               e.preventDefault();
                                               e.stopPropagation();
                                             }}
                                           >
-                                            <MessageSquare className="h-4 w-4" />
-                                            <span className="text-sm font-medium">Contact Team Lead</span>
+                                            <MessageSquare className="h-3.5 w-3.5" />
+                                            <span className="text-xs font-medium">Contact Team Lead</span>
                                           </Button>
                                         </DialogTrigger>
                                         <DialogContent
@@ -1337,8 +1314,8 @@ export default function ProjectsPage() {
                                     {currentUser && currentUser.id === project.owner_id && (
                                       <Button
                                         variant="outline"
-                                        size="lg"
-                                        className="h-10 gap-2 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
+                                        size="sm"
+                                        className="h-8 gap-1.5 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
                                         asChild
                                       >
                                         <Link 
@@ -1350,8 +1327,8 @@ export default function ProjectsPage() {
                                             e.stopPropagation();
                                           }}
                                         >
-                                          <MessageSquare className="h-4 w-4" />
-                                          <span className="text-sm font-medium">Manage Project</span>
+                                          <MessageSquare className="h-3.5 w-3.5" />
+                                          <span className="text-xs font-medium">Manage Project</span>
                                         </Link>
                                       </Button>
                                     )}
@@ -1359,8 +1336,8 @@ export default function ProjectsPage() {
                                     {!currentUser && (
                                       <Button
                                         variant="outline"
-                                        size="lg"
-                                        className="h-10 gap-2 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
+                                        size="sm"
+                                        className="h-8 gap-1.5 items-center bg-background/80 backdrop-blur-md hover:bg-background/95 border shadow-lg"
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
@@ -1371,8 +1348,8 @@ export default function ProjectsPage() {
                                           e.stopPropagation();
                                         }}
                                       >
-                                        <MessageSquare className="h-4 w-4" />
-                                        <span className="text-sm font-medium">Login to Contact</span>
+                                        <MessageSquare className="h-3.5 w-3.5" />
+                                        <span className="text-xs font-medium">Login to Contact</span>
                                       </Button>
                                     )}
                                   </div>
