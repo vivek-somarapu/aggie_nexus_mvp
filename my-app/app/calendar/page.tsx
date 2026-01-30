@@ -312,248 +312,263 @@ export default function CalendarPage() {
     return Array.from(map.entries());
   }, [listEvents]);
 
+  // Get featured events (next 3 upcoming events with posters)
+  const featuredEvents = useMemo(() => {
+    const now = new Date();
+    return allEvents
+      .filter((ev) => new Date(ev.start) >= now && ev.poster_url)
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+      .slice(0, 3);
+  }, [allEvents]);
+
+  // Stats for the header
+  const eventStats = useMemo(() => {
+    const now = new Date();
+    const upcoming = allEvents.filter((ev) => new Date(ev.start) >= now).length;
+    const thisWeek = allEvents.filter((ev) => {
+      const eventDate = new Date(ev.start);
+      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      return eventDate >= now && eventDate <= weekFromNow;
+    }).length;
+    return { upcoming, thisWeek, total: allEvents.length };
+  }, [allEvents]);
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: customScrollStyles }} />
       <motion.div
-        className="flex flex-col max-w-6xl bg-gradient-to-b mx-auto from-background via-background to-muted/20"
+        className="space-y-6"
         variants={pageVariants}
         initial="hidden"
         animate="visible"
         exit="exit"
       >
-        {/* Header */}
-        <motion.div
-          variants={itemVariants}
-          className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur"
-        >
-          <div className="container mx-auto flex flex-wrap items-center justify-between px-6 py-3 gap-4">
-            {/* Title */}
-            <h1 className="text-2xl font-bold md:text-3xl tracking-tight">
-              Events Calendar
-            </h1>
-
-            {/* Desktop: inline filters & stats */}
-            <div className="hidden md:flex items-center gap-6">
-              {/* Industry Filter */}
-              {/* <div>
-                <label className="sr-only">Industry</label>
-                <Select
-                  value={industryFilter}
-                  onValueChange={setIndustryFilter}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="All Industries" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Industries</SelectItem>
-                    {industryOptions.map((industry) => (
-                      <SelectItem key={industry} value={industry}>
-                        {industry}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div> */}
-
-              {/* Event Type */}
-              <div>
-                <label className="sr-only">Event Type</label>
-                <Select
-                  value={categoryFilter}
-                  onValueChange={setCategoryFilter}
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="All Events" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Events</SelectItem>
-                    {Object.entries(categories).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* View Toggle – only show on desktop */}
-              {isDesktop && (
-                <Tabs value={view} onValueChange={(v) => setView(v as any)}>
-                  <TabsList className="grid grid-cols-2">
-                    <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                    <TabsTrigger value="list">List</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
-
-              {profile && (
-                <Button
-                  onClick={() => router.push("/calendar/new")}
-                  size="sm"
-                  className="bg-green-600 text-white hover:bg-green-700 hover:text-white dark:hover:text-white"
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Add Event
-                </Button>
-              )}
-
-              {/* {isDesktop && effectiveView === "list" && (
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={includeOld}
-                    onCheckedChange={setIncludeOld}
-                  />
-                  <span className="text-sm">Old events</span>
-                </div>
-              )} */}
+        {/* Header Section - Similar to Community Page */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="relative"
+          >
+            {/* Green accent background for events */}
+            <div className="absolute inset-0 bg-gradient-to-r from-green-50 to-transparent dark:from-green-950/20 dark:to-transparent rounded-lg -m-4 p-4"></div>
+            <div className="relative z-10">
+              <h1 className="text-3xl font-bold tracking-tight">Events</h1>
+              <p className="text-muted-foreground">Discover and join events in the Aggie ecosystem</p>
             </div>
-
-            {/* Mobile: compact header with Add & Filter */}
-            <div className="md:hidden flex items-center gap-2">
-              {/* + Add button (floating style) */}
-              {profile && (
-                <Button
-                  size="icon"
-                  className="bg-green-600 text-white hover:bg-green-700 hover:text-white dark:hover:text-white"
-                  onClick={() => router.push("/calendar/new")}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
-
-              {/* Filter toggle button */}
+          </motion.div>
+          
+          {/* Add Event Button - Desktop */}
+          <div className="hidden md:flex items-center gap-3">
+            {profile && (
               <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setFiltersOpen(!filtersOpen)}
+                onClick={() => router.push("/calendar/new")}
+                className="bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/25"
               >
-                <Filter className="h-4 w-4" />
+                <Plus className="h-4 w-4 mr-2" /> Add Event
               </Button>
-            </div>
+            )}
           </div>
+        </div>
+
+        {/* Auth Alert */}
+        {!profile && !authLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+          >
+            <Alert className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-800">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <span className="font-medium">
+                  Sign in to add personal events and get personalized notifications.
+                </span>{" "}
+                <Button
+                  variant="link"
+                  className="text-blue-600 dark:text-blue-400 p-0 h-auto"
+                  onClick={() => router.push("/auth/login?redirect=/calendar")}
+                >
+                  Sign in now
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
+        {/* Error Alert */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+
+        {/* Filters Section - Collapsible Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <Card className="border-l-4 border-green-200 dark:border-green-800">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  <span className="text-lg font-semibold">Filters</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFiltersOpen(!filtersOpen)}
+                  className="h-8"
+                >
+                  {filtersOpen ? "Hide" : "Show"} Filters
+                </Button>
+              </div>
+              {filtersOpen && (
+                <div className="space-y-4 pt-2">
+                  {/* Filter Row: Event Type and View Toggle */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <label className="text-sm font-medium mb-2 block">Event Type</label>
+                      <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All Events" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Events</SelectItem>
+                          {Object.entries(categories).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* View Toggle - Desktop only */}
+                    {isDesktop && (
+                      <div className="flex-1">
+                        <label className="text-sm font-medium mb-2 block">View</label>
+                        <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                          <TabsList className="w-full">
+                            <TabsTrigger value="calendar" className="flex-1">Calendar</TabsTrigger>
+                            <TabsTrigger value="list" className="flex-1">List</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Show Past Events Toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Show past events</span>
+                    <Switch checked={includeOld} onCheckedChange={setIncludeOld} />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </motion.div>
 
-        {/* Mobile Filter Dropdown (with smooth animation) */}
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={
-            filtersOpen
-              ? { opacity: 1, height: "auto" }
-              : { opacity: 0, height: 0 }
-          }
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="md:hidden overflow-hidden px-6"
-        >
-          <div className="space-y-3 py-3 ">
-            {/* Industry Filter */}
-            {/* <div>
-              <Label
-                htmlFor="mobile-filter-industry"
-                className="text-sm py-2 font-medium"
-              >
-                Industry
-              </Label>
-              <Select value={industryFilter} onValueChange={setIndustryFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All Industries" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Industries</SelectItem>
-                  {industryOptions.map((industry) => (
-                    <SelectItem key={industry} value={industry}>
-                      {industry}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div> */}
-
-            {/* Event Type */}
-            <div>
-              <Label
-                htmlFor="mobile-filter-type"
-                className="text-sm py-2 font-medium"
-              >
-                Event Type
-              </Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All Events" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Events</SelectItem>
-                  {Object.entries(categories).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-sm py-2 font-medium">Old events</Label>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-sm text-muted-foreground">
-                  Show past events
-                </span>
-                <Switch checked={includeOld} onCheckedChange={setIncludeOld} />
+        {/* Featured Events Section */}
+        {featuredEvents.length > 0 && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            className="rounded-lg p-[2px] bg-gradient-to-b from-green-200 via-green-100 to-green-200 dark:from-green-900/40 dark:via-green-950/20 dark:to-green-900/40"
+          >
+            <div className="bg-background dark:bg-background rounded-lg p-4">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarIcon className="h-5 w-5 text-primary" />
+                  <h2 className="text-2xl font-semibold">Featured Events</h2>
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  {eventStats.thisWeek} this week · {eventStats.upcoming} upcoming
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {featuredEvents.map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 * index }}
+                    onClick={() => {
+                      if (isDesktop) {
+                        handleEventClick({ id: event.id } as any);
+                      } else {
+                        router.push(`/calendar/${event.id}`);
+                      }
+                    }}
+                    className="group cursor-pointer"
+                  >
+                    <Card className="overflow-hidden hover:shadow-md transition-shadow bg-green-50/30 dark:bg-green-950/10">
+                      <div className="relative aspect-[16/9] overflow-hidden">
+                        {event.poster_url && (
+                          <Image
+                            src={event.poster_url}
+                            alt={event.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-4">
+                          <div className="flex items-center gap-2 text-white/80 text-xs mb-2">
+                            <CalendarIcon className="h-3 w-3" />
+                            {format(new Date(event.start), "MMM d, h:mm a")}
+                          </div>
+                          <h3 className="text-white font-semibold line-clamp-2">
+                            {event.title}
+                          </h3>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
               </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
 
-        <div className="flex-1 overflow-hidden pt-4">
-          {/* Auth Alert */}
-          {!profile && !authLoading && (
-            <motion.div variants={itemVariants} className="mb-6 px-4">
-              <Alert className="bg-blue-50 text-blue-800 border-blue-200">
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  <span className="font-medium">
-                    Sign in to add personal events and get personalized
-                    notifications.
-                  </span>{" "}
-                  <Button
-                    variant="link"
-                    className="text-blue-600 p-0 h-auto"
-                    onClick={() =>
-                      router.push("/auth/login?redirect=/calendar")
-                    }
-                  >
-                    Sign in now
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </motion.div>
+        {/* Mobile Add Event Button */}
+        <div className="md:hidden flex justify-end">
+          {profile && (
+            <Button
+              onClick={() => router.push("/calendar/new")}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Event
+            </Button>
           )}
+        </div>
 
-          {/* Error Alert */}
-          {error && (
-            <motion.div variants={itemVariants} className="mb-6 px-4">
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-
-          {/* Main Grid */}
-          <div className="grid h-full gap-6">
-            {/* Events Pane */}
-            <section className="flex flex-col lg:col-span-3 h-full">
-              <AnimatePresence mode="wait">
-                {isLoading ? (
-                  <motion.div
-                    key="loading"
-                    className="flex-1 flex items-center justify-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </motion.div>
-                ) : effectiveView === "calendar" ? (
+        {/* Main Events Section */}
+        <Card>
+          <CardContent className="p-0 md:p-6">
+            <AnimatePresence mode="wait">
+              {isLoading ? (
+                <motion.div
+                  key="loading"
+                  className="flex-1 flex items-center justify-center py-12"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </motion.div>
+              ) : effectiveView === "calendar" ? (
                   // Calendarview of Events
                   <motion.div
                     key="calendar"
@@ -768,9 +783,8 @@ export default function CalendarPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </section>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
 
         {/* Event Information Dialog with Integrated RSVP */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
