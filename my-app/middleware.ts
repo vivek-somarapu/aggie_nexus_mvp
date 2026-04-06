@@ -68,6 +68,7 @@ export async function middleware(request: NextRequest) {
       '/api/events', // Allow fetching events without auth
       '/privacy', // Public privacy policy (required for OAuth)
       '/terms', // Public terms of service (required for OAuth)
+      '/eggs', // Easter egg hunt landing pages — token-gated, no login required
     ];
 
     // Check if current route is public or an API route
