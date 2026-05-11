@@ -1,107 +1,68 @@
-import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
-export async function middleware(request: NextRequest) {
+// Middleware only does fast cookie-presence routing.
+// Full auth verification (getUser, session validation) happens in server components
+// where Node.js APIs are available. The Edge Runtime cannot run the Supabase SDK
+// because @supabase/realtime-js uses process.versions, a Node.js-only API.
+
+const PUBLIC_ROUTES = [
+  '/',
+  '/auth/login',
+  '/auth/signup',
+  '/auth/callback',
+  '/auth/waiting',
+  '/auth/reset-password',
+  '/auth/forgot-password',
+  '/calendar',
+  '/api/events',
+  '/privacy',
+  '/terms',
+  '/eggs',
+  '/accelerator/access-denied',
+];
+
+function hasAuthCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some(
+    (cookie) => cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
+  );
+}
+
+export function middleware(request: NextRequest) {
   const currentPath = request.nextUrl.pathname;
 
-  // Middleware must create its own Supabase client using request/response cookies
-  // because next/headers cookies() is not available in the Edge Runtime.
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const isAuthenticated = !!user;
-  const isEmailVerified = !!user?.email_confirmed_at;
-
-  const publicRoutes = [
-    '/',
-    '/auth/login',
-    '/auth/signup',
-    '/auth/callback',
-    '/auth/waiting',
-    '/auth/reset-password',
-    '/auth/forgot-password',
-    '/calendar',
-    '/api/events',
-    '/privacy',
-    '/terms',
-    '/eggs',
-    '/accelerator/access-denied',
-  ];
-
-  const isPublicRoute = publicRoutes.some(
+  const isPublicRoute = PUBLIC_ROUTES.some(
     (route) => currentPath === route || currentPath.startsWith(route + '/')
   );
   const isApiRoute = currentPath.startsWith('/api/');
 
   if (isPublicRoute || isApiRoute) {
-    return response;
+    return NextResponse.next();
   }
 
-  if (!isAuthenticated) {
+  // Redirect unauthenticated users to login
+  if (!hasAuthCookie(request)) {
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('redirect', currentPath);
     return NextResponse.redirect(loginUrl);
   }
 
-  const verificationRequiredRoutes = [
-    '/profile',
-    '/projects',
-    '/users',
-    '/projects/new',
-    '/projects/edit',
-  ];
-
-  const requiresVerification = verificationRequiredRoutes.some((route) =>
-    currentPath.startsWith(route)
-  );
-
-  if (requiresVerification && !isEmailVerified) {
-    return NextResponse.redirect(new URL('/auth/waiting', request.url));
-  }
-
-  const authRoutes = ['/auth/login', '/auth/signup'];
-  const isAuthRoute = authRoutes.some((route) => currentPath.startsWith(route));
+  // Redirect authenticated users away from login/signup
+  const isAuthRoute =
+    currentPath.startsWith('/auth/login') || currentPath.startsWith('/auth/signup');
 
   if (isAuthRoute) {
-    if (!isEmailVerified) {
-      return NextResponse.redirect(new URL('/auth/waiting', request.url));
-    }
     return NextResponse.redirect(new URL('/', request.url));
   }
 
+  const response = NextResponse.next();
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.headers.set('Pragma', 'no-cache');
   response.headers.set('Expires', '0');
-
   return response;
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webpo)$).*)',
   ],
 };
