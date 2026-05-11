@@ -423,7 +423,7 @@ export default function CanecktLandingPage() {
         <span className="text-[10px] font-mono text-neutral-400 tracking-widest uppercase">
           Caneckt · AggieX 2026
         </span>
-        <span className="text-[12px] text-white tracking-wide">
+        <span className="text-[10px] text-white tracking-neutral-400">
           A Zachary Nowroozi Production
         </span>
       </footer>
