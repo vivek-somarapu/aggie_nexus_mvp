@@ -1,9 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-// Middleware only does fast cookie-presence routing.
-// Full auth verification (getUser, session validation) happens in server components
-// where Node.js APIs are available. The Edge Runtime cannot run the Supabase SDK
-// because @supabase/realtime-js uses process.versions, a Node.js-only API.
+// Run on Node.js runtime (not Edge) so Vercel's V8 isolate restrictions don't apply.
+// Next.js 15.1+ supports nodejs middleware via the runtime export below.
+export const runtime = 'nodejs';
 
 const PUBLIC_ROUTES = [
   '/',
