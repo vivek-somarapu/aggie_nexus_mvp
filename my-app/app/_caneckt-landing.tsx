@@ -418,10 +418,10 @@ export default function CanecktLandingPage() {
 
       {/* ── Footer ── */}
       <footer className="relative z-10 py-5 px-8 md:px-14 flex items-center justify-between border-t border-white/[0.03]">
-        <span className="text-[10px] font-mono text-neutral-800 tracking-widest uppercase">
+        <span className="text-[10px] font-mono text-neutral-400 tracking-widest uppercase">
           Caneckt · AggieX 2026
         </span>
-        <span className="text-[10px] text-neutral-800 tracking-wide">
+        <span className="text-[12px] text-white tracking-wide">
           A Zachary Nowroozi Production
         </span>
       </footer>
