@@ -196,7 +196,7 @@ export default function CanecktLandingPage() {
 
   return (
     <div
-      className={`${spaceGrotesk.variable} min-h-screen flex flex-col overflow-hidden`}
+      className={`${spaceGrotesk.variable} h-screen flex flex-col overflow-hidden`}
       style={{
         background: '#030308',
         backgroundImage: 'radial-gradient(rgba(255,255,255,0.055) 1px, transparent 1px)',
@@ -212,21 +212,23 @@ export default function CanecktLandingPage() {
         transition={{ duration: 0.5 }}
         className="relative z-10 flex items-center justify-between px-8 md:px-14 py-6"
       >
-        <Image
-          src="/images/AggieX_LogoLight.png"
-          alt="AggieX"
-          width={110}
-          height={36}
-          className="object-contain"
-          priority
-        />
+        <div className="relative w-24 sm:w-28 md:w-32 h-6 sm:h-7 md:h-8">
+          <Image
+            src="/images/AggieX_LogoLight.png"
+            alt="AggieX"
+            fill
+            priority
+            sizes="(max-width: 640px) 96px, (max-width: 768px) 112px, 128px"
+            className="object-contain"
+          />
+        </div>
         <span className="hidden sm:inline text-[10px] tracking-[0.35em] font-mono uppercase text-neutral-700">
           Invite only · Summer 2026
         </span>
       </motion.header>
 
       {/* ── Two-column layout ── */}
-      <main className="relative z-10 flex-1 flex flex-col lg:flex-row">
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col lg:flex-row">
 
         {/* Left: wordmark + descriptor */}
         <div className="flex-1 flex flex-col justify-center px-8 md:px-14 lg:px-20 xl:px-28 pt-8 pb-10 lg:py-0">
