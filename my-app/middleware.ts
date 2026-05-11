@@ -1,9 +1,10 @@
 import type { NextRequest } from 'next/server';
 
-// Run on Node.js runtime — avoids Edge Runtime V8 isolate restrictions.
-// All responses use the native Response class with Next.js internal headers
-// so no next/server classes are bundled, eliminating the __dirname cold-start crash.
-export const runtime = 'nodejs';
+// Edge Runtime (default). No next/server classes are imported at runtime —
+// only native Response/Headers/URL — so no __dirname or process.versions
+// references are bundled. The middleware-manifest.json is populated correctly
+// for Vercel's CDN routing (Node.js runtime breaks this by writing to
+// functions-config-manifest.json instead, which Vercel's edge layer ignores).
 
 const PUBLIC_ROUTES = [
   '/',
