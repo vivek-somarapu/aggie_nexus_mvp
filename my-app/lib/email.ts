@@ -25,14 +25,17 @@ export interface EmailService {
 const EMAIL_FROM = process.env.EMAIL_FROM ?? 'AggieX <noreply@aggiex.org>';
 
 class ResendEmailService implements EmailService {
-  private readonly client: Resend;
+  private client: Resend | null = null;
 
-  constructor() {
-    this.client = new Resend(process.env.RESEND_API_KEY);
+  private getClient(): Resend {
+    if (!this.client) {
+      this.client = new Resend(process.env.RESEND_API_KEY);
+    }
+    return this.client;
   }
 
   async send(message: EmailMessage): Promise<void> {
-    const { error } = await this.client.emails.send({
+    const { error } = await this.getClient().emails.send({
       from: EMAIL_FROM,
       to: message.to,
       subject: message.subject,
