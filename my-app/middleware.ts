@@ -1,7 +1,8 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-// Run on Node.js runtime (not Edge) so Vercel's V8 isolate restrictions don't apply.
-// Next.js 15.1+ supports nodejs middleware via the runtime export below.
+// Run on Node.js runtime — avoids Edge Runtime V8 isolate restrictions.
+// All responses use the native Response class with Next.js internal headers
+// so no next/server classes are bundled, eliminating the __dirname cold-start crash.
 export const runtime = 'nodejs';
 
 const PUBLIC_ROUTES = [
@@ -21,43 +22,57 @@ const PUBLIC_ROUTES = [
 ];
 
 function hasAuthCookie(request: NextRequest): boolean {
-  return request.cookies.getAll().some(
-    (cookie) => cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
-  );
+  const cookieHeader = request.headers.get('cookie') ?? '';
+  return cookieHeader.split(';').some((part) => {
+    const name = part.trim().split('=')[0].trim();
+    return name.startsWith('sb-') && name.endsWith('-auth-token');
+  });
+}
+
+// Equivalent to NextResponse.next() — tells Next.js to continue to the route handler.
+function continueResponse(extraHeaders?: Record<string, string>): Response {
+  const headers = new Headers(extraHeaders);
+  headers.set('x-middleware-next', '1');
+  return new Response(null, { headers });
+}
+
+// Equivalent to NextResponse.redirect() with a 302.
+function redirectTo(url: URL): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: url.toString() },
+  });
 }
 
 export function middleware(request: NextRequest) {
-  const currentPath = request.nextUrl.pathname;
+  const currentPath = new URL(request.url).pathname;
 
   const isPublicRoute = PUBLIC_ROUTES.some(
     (route) => currentPath === route || currentPath.startsWith(route + '/')
   );
-  const isApiRoute = currentPath.startsWith('/api/');
 
-  if (isPublicRoute || isApiRoute) {
-    return NextResponse.next();
+  if (isPublicRoute || currentPath.startsWith('/api/')) {
+    return continueResponse();
   }
 
-  // Redirect unauthenticated users to login
   if (!hasAuthCookie(request)) {
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('redirect', currentPath);
-    return NextResponse.redirect(loginUrl);
+    return redirectTo(loginUrl);
   }
 
-  // Redirect authenticated users away from login/signup
   const isAuthRoute =
     currentPath.startsWith('/auth/login') || currentPath.startsWith('/auth/signup');
 
   if (isAuthRoute) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return redirectTo(new URL('/', request.url));
   }
 
-  const response = NextResponse.next();
-  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  response.headers.set('Pragma', 'no-cache');
-  response.headers.set('Expires', '0');
-  return response;
+  return continueResponse({
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  });
 }
 
 export const config = {
