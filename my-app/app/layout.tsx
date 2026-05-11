@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
 import type { Metadata } from "next";
 import ClientLayout from "@/components/client-layout";
-import Navbar from "@/components/navbar";
+import ConditionalNavbar from "@/components/conditional-navbar";
 import { Toaster } from "@/components/ui/sonner";
 import RootCodeRedirect from "./root-code-redirect"; // already imported
 import AuthDebug from "@/components/auth-debug"; // Import the debug component
@@ -60,7 +60,7 @@ export default function RootLayout({
           storageKey="aggie-nexus-theme"
         >
           <AuthProvider>
-            <Navbar />
+            <ConditionalNavbar />
             <ClientLayout>
               <RootCodeRedirect>{children}</RootCodeRedirect>
             </ClientLayout>
