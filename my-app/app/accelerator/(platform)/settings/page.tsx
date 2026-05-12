@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import WeekUnlockList from './components/week-unlock-list';
+import EmbedContentPanel from './components/embed-content-panel';
 
 async function fetchSettingsData() {
   const supabase = await createClient();
@@ -42,6 +43,15 @@ export default async function SettingsPage() {
           content and deliverables.
         </p>
         <WeekUnlockList weeks={weeks} />
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-1 text-sm font-medium text-neutral-200">AI Data</h2>
+        <p className="mb-4 text-xs text-neutral-500">
+          Keep the AI Advisor&apos;s knowledge base current. Indexing is incremental — only
+          content that has changed since the last run is re-processed.
+        </p>
+        <EmbedContentPanel />
       </section>
     </div>
   );
