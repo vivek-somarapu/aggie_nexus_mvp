@@ -6,6 +6,10 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Prevent webpack from bundling these packages — they use Node.js internals
+  // (pdfjs-dist workers, fs reads) that break when bundled. They run fine as
+  // native Node.js modules in API routes.
+  serverExternalPackages: ['pdf-parse', 'mammoth', 'pdfjs-dist'],
   images: {
     remotePatterns: [
       {
