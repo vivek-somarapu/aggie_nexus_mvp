@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import type { AccelProfile, AccelRole } from '@/lib/accel-types';
-import AcceleratorSidebar from './components/accelerator-sidebar';
+import AccelShell from './components/accel-shell';
 
 async function fetchAccelProfile(): Promise<AccelProfile | null> {
   const supabase = await createClient();
@@ -41,12 +41,8 @@ export default async function AcceleratorLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-neutral-950 text-neutral-100">
-      <AcceleratorSidebar role={profile.role as AccelRole} />
-
-      <main className="flex-1 overflow-y-auto">
-        {children}
-      </main>
-    </div>
+    <AccelShell role={profile.role as AccelRole}>
+      {children}
+    </AccelShell>
   );
 }
