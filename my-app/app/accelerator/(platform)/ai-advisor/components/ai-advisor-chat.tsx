@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { Send, Loader2, Sparkles, RotateCcw } from 'lucide-react';
+import { Send, Loader2, Sparkles, RotateCcw, X } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -48,17 +48,20 @@ const ROLE_LABELS: Record<AccelRole, string> = {
 interface AiAdvisorChatProps {
   role: string;
   userName: string;
+  onClose?: () => void;
 }
 
-export default function AiAdvisorChat({ role, userName }: AiAdvisorChatProps) {
+export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChatProps) {
   const accelRole = role as AccelRole;
   const starterPrompts = ROLE_STARTER_PROMPTS[accelRole] ?? [];
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setInput, setMessages } =
-    useChat({
-      api: '/api/accelerator/ai-advisor',
-    });
+  const { messages, sendMessage, setMessages, status } = useChat({
+    api: '/api/accelerator/ai-advisor',
+  });
 
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -75,13 +78,23 @@ export default function AiAdvisorChat({ role, userName }: AiAdvisorChatProps) {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
   }, [input]);
 
+  const submit = () => {
+    const text = input.trim();
+    if (!text || isLoading) return;
+    setInput('');
+    sendMessage({ text });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() && !isLoading) {
-        handleSubmit(e as unknown as React.FormEvent);
-      }
+      submit();
     }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submit();
   };
 
   const useStarterPrompt = (prompt: string) => {
@@ -99,27 +112,40 @@ export default function AiAdvisorChat({ role, userName }: AiAdvisorChatProps) {
   return (
     <div className="flex h-full flex-col">
       {/* ── Header ── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-6 py-4">
+      <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <Sparkles size={15} className="text-purple-400" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-500/15">
+            <Sparkles size={13} className="text-purple-400" />
+          </div>
           <div>
-            <p className="text-sm font-medium text-neutral-100">
+            <p className="text-sm font-medium text-neutral-100 leading-tight">
               {ROLE_LABELS[accelRole]}
             </p>
-            <p className="text-xs text-neutral-600">
-              Powered by Llama 3.3 · Live program data
+            <p className="text-[10px] text-neutral-600 leading-tight mt-0.5">
+              Llama 3.3 · Live program data
             </p>
           </div>
         </div>
-        {hasMessages && (
-          <button
-            onClick={reset}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
-          >
-            <RotateCcw size={11} />
-            New chat
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {hasMessages && (
+            <button
+              onClick={reset}
+              title="New chat"
+              className="flex items-center justify-center h-7 w-7 rounded-md text-neutral-600 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
+            >
+              <RotateCcw size={12} />
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              title="Close"
+              className="flex items-center justify-center h-7 w-7 rounded-md text-neutral-600 transition-colors hover:bg-neutral-800 hover:text-neutral-300"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Message area ── */}
@@ -152,28 +178,37 @@ export default function AiAdvisorChat({ role, userName }: AiAdvisorChatProps) {
         ) : (
           /* Message thread */
           <div className="mx-auto w-full max-w-2xl flex flex-col gap-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={['flex', message.role === 'user' ? 'justify-end' : 'justify-start'].join(' ')}
-              >
-                {message.role === 'assistant' && (
-                  <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-500/20">
-                    <Sparkles size={11} className="text-purple-400" />
-                  </div>
-                )}
+            {messages.map((message) => {
+              const textContent = message.parts
+                .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+                .map((part) => part.text)
+                .join('');
+
+              if (!textContent) return null;
+
+              return (
                 <div
-                  className={[
-                    'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
-                    message.role === 'user'
-                      ? 'rounded-tr-sm bg-neutral-700 text-neutral-100'
-                      : 'rounded-tl-sm bg-neutral-900 text-neutral-200',
-                  ].join(' ')}
+                  key={message.id}
+                  className={['flex', message.role === 'user' ? 'justify-end' : 'justify-start'].join(' ')}
                 >
-                  <MessageContent content={message.content} />
+                  {message.role === 'assistant' && (
+                    <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-500/20">
+                      <Sparkles size={11} className="text-purple-400" />
+                    </div>
+                  )}
+                  <div
+                    className={[
+                      'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
+                      message.role === 'user'
+                        ? 'rounded-tr-sm bg-neutral-700 text-neutral-100'
+                        : 'rounded-tl-sm bg-neutral-900 text-neutral-200',
+                    ].join(' ')}
+                  >
+                    <MessageContent content={textContent} />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {isLoading && (
               <div className="flex justify-start">
@@ -196,12 +231,12 @@ export default function AiAdvisorChat({ role, userName }: AiAdvisorChatProps) {
       {/* ── Input area ── */}
       <div className="shrink-0 border-t border-neutral-800 px-6 py-4">
         <div className="mx-auto max-w-2xl">
-          <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
             <div className="flex-1 overflow-hidden rounded-2xl border border-neutral-700 bg-neutral-900 focus-within:border-neutral-600 transition-colors">
               <textarea
                 ref={textareaRef}
                 value={input}
-                onChange={handleInputChange}
+                onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask about deliverables, traction, curriculum, team progress…"
                 rows={1}

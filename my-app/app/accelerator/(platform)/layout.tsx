@@ -41,7 +41,7 @@ export default async function AcceleratorLayout({
   }
 
   return (
-    <AccelShell role={profile.role as AccelRole}>
+    <AccelShell role={profile.role as AccelRole} userName={profile.full_name ?? ''}>
       {children}
     </AccelShell>
   );

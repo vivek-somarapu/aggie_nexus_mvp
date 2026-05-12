@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { AccelRole } from '@/lib/accel-types';
 import AcceleratorSidebar from './accelerator-sidebar';
+import AiAdvisorChat from '../ai-advisor/components/ai-advisor-chat';
 
 interface AccelShellProps {
   role: AccelRole;
+  userName: string;
   children: React.ReactNode;
 }
 
@@ -61,8 +63,9 @@ function BackgroundRings() {
   );
 }
 
-export default function AccelShell({ role, children }: AccelShellProps) {
+export default function AccelShell({ role, userName, children }: AccelShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-neutral-950 text-neutral-100">
@@ -73,6 +76,8 @@ export default function AccelShell({ role, children }: AccelShellProps) {
         role={role}
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed((prev) => !prev)}
+        isAdvisorOpen={isAdvisorOpen}
+        onAdvisorToggle={() => setIsAdvisorOpen((prev) => !prev)}
       />
 
       {/* Content column: main scrolls, footer stays pinned */}
@@ -81,11 +86,31 @@ export default function AccelShell({ role, children }: AccelShellProps) {
           {children}
         </main>
 
-        <footer className="shrink-0 border-t border-neutral-900 px-6 py-2.5 flex justify-end">
-          <span className="text-[10px] text-neutral-800 tracking-wide">
+        {/* Footer — h-10 to match the sidebar footer exactly */}
+        <footer className="shrink-0 border-t border-neutral-800 h-10 flex items-center justify-end px-6">
+          <span className="text-[10px] text-neutral-400 tracking-wide">
             A Zachary Nowroozi Production
           </span>
         </footer>
+
+        {/* ── AI Advisor overlay panel ── */}
+        {/* Always in the DOM so chat history is preserved across open/close */}
+        <div
+          className={[
+            'absolute right-0 inset-y-0 flex flex-col',
+            'w-[440px] max-w-[calc(100vw-5rem)]',
+            'bg-neutral-950 border-l border-neutral-800',
+            'shadow-[-12px_0_32px_rgba(0,0,0,0.5)]',
+            'transition-transform duration-300 ease-in-out z-30',
+            isAdvisorOpen ? 'translate-x-0' : 'translate-x-full',
+          ].join(' ')}
+        >
+          <AiAdvisorChat
+            role={role}
+            userName={userName}
+            onClose={() => setIsAdvisorOpen(false)}
+          />
+        </div>
       </div>
     </div>
   );

@@ -56,12 +56,6 @@ const NAV_GROUPS: NavGroup[] = [
         icon: LayoutDashboard,
         roles: ['founder', 'aggiex_team', 'mce_staff', 'mentor'],
       },
-      {
-        label: 'AI Advisor',
-        href: '/accelerator/ai-advisor',
-        icon: Sparkles,
-        roles: ['founder', 'aggiex_team', 'mce_staff', 'mentor'],
-      },
     ],
   },
   {
@@ -186,12 +180,16 @@ interface AcceleratorSidebarProps {
   role: AccelRole;
   isCollapsed: boolean;
   onToggle: () => void;
+  isAdvisorOpen: boolean;
+  onAdvisorToggle: () => void;
 }
 
 export default function AcceleratorSidebar({
   role,
   isCollapsed,
   onToggle,
+  isAdvisorOpen,
+  onAdvisorToggle,
 }: AcceleratorSidebarProps) {
   const pathname = usePathname();
 
@@ -320,16 +318,47 @@ export default function AcceleratorSidebar({
             </div>
           </div>
         ))}
+
+        {/* ── AI Advisor toggle — button, not a link ── */}
+        <div>
+          {!isCollapsed && (
+            <p className="mb-1 px-2.5 text-[9px] font-mono uppercase tracking-[0.35em] text-neutral-700">
+              Assistant
+            </p>
+          )}
+          <button
+            onClick={onAdvisorToggle}
+            title={isCollapsed ? 'AI Advisor' : undefined}
+            className={[
+              'w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors',
+              isCollapsed ? 'justify-center' : '',
+              isAdvisorOpen
+                ? 'bg-purple-500/15 text-purple-300'
+                : 'text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200',
+            ].join(' ')}
+          >
+            <Sparkles size={15} strokeWidth={1.75} className="shrink-0" />
+            <span
+              className={`
+                whitespace-nowrap overflow-hidden
+                transition-all duration-150 ease-in-out
+                ${isCollapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100'}
+              `}
+            >
+              AI Advisor
+            </span>
+          </button>
+        </div>
       </nav>
 
-      {/* ── Footer ── */}
-      <div className="border-t border-neutral-800/60 p-2">
+      {/* ── Footer — h-10 to match main content footer ── */}
+      <div className="border-t border-neutral-800 h-10 flex items-center px-2">
         {isCollapsed ? (
           <button
             onClick={onToggle}
             aria-label="Expand sidebar"
-            className="flex w-full items-center justify-center rounded-md p-2
-              text-neutral-600 hover:text-neutral-300 hover:bg-neutral-800
+            className="flex w-full items-center justify-center rounded-md h-7
+              text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800
               transition-colors"
           >
             <ChevronRight size={14} />
@@ -337,8 +366,8 @@ export default function AcceleratorSidebar({
         ) : (
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-md px-2.5 py-2
-              text-xs text-neutral-600 hover:text-neutral-300
+            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 w-full
+              text-xs text-neutral-400 hover:text-neutral-200
               transition-colors"
           >
             <ArrowUpLeft size={12} className="shrink-0" />
