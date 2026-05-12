@@ -29,7 +29,7 @@ const UIMessageSchema = z.object({
 
 const RequestSchema = z.object({
   messages: z.array(UIMessageSchema).min(1).max(20),
-  // Fields sent by the new SDK transport (ignored but allowed)
+  // Fields sent by the SDK transport (ignored but allowed through)
   id: z.string().optional(),
   trigger: z.string().optional(),
   messageId: z.string().optional(),
@@ -39,16 +39,18 @@ const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+function errorResponse(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 export async function POST(request: NextRequest) {
   // Auth check
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  if (!user) return errorResponse('Unauthorized', 401);
 
   // Role check — only accelerator users
   const { data: profile } = await supabase
@@ -57,32 +59,21 @@ export async function POST(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (!profile) {
-    return new Response(JSON.stringify({ error: 'No accelerator profile' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  if (!profile) return errorResponse('No accelerator profile', 403);
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Invalid JSON', 400);
   }
 
   const parsed = RequestSchema.safeParse(body);
   if (!parsed.success) {
-    return new Response(
-      JSON.stringify({ error: 'Validation failed', details: parsed.error.flatten() }),
-      { status: 422, headers: { 'Content-Type': 'application/json' } }
-    );
+    return errorResponse('Invalid request body', 422);
   }
 
-  // Extract the latest user message text for semantic search.
+  // Extract the latest user message text for semantic search
   const lastUserText = parsed.data.messages
     .filter((m) => m.role === 'user')
     .at(-1)
@@ -92,17 +83,24 @@ export async function POST(request: NextRequest) {
     .join(' ')
     .trim() ?? '';
 
-  // Build base context (cached) and semantic context (live, query-specific) in parallel.
-  const [systemPrompt, semanticContext] = await Promise.all([
-    buildSystemPrompt(user.id, profile.role as AccelRole),
-    buildSemanticContext(lastUserText),
-  ]);
+  // Build base context (Redis-cached) and semantic context (live) in parallel
+  let systemPrompt: string;
+  let semanticContext: string;
+  try {
+    [systemPrompt, semanticContext] = await Promise.all([
+      buildSystemPrompt(user.id, profile.role as AccelRole),
+      buildSemanticContext(lastUserText),
+    ]);
+  } catch (error) {
+    console.error('[ai-advisor] Context build failed:', error);
+    return errorResponse('Failed to load program context', 500);
+  }
 
   const fullSystemPrompt = semanticContext
     ? `${systemPrompt}\n\n${semanticContext}`
     : systemPrompt;
 
-  // convertToModelMessages converts UIMessage[] (parts-based) to ModelMessage[] for streamText
+  // convertToModelMessages converts UIMessage[] (parts-based) into ModelMessage[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const modelMessages = convertToModelMessages(parsed.data.messages as any[]);
 
@@ -114,5 +112,7 @@ export async function POST(request: NextRequest) {
     temperature: 0.3,
   });
 
-  return result.toUIMessageStreamResponse();
+  // toTextStreamResponse streams plain text — pairs with TextStreamChatTransport
+  // on the client. Simpler and more reliable than the UIMessage chunk protocol.
+  return result.toTextStreamResponse();
 }

@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
-import { Send, Loader2, Sparkles, RotateCcw, X } from 'lucide-react';
+import { TextStreamChatTransport } from 'ai';
+import { Send, Loader2, Sparkles, RotateCcw, X, AlertCircle } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ const ROLE_LABELS: Record<AccelRole, string> = {
   mentor: 'Mentor Advisor',
 };
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 interface AiAdvisorChatProps {
   role: string;
@@ -56,8 +56,10 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   const accelRole = role as AccelRole;
   const starterPrompts = ROLE_STARTER_PROMPTS[accelRole] ?? [];
 
-  const { messages, sendMessage, setMessages, status } = useChat({
-    transport: new DefaultChatTransport({ api: '/api/accelerator/ai-advisor' }),
+  // TextStreamChatTransport pairs with toTextStreamResponse() on the server.
+  // Plain text stream — simpler and more reliable than UIMessage chunk protocol.
+  const { messages, sendMessage, setMessages, status, error } = useChat({
+    transport: new TextStreamChatTransport({ api: '/api/accelerator/ai-advisor' }),
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
@@ -180,12 +182,8 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
           /* Message thread */
           <div className="mx-auto w-full max-w-2xl flex flex-col gap-4">
             {messages.map((message) => {
-              const textContent = message.parts
-                .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-                .map((part) => part.text)
-                .join('');
-
-              if (!textContent) return null;
+              const textContent = extractText(message);
+              if (!textContent && message.role !== 'user') return null;
 
               return (
                 <div
@@ -205,12 +203,16 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
                         : 'rounded-tl-sm bg-neutral-900 text-neutral-200',
                     ].join(' ')}
                   >
-                    <MessageContent content={textContent} />
+                    {textContent
+                      ? <MessageContent content={textContent} />
+                      : <span className="text-neutral-600 italic text-xs">No content</span>
+                    }
                   </div>
                 </div>
               );
             })}
 
+            {/* Streaming indicator */}
             {isLoading && (
               <div className="flex justify-start">
                 <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-500/20">
@@ -220,6 +222,17 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.3s]" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.15s]" />
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500" />
+                </div>
+              </div>
+            )}
+
+            {/* Error state */}
+            {status === 'error' && error && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3">
+                <AlertCircle size={13} className="mt-0.5 shrink-0 text-red-400" />
+                <div>
+                  <p className="text-xs font-medium text-red-300">Something went wrong</p>
+                  <p className="mt-0.5 text-xs text-red-400/70">{error.message}</p>
                 </div>
               </div>
             )}
@@ -258,7 +271,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
             </button>
           </form>
           <p className="mt-2 text-center text-[10px] text-neutral-700">
-            Enter to send · Shift+Enter for new line · Data refreshes each session
+            Enter to send · Shift+Enter for new line
           </p>
         </div>
       </div>
@@ -266,8 +279,29 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   );
 }
 
+// ─── Text extraction ───────────────────────────────────────────────────────────
+// Handles both the UIMessage parts-based format and any legacy content field.
+
+function extractText(message: { parts?: unknown; content?: unknown }): string {
+  // Primary path: parts array (AI SDK v6 format)
+  if (Array.isArray(message.parts)) {
+    const text = message.parts
+      .filter((p): p is { type: string; text: string } =>
+        typeof p === 'object' && p !== null && (p as Record<string, unknown>).type === 'text',
+      )
+      .map((p) => p.text)
+      .join('');
+    if (text) return text;
+  }
+
+  // Fallback: legacy string content field
+  if (typeof message.content === 'string') return message.content;
+
+  return '';
+}
+
 // ─── Message content renderer ─────────────────────────────────────────────────
-// Very lightweight markdown: bold, code, and bullet lists without a heavy library
+// Lightweight markdown: headers, bold, code, and bullet lists.
 
 function MessageContent({ content }: { content: string }) {
   const lines = content.split('\n');
@@ -307,7 +341,6 @@ function MessageContent({ content }: { content: string }) {
 }
 
 function renderInline(text: string): React.ReactNode {
-  // Handle **bold** and `code` inline
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) {
