@@ -52,6 +52,7 @@ async function fetchBatch(texts: string[], apiKey: string): Promise<number[][]> 
       model: JINA_MODEL,
       input: texts,
       dimensions: EMBEDDING_DIMENSIONS,
+      truncate: true,
     }),
   });
 
