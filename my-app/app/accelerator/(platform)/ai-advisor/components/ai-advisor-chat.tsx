@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { Send, Loader2, Sparkles, RotateCcw, X } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -56,7 +57,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   const starterPrompts = ROLE_STARTER_PROMPTS[accelRole] ?? [];
 
   const { messages, sendMessage, setMessages, status } = useChat({
-    api: '/api/accelerator/ai-advisor',
+    transport: new DefaultChatTransport({ api: '/api/accelerator/ai-advisor' }),
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
