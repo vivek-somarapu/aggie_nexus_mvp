@@ -1,21 +1,38 @@
 import { createGroq } from '@ai-sdk/groq';
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { buildSystemPrompt } from '@/lib/ai/context-builder';
+import { buildSystemPrompt, buildSemanticContext } from '@/lib/ai/context-builder';
 import type { AccelRole } from '@/lib/accel-types';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
+// UIMessage parts schema — only validate the shape we care about
+const TextPartSchema = z.object({
+  type: z.literal('text'),
+  text: z.string().max(4000),
+});
+
+const AnyPartSchema = z.union([
+  TextPartSchema,
+  z.object({ type: z.string() }).passthrough(),
+]);
+
+const UIMessageSchema = z.object({
+  id: z.string(),
+  role: z.enum(['user', 'assistant', 'system']),
+  parts: z.array(AnyPartSchema),
+  metadata: z.unknown().optional(),
+});
+
 const RequestSchema = z.object({
-  messages: z.array(
-    z.object({
-      role: z.enum(['user', 'assistant']),
-      content: z.string().max(4000),
-    })
-  ).min(1).max(20),
+  messages: z.array(UIMessageSchema).min(1).max(20),
+  // Fields sent by the new SDK transport (ignored but allowed)
+  id: z.string().optional(),
+  trigger: z.string().optional(),
+  messageId: z.string().optional(),
 });
 
 const groq = createGroq({
@@ -65,15 +82,37 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const systemPrompt = await buildSystemPrompt(user.id, profile.role as AccelRole);
+  // Extract the latest user message text for semantic search.
+  const lastUserText = parsed.data.messages
+    .filter((m) => m.role === 'user')
+    .at(-1)
+    ?.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join(' ')
+    .trim() ?? '';
+
+  // Build base context (cached) and semantic context (live, query-specific) in parallel.
+  const [systemPrompt, semanticContext] = await Promise.all([
+    buildSystemPrompt(user.id, profile.role as AccelRole),
+    buildSemanticContext(lastUserText),
+  ]);
+
+  const fullSystemPrompt = semanticContext
+    ? `${systemPrompt}\n\n${semanticContext}`
+    : systemPrompt;
+
+  // convertToModelMessages converts UIMessage[] (parts-based) to ModelMessage[] for streamText
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const modelMessages = convertToModelMessages(parsed.data.messages as any[]);
 
   const result = streamText({
     model: groq('llama-3.3-70b-versatile'),
-    system: systemPrompt,
-    messages: parsed.data.messages,
+    system: fullSystemPrompt,
+    messages: modelMessages,
     maxTokens: 1024,
     temperature: 0.3,
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }

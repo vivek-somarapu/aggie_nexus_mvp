@@ -558,3 +558,132 @@ export async function buildSystemPrompt(userId: string, role: AccelRole): Promis
   // Today's date is composed outside the cache so it is always accurate.
   return `${preamble}\n\nToday's date: ${format(new Date(), 'MMMM d, yyyy')}.\n\n---\nPROGRAM DATA (live, pulled from database):\n${context}\n---`;
 }
+
+// ─── Semantic context ─────────────────────────────────────────────────────────
+
+const SEMANTIC_SIMILARITY_THRESHOLD = 0.75;
+const SEMANTIC_MATCH_LIMIT = 5;
+// Truncate long submission text to keep injected tokens lean.
+const SUBMISSION_PREVIEW_LENGTH = 300;
+
+interface SemanticMatch {
+  sourceTable: string;
+  sourceId: string;
+  similarity: number;
+  snippet: string;
+}
+
+/**
+ * Embeds the user's latest query, runs a cosine similarity search across all
+ * embedded content, and returns a formatted block ready to append to the
+ * system prompt. Returns an empty string if Jina is unconfigured, the query
+ * is empty, or no matches exceed the similarity threshold.
+ *
+ * This is an opt-in helper — the core buildSystemPrompt() path is unaffected.
+ */
+export async function buildSemanticContext(query: string): Promise<string> {
+  if (!query.trim()) return '';
+  if (!process.env.JINA_API_KEY) return '';
+
+  // Dynamic import avoids loading the embedder on paths that never use it.
+  const { embedText } = await import('@/lib/ai/embedder');
+  const supabase = await createClient();
+
+  let queryVector: number[];
+  try {
+    queryVector = await embedText(query);
+  } catch (error) {
+    console.error('[buildSemanticContext] Failed to embed query:', error);
+    return '';
+  }
+
+  const { data: matches, error: rpcError } = await supabase.rpc('match_embeddings', {
+    query_embedding: queryVector,
+    match_threshold: SEMANTIC_SIMILARITY_THRESHOLD,
+    match_count: SEMANTIC_MATCH_LIMIT,
+    filter_source: null,
+  });
+
+  if (rpcError) {
+    console.error('[buildSemanticContext] match_embeddings RPC failed:', rpcError);
+    return '';
+  }
+
+  if (!matches?.length) return '';
+
+  const hydrated = await Promise.all(
+    (matches as Array<{ source_table: string; source_id: string; similarity: number }>).map(
+      (match) => hydrateSnippet(match, supabase),
+    ),
+  );
+
+  const valid = hydrated.filter((s): s is SemanticMatch => s !== null);
+  if (valid.length === 0) return '';
+
+  const lines = [
+    '## SEMANTICALLY RELEVANT CONTENT (matched to your query)',
+    ...valid.map(
+      (s) => `  [${s.sourceTable}, similarity: ${s.similarity.toFixed(2)}] ${s.snippet}`,
+    ),
+  ];
+
+  return lines.join('\n');
+}
+
+async function hydrateSnippet(
+  match: { source_table: string; source_id: string; similarity: number },
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<SemanticMatch | null> {
+  const { source_table, source_id, similarity } = match;
+
+  if (source_table === 'accel_curriculum_files') {
+    const { data } = await supabase
+      .from('accel_curriculum_files')
+      .select('title, description')
+      .eq('id', source_id)
+      .single();
+    if (!data) return null;
+    const snippet = `${data.title}${data.description ? `: ${data.description}` : ''}`;
+    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
+  }
+
+  if (source_table === 'accel_deliverables') {
+    const { data } = await supabase
+      .from('accel_deliverables')
+      .select('title, expected_format')
+      .eq('id', source_id)
+      .single();
+    if (!data) return null;
+    const snippet = `${data.title} (format: ${data.expected_format})`;
+    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
+  }
+
+  if (source_table === 'accel_submissions') {
+    const { data } = await supabase
+      .from('accel_submissions')
+      .select('text_content')
+      .eq('id', source_id)
+      .single();
+    if (!data?.text_content) return null;
+    const text = data.text_content as string;
+    const preview = text.length > SUBMISSION_PREVIEW_LENGTH
+      ? `${text.slice(0, SUBMISSION_PREVIEW_LENGTH)}…`
+      : text;
+    return { sourceTable: source_table, sourceId: source_id, similarity, snippet: preview };
+  }
+
+  if (source_table === 'accel_meeting_records') {
+    const { data } = await supabase
+      .from('accel_meeting_records')
+      .select('notes, meeting_date, meeting_type')
+      .eq('id', source_id)
+      .single();
+    if (!data?.notes) return null;
+    const notes = data.notes as string;
+    const preview = notes.length > 200 ? `${notes.slice(0, 200)}…` : notes;
+    const snippet = `${fmtDate(data.meeting_date)} ${data.meeting_type}: ${preview}`;
+    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
+  }
+
+  return null;
+}
