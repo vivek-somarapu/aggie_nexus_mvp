@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUpLeft,
+  Sparkles,
 } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -53,6 +54,12 @@ const NAV_GROUPS: NavGroup[] = [
         label: 'Dashboard',
         href: '/accelerator/dashboard',
         icon: LayoutDashboard,
+        roles: ['founder', 'aggiex_team', 'mce_staff', 'mentor'],
+      },
+      {
+        label: 'AI Advisor',
+        href: '/accelerator/ai-advisor',
+        icon: Sparkles,
         roles: ['founder', 'aggiex_team', 'mce_staff', 'mentor'],
       },
     ],
