@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   // convertToModelMessages converts UIMessage[] (parts-based) into ModelMessage[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const modelMessages = convertToModelMessages(parsed.data.messages as any[]);
+  const modelMessages = await convertToModelMessages(parsed.data.messages as any[]);
 
   const result = streamText({
     model: groq('llama-3.3-70b-versatile'),
