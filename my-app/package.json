@@ -31,6 +31,7 @@
     "@tailwindcss/oxide": "^4.1.8",
     "@tailwindcss/postcss": "^4.1.8",
     "@uidotdev/usehooks": "^2.4.1",
+    "@upstash/redis": "^1.38.0",
     "@vercel/analytics": "^1.5.0",
     "ai": "^6.0.180",
     "cheerio": "^1.0.0",

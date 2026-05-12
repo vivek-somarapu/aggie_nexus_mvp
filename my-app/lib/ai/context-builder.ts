@@ -9,6 +9,37 @@ import { createClient } from '@/lib/supabase/server';
 import { format, parseISO } from 'date-fns';
 import { AGGIEX_2026_PROGRAM_ID } from '@/lib/accel-types';
 import type { AccelRole } from '@/lib/accel-types';
+import { getRedis } from '@/lib/redis';
+
+// ─── Cache config ─────────────────────────────────────────────────────────────
+
+// 5-minute TTL balances data freshness against cold-start latency.
+// Accelerator data changes infrequently within a single session window.
+const CONTEXT_CACHE_TTL_SECONDS = 300;
+
+/**
+ * Returns the cached context string for a given key, or builds it fresh and
+ * populates the cache. Degrades silently to live fetches when Redis is absent.
+ */
+async function withContextCache(
+  cacheKey: string,
+  buildFn: () => Promise<string>,
+): Promise<string> {
+  const redis = getRedis();
+
+  if (redis) {
+    const cached = await redis.get<string>(cacheKey);
+    if (cached) return cached;
+  }
+
+  const context = await buildFn();
+
+  if (redis) {
+    await redis.setex(cacheKey, CONTEXT_CACHE_TTL_SECONDS, context);
+  }
+
+  return context;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -511,14 +542,19 @@ const ROLE_PREAMBLES: Record<AccelRole, string> = {
 export async function buildSystemPrompt(userId: string, role: AccelRole): Promise<string> {
   const preamble = ROLE_PREAMBLES[role];
 
-  let context: string;
-  if (role === 'founder') {
-    context = await buildFounderContext(userId);
-  } else if (role === 'aggiex_team' || role === 'mce_staff') {
-    context = await buildAdminContext();
-  } else {
-    context = await buildMentorContext(userId);
-  }
+  // Admin context is identical for every aggiex/mce user — share one cache entry.
+  // Founder and mentor context is personal — scope the key by userId.
+  const isAdminRole = role === 'aggiex_team' || role === 'mce_staff';
+  const cacheKey = isAdminRole
+    ? `accel:ctx:admin`
+    : `accel:ctx:${role}:${userId}`;
 
+  const context = await withContextCache(cacheKey, () => {
+    if (role === 'founder') return buildFounderContext(userId);
+    if (isAdminRole) return buildAdminContext();
+    return buildMentorContext(userId);
+  });
+
+  // Today's date is composed outside the cache so it is always accurate.
   return `${preamble}\n\nToday's date: ${format(new Date(), 'MMMM d, yyyy')}.\n\n---\nPROGRAM DATA (live, pulled from database):\n${context}\n---`;
 }
