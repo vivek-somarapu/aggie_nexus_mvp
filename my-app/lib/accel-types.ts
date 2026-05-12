@@ -76,6 +76,8 @@ export type AccelVisibleTo = 'all' | 'aggiex_team' | 'founders' | 'mentors';
 
 export type AccelFundingStatus = 'on_track' | 'paused' | 'probation' | 'exited';
 
+export type AccelFundType = 'dilutive' | 'non_dilutive';
+
 export type AccelReviewVisibility = 'team' | 'internal';
 
 // ============================================================
@@ -314,6 +316,34 @@ export interface AccelProgramEvent {
   created_at: string;
 }
 
+export interface AccelFundingEvent {
+  id: string;
+  team_id: string;
+  program_id: string;
+  fund_type: AccelFundType;
+  amount: number;
+  source: string;
+  acquired_at: string;
+  notes: string | null;
+  logged_by: string | null;
+  created_at: string;
+}
+
+export interface AccelMentorProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  bio: string | null;
+  company: string | null;
+  title: string | null;
+  linkedin_url: string | null;
+  expertise_tags: string[];
+  tier: AccelMentorTier;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AccelMilestoneFunding {
   id: string;
   team_id: string;
@@ -395,6 +425,11 @@ export const FUNDING_STATUS_LABELS: Record<AccelFundingStatus, string> = {
   paused: 'Paused',
   probation: 'Probation',
   exited: 'Exited',
+};
+
+export const FUND_TYPE_LABELS: Record<AccelFundType, string> = {
+  dilutive: 'Dilutive',
+  non_dilutive: 'Non-Dilutive',
 };
 
 export const CRUCIBLE_OUTCOME_LABELS: Record<AccelCrucibleOutcome, string> = {

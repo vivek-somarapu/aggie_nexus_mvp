@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { format, parseISO } from 'date-fns';
 import LogMeetingForm from './components/log-meeting-form';
 import type { AccelMeetingType } from '@/lib/accel-types';
 
@@ -76,7 +77,6 @@ export default async function MyTeamMeetingsPage() {
           </h2>
           <div className="flex flex-col gap-3">
             {meetings.map((meeting) => {
-              const meetingDate = new Date(meeting.meeting_date + 'T00:00:00');
               const weekNumber = (meeting.accel_weeks as { week_number: number } | null)?.week_number;
 
               return (
@@ -102,10 +102,7 @@ export default async function MyTeamMeetingsPage() {
                         </span>
                       )}
                       <span className="text-xs text-neutral-500">
-                        {meetingDate.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                        {format(parseISO(meeting.meeting_date), 'MMM d, yyyy')}
                       </span>
                     </div>
                   </div>

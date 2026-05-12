@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { format, parseISO } from 'date-fns';
 import type { AccelRole, AccelMetricType } from '@/lib/accel-types';
 
 const METRIC_TYPE_LABELS: Record<AccelMetricType, string> = {
@@ -173,7 +174,6 @@ export default async function TractionPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {entries.map((entry) => {
-              const entryDate = new Date(entry.entry_date + 'T00:00:00');
               const teamName = (entry.accel_teams as { name: string } | null)?.name;
               const weekNumber = (entry.accel_weeks as { week_number: number } | null)?.week_number;
               const metricType = entry.metric_type as AccelMetricType;
@@ -206,7 +206,7 @@ export default async function TractionPage() {
                       {entry.value.toLocaleString()} {entry.unit}
                     </p>
                     <p className="text-xs text-neutral-600">
-                      {entryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {format(parseISO(entry.entry_date), 'MMM d, yyyy')}
                     </p>
                   </div>
                 </div>

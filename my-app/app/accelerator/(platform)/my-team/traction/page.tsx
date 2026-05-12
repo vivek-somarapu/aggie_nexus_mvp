@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { format, parseISO } from 'date-fns';
 import LogTractionForm from './components/log-traction-form';
 import type { AccelMetricType } from '@/lib/accel-types';
 
@@ -107,7 +108,6 @@ export default async function MyTeamTractionPage() {
           </h2>
           <div className="flex flex-col gap-2">
             {tractionEntries.map((entry) => {
-              const entryDate = new Date(entry.entry_date + 'T00:00:00');
               const weekNumber = (entry.accel_weeks as { week_number: number } | null)?.week_number;
               const metricType = entry.metric_type as AccelMetricType;
 
@@ -136,7 +136,7 @@ export default async function MyTeamTractionPage() {
                       {entry.value.toLocaleString()} {entry.unit}
                     </p>
                     <p className="text-xs text-neutral-600">
-                      {entryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {format(parseISO(entry.entry_date), 'MMM d, yyyy')}
                     </p>
                   </div>
                 </div>
