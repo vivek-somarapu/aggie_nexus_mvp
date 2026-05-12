@@ -31,6 +31,7 @@ const SOURCE_LABELS: Record<string, string> = {
   accel_deliverables: 'Deliverables',
   accel_submissions: 'Submissions',
   accel_meeting_records: 'Meeting notes',
+  accel_context_docs: 'Context docs',
 };
 
 function formatDuration(ms: number): string {

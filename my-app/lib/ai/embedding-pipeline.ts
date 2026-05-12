@@ -16,7 +16,8 @@ type EmbeddingSource =
   | 'accel_curriculum_files'
   | 'accel_deliverables'
   | 'accel_submissions'
-  | 'accel_meeting_records';
+  | 'accel_meeting_records'
+  | 'accel_context_docs';
 
 interface EmbeddingRow {
   source_table: EmbeddingSource;
@@ -238,10 +239,45 @@ async function embedMeetingRecords(): Promise<EmbedSourceResult> {
   return { source, upserted: rows.length, skipped: meetings.length - rows.length };
 }
 
+async function embedContextDocs(): Promise<EmbedSourceResult> {
+  const source: EmbeddingSource = 'accel_context_docs';
+  const supabase = createAdminClient();
+
+  const { data: docs, error } = await supabase
+    .from('accel_context_docs')
+    .select('id, title, content');
+
+  if (error) throw new Error(`Failed to fetch context docs: ${error.message}`);
+  if (!docs?.length) return { source, upserted: 0, skipped: 0 };
+
+  const existingHashes = await fetchExistingHashes(source);
+
+  const toEmbed = docs.filter((doc) => {
+    const text = `${doc.title}\n\n${doc.content}`;
+    return existingHashes.get(doc.id) !== md5(text);
+  });
+
+  if (toEmbed.length === 0) return { source, upserted: 0, skipped: docs.length };
+
+  const texts = toEmbed.map((doc) => `${doc.title}\n\n${doc.content}`);
+  const embedded = await embedBatch(texts);
+
+  const rows: EmbeddingRow[] = toEmbed.map((doc, i) => ({
+    source_table: source,
+    source_id: doc.id,
+    content_hash: md5(texts[i]),
+    embedding: embedded[i].vector,
+    embedded_at: new Date().toISOString(),
+  }));
+
+  await upsertEmbeddings(rows);
+  return { source, upserted: rows.length, skipped: docs.length - rows.length };
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Re-embeds all four source tables. Sources run in parallel since each
+ * Re-embeds all five source tables. Sources run in parallel since each
  * calls a separate Supabase table and a separate Jina batch — no shared
  * resource contention. Idempotent: unchanged rows are skipped via MD5 hash.
  */
@@ -253,6 +289,7 @@ export async function embedAllSources(): Promise<EmbedAllResult> {
     embedDeliverables(),
     embedSubmissions(),
     embedMeetingRecords(),
+    embedContextDocs(),
   ]);
 
   const totalUpserted = results.reduce((sum, r) => sum + r.upserted, 0);

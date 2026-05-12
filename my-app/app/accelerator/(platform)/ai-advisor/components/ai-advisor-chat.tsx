@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
-import { Send, Loader2, Sparkles, RotateCcw, X, AlertCircle } from 'lucide-react';
+import Image from 'next/image';
+import { Send, Loader2, RotateCcw, X, AlertCircle } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -117,15 +118,21 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
       {/* ── Header ── */}
       <div className="flex shrink-0 items-center justify-between border-b border-neutral-800 px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-500/15">
-            <Sparkles size={13} className="text-purple-400" />
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+            <Image
+              src="/images/AggieX_logo_X.png"
+              alt="AggieX"
+              width={20}
+              height={20}
+              className="object-contain"
+            />
           </div>
           <div>
             <p className="text-sm font-medium text-neutral-100 leading-tight">
               {ROLE_LABELS[accelRole]}
             </p>
             <p className="text-[10px] text-neutral-600 leading-tight mt-0.5">
-              Llama 3.3 · Live program data
+              AggieX Advisor · Live program data
             </p>
           </div>
         </div>
@@ -156,8 +163,14 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
         {!hasMessages ? (
           /* Empty state — starter prompts */
           <div className="my-auto flex flex-col items-center">
-            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-purple-500/10">
-              <Sparkles size={18} className="text-purple-400" />
+            <div className="mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white">
+              <Image
+                src="/images/AggieX_logo_X.png"
+                alt="AggieX"
+                width={28}
+                height={28}
+                className="object-contain"
+              />
             </div>
             <p className="mt-3 text-sm font-medium text-neutral-200">
               Hi {userName.split(' ')[0]}, ask me anything.
@@ -191,8 +204,14 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
                   className={['flex', message.role === 'user' ? 'justify-end' : 'justify-start'].join(' ')}
                 >
                   {message.role === 'assistant' && (
-                    <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-500/20">
-                      <Sparkles size={11} className="text-purple-400" />
+                    <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+                      <Image
+                        src="/images/AggieX_logo_X.png"
+                        alt="AggieX"
+                        width={16}
+                        height={16}
+                        className="object-contain"
+                      />
                     </div>
                   )}
                   <div
@@ -215,8 +234,14 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
             {/* Streaming indicator */}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-purple-500/20">
-                  <Sparkles size={11} className="text-purple-400" />
+                <div className="mr-2 mt-1 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+                  <Image
+                    src="/images/AggieX_logo_X.png"
+                    alt="AggieX"
+                    width={16}
+                    height={16}
+                    className="object-contain"
+                  />
                 </div>
                 <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm bg-neutral-900 px-4 py-3">
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.3s]" />

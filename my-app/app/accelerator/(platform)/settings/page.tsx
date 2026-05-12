@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import WeekUnlockList from './components/week-unlock-list';
 import EmbedContentPanel from './components/embed-content-panel';
+import ContextDocsPanel from './components/context-docs-panel';
 
 async function fetchSettingsData() {
   const supabase = await createClient();
@@ -16,16 +17,27 @@ async function fetchSettingsData() {
 
   if (profile?.role !== 'aggiex_team') redirect('/accelerator/dashboard');
 
-  const { data: weeks } = await supabase
-    .from('accel_weeks')
-    .select('id, week_number, theme, start_date, end_date, is_unlocked, unlocked_at, intensity')
-    .order('week_number');
+  const [weeksResult, teamsResult] = await Promise.all([
+    supabase
+      .from('accel_weeks')
+      .select('id, week_number, theme, start_date, end_date, is_unlocked, unlocked_at, intensity')
+      .order('week_number'),
 
-  return { weeks: weeks ?? [] };
+    supabase
+      .from('accel_teams')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name'),
+  ]);
+
+  return {
+    weeks: weeksResult.data ?? [],
+    teams: teamsResult.data ?? [],
+  };
 }
 
 export default async function SettingsPage() {
-  const { weeks } = await fetchSettingsData();
+  const { weeks, teams } = await fetchSettingsData();
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
@@ -46,12 +58,15 @@ export default async function SettingsPage() {
       </section>
 
       <section className="mt-10">
-        <h2 className="mb-1 text-sm font-medium text-neutral-200">AI Data</h2>
+        <h2 className="mb-1 text-sm font-medium text-neutral-200">AI Knowledge Base</h2>
         <p className="mb-4 text-xs text-neutral-500">
-          Keep the AI Advisor&apos;s knowledge base current. Indexing is incremental — only
-          content that has changed since the last run is re-processed.
+          Upload reference documents and sync all content so the AI Advisor can surface relevant
+          context. Run a sync after uploading documents or at the end of each week.
         </p>
-        <EmbedContentPanel />
+        <div className="space-y-4">
+          <ContextDocsPanel teams={teams} />
+          <EmbedContentPanel />
+        </div>
       </section>
     </div>
   );

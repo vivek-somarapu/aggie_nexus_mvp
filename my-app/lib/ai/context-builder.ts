@@ -685,5 +685,19 @@ async function hydrateSnippet(
     return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
   }
 
+  if (source_table === 'accel_context_docs') {
+    const { data } = await supabase
+      .from('accel_context_docs')
+      .select('title, content')
+      .eq('id', source_id)
+      .single();
+    if (!data) return null;
+    const preview = data.content.length > 300
+      ? `${data.content.slice(0, 300)}…`
+      : data.content;
+    const snippet = `${data.title}: ${preview}`;
+    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
+  }
+
   return null;
 }
