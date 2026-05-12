@@ -1,87 +1,57 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import type {
-  AccelProfile,
-  AccelWeek,
-  AccelTeam,
-  AccelSubmission,
-  AccelMilestoneFunding,
-  AccelTractionEntry,
-  AccelDailyReport,
-  AccelProgramEvent,
-  AccelMentorAssessment,
-  AccelFundingStatus,
-  AGGIEX_2026_PROGRAM_ID,
-} from '@/lib/accel-types';
-import { ACCEL_ROLES } from '@/lib/accel-types';
+import type { AccelProfile, AccelProgramEvent } from '@/lib/accel-types';
+import { AGGIEX_2026_PROGRAM_ID } from '@/lib/accel-types';
 import AggiexTeamDashboard from './components/aggiex-team-dashboard';
 import FounderDashboard from './components/founder-dashboard';
 import MentorDashboard from './components/mentor-dashboard';
 import MceStaffDashboard from './components/mce-staff-dashboard';
 
-// Fetch profile and branch to role-specific dashboard data fetcher
-async function fetchDashboardData(profile: AccelProfile) {
-  const supabase = await createClient();
+// ─── Admin / MCE staff fetcher ────────────────────────────────────────────────
 
-  if (profile.role === 'aggiex_team' || profile.role === 'mce_staff') {
-    return fetchAdminDashboardData(supabase, profile);
-  }
+async function fetchAdminDashboardData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  profile: AccelProfile
+) {
+  const [teamsResult, currentWeekResult, upcomingEventsResult, mentorsResult, allWeeksResult] =
+    await Promise.all([
+      supabase
+        .from('accel_teams')
+        .select('*, accel_milestone_funding (*)')
+        .eq('is_active', true)
+        .order('name'),
 
-  if (profile.role === 'founder') {
-    return fetchFounderDashboardData(supabase, profile);
-  }
+      supabase
+        .from('accel_weeks')
+        .select('*')
+        .lte('start_date', new Date().toISOString().split('T')[0])
+        .order('week_number', { ascending: false })
+        .limit(1)
+        .single(),
 
-  if (profile.role === 'mentor') {
-    return fetchMentorDashboardData(supabase, profile);
-  }
+      supabase
+        .from('accel_program_events')
+        .select('*')
+        .gte('event_date', new Date().toISOString().split('T')[0])
+        .order('event_date')
+        .limit(5),
 
-  return null;
-}
+      supabase
+        .from('accel_profiles')
+        .select('id, full_name, email, accel_mentor_assignments (team_id, tier, accel_teams (name))')
+        .eq('role', 'mentor')
+        .eq('is_active', true)
+        .order('full_name'),
 
-async function fetchAdminDashboardData(supabase: Awaited<ReturnType<typeof createClient>>, profile: AccelProfile) {
-  const [teamsResult, currentWeekResult, upcomingEventsResult, mentorsResult, allWeeksResult] = await Promise.all([
-    supabase
-      .from('accel_teams')
-      .select(`
-        *,
-        accel_milestone_funding (*)
-      `)
-      .eq('is_active', true)
-      .order('name'),
+      supabase
+        .from('accel_weeks')
+        .select('id, week_number, theme, is_unlocked, start_date, end_date')
+        .order('week_number'),
+    ]);
 
-    supabase
-      .from('accel_weeks')
-      .select('*')
-      .lte('start_date', new Date().toISOString().split('T')[0])
-      .order('week_number', { ascending: false })
-      .limit(1)
-      .single(),
-
-    supabase
-      .from('accel_program_events')
-      .select('*')
-      .gte('event_date', new Date().toISOString().split('T')[0])
-      .order('event_date')
-      .limit(5),
-
-    supabase
-      .from('accel_profiles')
-      .select(`
-        id, full_name, email,
-        accel_mentor_assignments (team_id, tier, accel_teams (name))
-      `)
-      .eq('role', 'mentor')
-      .eq('is_active', true)
-      .order('full_name'),
-
-    supabase
-      .from('accel_weeks')
-      .select('id, week_number, theme, is_unlocked, start_date, end_date')
-      .order('week_number'),
-  ]);
-
-  // For the current week, fetch submission status per team
   const currentWeek = currentWeekResult.data;
+
+  // Submission summary per team for the current week
   let submissionSummary: Array<{
     team_id: string;
     submitted_count: number;
@@ -103,8 +73,7 @@ async function fetchAdminDashboardData(supabase: Awaited<ReturnType<typeof creat
         .select('team_id, status, deliverable_id')
         .in('deliverable_id', deliverableIds);
 
-      const teams: AccelTeam[] = teamsResult.data ?? [];
-
+      const teams = teamsResult.data ?? [];
       submissionSummary = teams.map((team) => {
         const teamSubmissions = submissions?.filter((s) => s.team_id === team.id) ?? [];
         return {
@@ -133,19 +102,29 @@ async function fetchAdminDashboardData(supabase: Awaited<ReturnType<typeof creat
   };
 }
 
-async function fetchFounderDashboardData(supabase: Awaited<ReturnType<typeof createClient>>, profile: AccelProfile) {
-  if (!profile.team_id) return { role: profile.role, team: null };
+// ─── Founder fetcher ──────────────────────────────────────────────────────────
 
-  const [teamResult, currentWeekResult, upcomingEventsResult, recentMeetingsResult] = await Promise.all([
-    supabase
-      .from('accel_teams')
-      .select('*')
-      .eq('id', profile.team_id)
-      .single(),
+async function fetchFounderDashboardData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  profile: AccelProfile
+) {
+  if (!profile.team_id) {
+    return { role: profile.role, team: null };
+  }
+
+  const [
+    teamResult,
+    currentWeekResult,
+    upcomingEventsResult,
+    recentMeetingsResult,
+    mentorAssignmentsResult,
+    tractionCountResult,
+  ] = await Promise.all([
+    supabase.from('accel_teams').select('id, name').eq('id', profile.team_id).single(),
 
     supabase
       .from('accel_weeks')
-      .select('*')
+      .select('id, week_number, theme')
       .eq('is_unlocked', true)
       .order('week_number', { ascending: false })
       .limit(1)
@@ -153,7 +132,7 @@ async function fetchFounderDashboardData(supabase: Awaited<ReturnType<typeof cre
 
     supabase
       .from('accel_program_events')
-      .select('*')
+      .select('id, title, event_date, is_mandatory, event_type')
       .gte('event_date', new Date().toISOString().split('T')[0])
       .in('visible_to', ['all', 'founders'])
       .order('event_date')
@@ -161,51 +140,144 @@ async function fetchFounderDashboardData(supabase: Awaited<ReturnType<typeof cre
 
     supabase
       .from('accel_meeting_records')
-      .select('id, meeting_type, meeting_date, duration_minutes, attendees')
+      .select('id, meeting_type, meeting_date, duration_minutes')
       .eq('team_id', profile.team_id)
       .order('meeting_date', { ascending: false })
       .limit(3),
+
+    // Mentor assignments for this team
+    supabase
+      .from('accel_mentor_assignments')
+      .select('id, mentor_id, tier, assigned_weeks, accel_profiles!mentor_id (full_name, email)')
+      .eq('team_id', profile.team_id),
+
+    // How many traction entries logged this program
+    supabase
+      .from('accel_traction_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('team_id', profile.team_id),
   ]);
 
   const currentWeek = currentWeekResult.data;
-  let deliverables: Array<{ id: string; title: string; submission: { status: string } | null }> = [];
+
+  // Fetch deliverables and submissions separately to avoid inner-join exclusion
+  let deliverables: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    is_required: boolean;
+    expected_format: string;
+    submission: {
+      id: string;
+      status: string;
+      text_content: string | null;
+      version: number;
+      submitted_at: string | null;
+    } | null;
+    feedback: string | null;
+  }> = [];
+
+  let curriculumFiles: Array<{
+    id: string;
+    title: string;
+    file_type: string;
+    file_url: string;
+  }> = [];
 
   if (currentWeek) {
-    const { data: weekDeliverables } = await supabase
-      .from('accel_deliverables')
-      .select(`
-        id,
-        title,
-        sort_order,
-        accel_submissions!inner (status)
-      `)
-      .eq('week_id', currentWeek.id)
-      .order('sort_order');
+    const [deliverableRows, curriculumResult] = await Promise.all([
+      supabase
+        .from('accel_deliverables')
+        .select('id, title, description, is_required, expected_format, sort_order')
+        .eq('week_id', currentWeek.id)
+        .order('sort_order'),
 
-    deliverables = (weekDeliverables ?? []).map((d: any) => ({
-      id: d.id,
-      title: d.title,
-      submission: d.accel_submissions?.[0] ?? null,
-    }));
+      supabase
+        .from('accel_curriculum_files')
+        .select('id, title, file_type, file_url')
+        .eq('week_id', currentWeek.id)
+        .eq('is_active', true)
+        .in('access_level', ['all', 'founders_only'])
+        .order('title'),
+    ]);
+
+    const deliverableIds = (deliverableRows.data ?? []).map((d) => d.id);
+    curriculumFiles = curriculumResult.data ?? [];
+
+    // Fetch submissions and reviews in parallel
+    const [submissionsResult, reviewsResult] = await Promise.all([
+      deliverableIds.length > 0
+        ? supabase
+            .from('accel_submissions')
+            .select('id, deliverable_id, status, text_content, version, submitted_at')
+            .eq('team_id', profile.team_id)
+            .in('deliverable_id', deliverableIds)
+            .order('version', { ascending: false })
+        : Promise.resolve({ data: [] }),
+
+      // Fetch team-visible reviews for this team's submissions
+      deliverableIds.length > 0
+        ? supabase
+            .from('accel_reviews')
+            .select('id, submission_id, comments, score, created_at')
+            .eq('visibility', 'team')
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    // Keep only the latest submission per deliverable
+    const latestByDeliverable = new Map<string, NonNullable<typeof submissionsResult.data>[number]>();
+    for (const submission of submissionsResult.data ?? []) {
+      if (!latestByDeliverable.has(submission.deliverable_id)) {
+        latestByDeliverable.set(submission.deliverable_id, submission);
+      }
+    }
+
+    // Map reviews by submission id
+    const reviewBySubmission = new Map<string, string | null>();
+    for (const review of reviewsResult.data ?? []) {
+      if (!reviewBySubmission.has(review.submission_id) && review.comments) {
+        reviewBySubmission.set(review.submission_id, review.comments);
+      }
+    }
+
+    deliverables = (deliverableRows.data ?? []).map((d) => {
+      const submission = latestByDeliverable.get(d.id) ?? null;
+      const feedback = submission ? (reviewBySubmission.get(submission.id) ?? null) : null;
+      return {
+        id: d.id,
+        title: d.title,
+        description: d.description,
+        is_required: d.is_required,
+        expected_format: d.expected_format,
+        submission,
+        feedback,
+      };
+    });
   }
 
   return {
     role: profile.role,
     team: teamResult.data,
     currentWeek,
-    upcomingEvents: upcomingEventsResult.data ?? [],
+    upcomingEvents: (upcomingEventsResult.data ?? []) as AccelProgramEvent[],
     deliverables,
     recentMeetings: recentMeetingsResult.data ?? [],
+    mentorAssignments: mentorAssignmentsResult.data ?? [],
+    tractionEntryCount: tractionCountResult.count ?? 0,
+    curriculumFiles,
   };
 }
 
-async function fetchMentorDashboardData(supabase: Awaited<ReturnType<typeof createClient>>, profile: AccelProfile) {
+// ─── Mentor fetcher ───────────────────────────────────────────────────────────
+
+async function fetchMentorDashboardData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  profile: AccelProfile
+) {
   const { data: assignments } = await supabase
     .from('accel_mentor_assignments')
-    .select(`
-      *,
-      accel_teams (*)
-    `)
+    .select('*, accel_teams (*)')
     .eq('mentor_id', profile.id);
 
   const assignedTeamIds = (assignments ?? []).map((a) => a.team_id);
@@ -246,10 +318,14 @@ async function fetchMentorDashboardData(supabase: Awaited<ReturnType<typeof crea
   };
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
   const { data: profile } = await supabase
@@ -260,22 +336,26 @@ export default async function DashboardPage() {
 
   if (!profile) redirect('/accelerator/access-denied');
 
-  const dashboardData = await fetchDashboardData(profile as AccelProfile);
+  const accelProfile = profile as AccelProfile;
 
-  if (profile.role === 'aggiex_team') {
-    return <AggiexTeamDashboard data={dashboardData} />;
+  if (accelProfile.role === 'aggiex_team') {
+    const data = await fetchAdminDashboardData(supabase, accelProfile);
+    return <AggiexTeamDashboard data={data} />;
   }
 
-  if (profile.role === 'mce_staff') {
-    return <MceStaffDashboard data={dashboardData} />;
+  if (accelProfile.role === 'mce_staff') {
+    const data = await fetchAdminDashboardData(supabase, accelProfile);
+    return <MceStaffDashboard data={data} />;
   }
 
-  if (profile.role === 'founder') {
-    return <FounderDashboard data={dashboardData} />;
+  if (accelProfile.role === 'founder') {
+    const data = await fetchFounderDashboardData(supabase, accelProfile);
+    return <FounderDashboard data={data} />;
   }
 
-  if (profile.role === 'mentor') {
-    return <MentorDashboard data={dashboardData} />;
+  if (accelProfile.role === 'mentor') {
+    const data = await fetchMentorDashboardData(supabase, accelProfile);
+    return <MentorDashboard data={data} />;
   }
 
   redirect('/accelerator/access-denied');

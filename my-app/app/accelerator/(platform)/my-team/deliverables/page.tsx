@@ -4,7 +4,9 @@ import SubmitDeliverablePanel from './components/submit-deliverable-panel';
 
 async function fetchDeliverablesData() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
   const { data: profile } = await supabase
@@ -17,7 +19,7 @@ async function fetchDeliverablesData() {
     redirect('/accelerator/dashboard');
   }
 
-  // All unlocked weeks with their deliverables and this team's submissions
+  // All unlocked weeks
   const { data: weeks } = await supabase
     .from('accel_weeks')
     .select('id, week_number, theme, start_date')
@@ -30,37 +32,66 @@ async function fetchDeliverablesData() {
 
   const weekIds = weeks.map((w) => w.id);
 
-  const { data: deliverables } = await supabase
+  const { data: deliverableRows } = await supabase
     .from('accel_deliverables')
     .select('id, week_id, title, description, is_required, expected_format, sort_order')
     .in('week_id', weekIds)
     .order('sort_order');
 
-  const deliverableIds = (deliverables ?? []).map((d) => d.id);
+  const deliverableIds = (deliverableRows ?? []).map((d) => d.id);
 
-  const { data: submissions } = await supabase
-    .from('accel_submissions')
-    .select('id, deliverable_id, status, submitted_at, text_content, version')
-    .eq('team_id', profile.team_id)
-    .in('deliverable_id', deliverableIds)
-    .order('version', { ascending: false });
+  // Fetch submissions and team-visible reviews in parallel
+  const [submissionsResult, reviewsResult] = await Promise.all([
+    deliverableIds.length > 0
+      ? supabase
+          .from('accel_submissions')
+          .select('id, deliverable_id, status, submitted_at, text_content, version')
+          .eq('team_id', profile.team_id)
+          .in('deliverable_id', deliverableIds)
+          .order('version', { ascending: false })
+      : Promise.resolve({ data: [] }),
 
-  // Keep only the latest submission per deliverable
-  const latestSubmissions = new Map<string, typeof submissions extends (infer T)[] | null ? T : never>();
-  for (const submission of submissions ?? []) {
-    if (!latestSubmissions.has(submission.deliverable_id)) {
-      latestSubmissions.set(submission.deliverable_id, submission);
+    // Team-visible review feedback only
+    deliverableIds.length > 0
+      ? supabase
+          .from('accel_reviews')
+          .select('id, submission_id, comments')
+          .eq('visibility', 'team')
+          .not('comments', 'is', null)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  // Latest submission per deliverable
+  const latestByDeliverable = new Map<
+    string,
+    NonNullable<typeof submissionsResult.data>[number]
+  >();
+  for (const submission of submissionsResult.data ?? []) {
+    if (!latestByDeliverable.has(submission.deliverable_id)) {
+      latestByDeliverable.set(submission.deliverable_id, submission);
+    }
+  }
+
+  // Latest team-visible review per submission
+  const reviewBySubmission = new Map<string, string>();
+  for (const review of reviewsResult.data ?? []) {
+    if (!reviewBySubmission.has(review.submission_id) && review.comments) {
+      reviewBySubmission.set(review.submission_id, review.comments);
     }
   }
 
   const weeksWithDeliverables = weeks.map((week) => ({
     ...week,
-    deliverables: (deliverables ?? [])
+    deliverables: (deliverableRows ?? [])
       .filter((d) => d.week_id === week.id)
-      .map((d) => ({
-        ...d,
-        submission: latestSubmissions.get(d.id) ?? null,
-      })),
+      .map((d) => {
+        const submission = latestByDeliverable.get(d.id) ?? null;
+        const feedback = submission
+          ? (reviewBySubmission.get(submission.id) ?? null)
+          : null;
+        return { ...d, submission, feedback };
+      }),
   }));
 
   return { weeks: weeksWithDeliverables, profile };
@@ -69,11 +100,46 @@ async function fetchDeliverablesData() {
 export default async function DeliverablesPage() {
   const { weeks, profile } = await fetchDeliverablesData();
 
+  const totalDeliverables = weeks.reduce((sum, w) => sum + w.deliverables.length, 0);
+  const submittedTotal = weeks.reduce(
+    (sum, w) =>
+      sum +
+      w.deliverables.filter(
+        (d) =>
+          d.submission?.status &&
+          ['submitted', 'under_review', 'approved'].includes(d.submission.status)
+      ).length,
+    0
+  );
+  const needsRevisionTotal = weeks.reduce(
+    (sum, w) =>
+      sum +
+      w.deliverables.filter(
+        (d) =>
+          d.submission?.status === 'needs_revision' ||
+          d.submission?.status === 'flagged'
+      ).length,
+    0
+  );
+
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-widest text-neutral-500">My Team</p>
-        <h1 className="mt-1 text-xl font-semibold text-neutral-100">Deliverables</h1>
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-neutral-500">My Team</p>
+          <h1 className="mt-1 text-xl font-semibold text-neutral-100">Deliverables</h1>
+          {totalDeliverables > 0 && (
+            <p className="mt-0.5 text-sm text-neutral-500">
+              {submittedTotal}/{totalDeliverables} submitted
+              {needsRevisionTotal > 0 && (
+                <span className="ml-2 text-orange-400">
+                  · {needsRevisionTotal} need{needsRevisionTotal > 1 ? '' : 's'} revision
+                </span>
+              )}
+            </p>
+          )}
+        </div>
       </div>
 
       {weeks.length === 0 ? (
@@ -85,8 +151,15 @@ export default async function DeliverablesPage() {
       ) : (
         <div className="flex flex-col gap-8">
           {weeks.map((week) => {
-            const submittedCount = week.deliverables.filter((d) =>
-              d.submission?.status && ['submitted', 'under_review', 'approved'].includes(d.submission.status)
+            const weekSubmitted = week.deliverables.filter((d) =>
+              d.submission?.status &&
+              ['submitted', 'under_review', 'approved'].includes(d.submission.status)
+            ).length;
+
+            const weekNeedsRevision = week.deliverables.filter(
+              (d) =>
+                d.submission?.status === 'needs_revision' ||
+                d.submission?.status === 'flagged'
             ).length;
 
             return (
@@ -95,9 +168,16 @@ export default async function DeliverablesPage() {
                   <h2 className="text-sm font-medium text-neutral-200">
                     Week {week.week_number} — {week.theme}
                   </h2>
-                  <span className="text-xs tabular-nums text-neutral-500">
-                    {submittedCount}/{week.deliverables.length} submitted
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {weekNeedsRevision > 0 && (
+                      <span className="text-xs text-orange-400">
+                        {weekNeedsRevision} revision{weekNeedsRevision > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    <span className="text-xs tabular-nums text-neutral-600">
+                      {weekSubmitted}/{week.deliverables.length} submitted
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">

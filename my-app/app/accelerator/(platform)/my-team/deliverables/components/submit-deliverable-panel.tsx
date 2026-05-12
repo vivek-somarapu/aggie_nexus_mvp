@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { SUBMISSION_STATUS_LABELS } from '@/lib/accel-types';
 import type { AccelSubmissionStatus } from '@/lib/accel-types';
 
@@ -29,6 +29,8 @@ interface Deliverable {
     text_content: string | null;
     version: number;
   } | null;
+  // Team-visible review feedback, fetched server-side
+  feedback?: string | null;
 }
 
 interface SubmitDeliverablePanelProps {
@@ -134,6 +136,26 @@ export default function SubmitDeliverablePanel({
       {/* Expanded panel */}
       {isExpanded && (
         <div className="border-t border-neutral-800 px-4 pb-4 pt-3">
+          {/* Feedback from AggieX — shown prominently when revision needed */}
+          {deliverable.feedback &&
+            (localStatus === 'needs_revision' || localStatus === 'flagged') && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-md border border-orange-500/25 bg-orange-500/5 px-3 py-3">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0 text-orange-400" />
+                <div>
+                  <p className="text-xs font-medium text-orange-400">Feedback from AggieX</p>
+                  <p className="mt-1 text-sm text-neutral-300">{deliverable.feedback}</p>
+                </div>
+              </div>
+            )}
+
+          {/* Approved message */}
+          {localStatus === 'approved' && (
+            <div className="mb-4 flex items-center gap-2.5 rounded-md border border-emerald-500/25 bg-emerald-500/5 px-3 py-2.5">
+              <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />
+              <p className="text-sm text-emerald-300">Approved — no further action needed.</p>
+            </div>
+          )}
+
           {deliverable.description && (
             <p className="mb-3 text-sm text-neutral-400">{deliverable.description}</p>
           )}

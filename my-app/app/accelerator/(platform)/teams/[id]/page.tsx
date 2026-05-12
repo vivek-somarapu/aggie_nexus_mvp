@@ -11,6 +11,7 @@ import {
 import type { AccelRole, AccelSubmissionStatus, AccelFundingStatus } from '@/lib/accel-types';
 import FundingEditor from './components/funding-editor';
 import LogoEditor from './components/logo-editor';
+import ReviewSubmissionsPanel from './components/review-submissions-panel';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -111,6 +112,18 @@ async function fetchTeamDetailData(teamId: string) {
   // Current week = highest unlocked
   const currentWeek = weeks.filter((w) => w.is_unlocked).at(-1) ?? null;
 
+  // For admins: fetch full submission detail + existing team-visible reviews
+  let reviewableSubmissions: Array<{
+    id: string;
+    deliverableId: string;
+    deliverableTitle: string;
+    status: AccelSubmissionStatus;
+    textContent: string | null;
+    submittedAt: string | null;
+    version: number;
+    existingFeedback: string | null;
+  }> = [];
+
   let currentWeekDeliverables: Array<{
     id: string;
     title: string;
@@ -126,20 +139,58 @@ async function fetchTeamDetailData(teamId: string) {
       .order('sort_order');
 
     if (wDeliverables) {
-      const { data: wSubmissions } = await supabase
-        .from('accel_submissions')
-        .select('deliverable_id, status')
-        .eq('team_id', teamId)
-        .in('deliverable_id', wDeliverables.map((d) => d.id));
+      const deliverableIds = wDeliverables.map((d) => d.id);
 
-      const subMap = Object.fromEntries(
-        (wSubmissions ?? []).map((s) => [s.deliverable_id, s])
-      );
+      const [submissionsResult, reviewsResult] = await Promise.all([
+        supabase
+          .from('accel_submissions')
+          .select('id, deliverable_id, status, text_content, submitted_at, version')
+          .eq('team_id', teamId)
+          .in('deliverable_id', deliverableIds)
+          .order('version', { ascending: false }),
 
-      currentWeekDeliverables = wDeliverables.map((d) => ({
-        ...d,
-        submission: subMap[d.id] ?? null,
-      }));
+        supabase
+          .from('accel_reviews')
+          .select('submission_id, comments')
+          .eq('visibility', 'team')
+          .not('comments', 'is', null)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      // Latest submission per deliverable
+      const latestByDeliverable = new Map<string, NonNullable<typeof submissionsResult.data>[number]>();
+      for (const submission of submissionsResult.data ?? []) {
+        if (!latestByDeliverable.has(submission.deliverable_id)) {
+          latestByDeliverable.set(submission.deliverable_id, submission);
+        }
+      }
+
+      // Latest feedback per submission
+      const feedbackBySubmission = new Map<string, string>();
+      for (const review of reviewsResult.data ?? []) {
+        if (!feedbackBySubmission.has(review.submission_id) && review.comments) {
+          feedbackBySubmission.set(review.submission_id, review.comments);
+        }
+      }
+
+      currentWeekDeliverables = wDeliverables.map((d) => {
+        const sub = latestByDeliverable.get(d.id) ?? null;
+        return { ...d, submission: sub ? { status: sub.status as AccelSubmissionStatus } : null };
+      });
+
+      reviewableSubmissions = wDeliverables.map((d) => {
+        const sub = latestByDeliverable.get(d.id) ?? null;
+        return {
+          id: sub?.id ?? '',
+          deliverableId: d.id,
+          deliverableTitle: d.title,
+          status: (sub?.status ?? 'not_started') as AccelSubmissionStatus,
+          textContent: sub?.text_content ?? null,
+          submittedAt: sub?.submitted_at ?? null,
+          version: sub?.version ?? 1,
+          existingFeedback: sub ? (feedbackBySubmission.get(sub.id) ?? null) : null,
+        };
+      });
     }
   }
 
@@ -148,6 +199,7 @@ async function fetchTeamDetailData(teamId: string) {
     role: profile.role as AccelRole,
     currentWeek,
     currentWeekDeliverables,
+    reviewableSubmissions,
     weekProgress,
   };
 }
@@ -160,7 +212,7 @@ export default async function TeamDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { team, role, currentWeek, currentWeekDeliverables, weekProgress } =
+  const { team, role, currentWeek, currentWeekDeliverables, reviewableSubmissions, weekProgress } =
     await fetchTeamDetailData(id);
 
   const funding = team.accel_milestone_funding?.[0] ?? null;
@@ -230,29 +282,37 @@ export default async function TeamDetailPage({
       <div className="grid grid-cols-3 gap-6">
         {/* Left column — deliverables + progress */}
         <div className="col-span-2 flex flex-col gap-6">
-          {/* Current week deliverables */}
+          {/* Current week deliverables — with inline review for admins */}
           {currentWeek && currentWeekDeliverables.length > 0 && (
             <section>
               <h2 className="mb-3 text-xs font-medium uppercase tracking-widest text-neutral-500">
                 Week {currentWeek.week_number} Deliverables
               </h2>
-              <div className="overflow-hidden rounded-lg border border-neutral-800">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-neutral-800/50">
-                    {currentWeekDeliverables.map((d) => {
-                      const status: AccelSubmissionStatus = d.submission?.status ?? 'not_started';
-                      return (
-                        <tr key={d.id} className="hover:bg-neutral-900/30">
-                          <td className="px-4 py-3 text-neutral-200">{d.title}</td>
-                          <td className={`px-4 py-3 text-right text-xs font-medium ${STATUS_COLORS[status]}`}>
-                            {SUBMISSION_STATUS_LABELS[status]}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+
+              {isAdmin ? (
+                <ReviewSubmissionsPanel submissions={reviewableSubmissions} />
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-neutral-800">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-neutral-800/50">
+                      {currentWeekDeliverables.map((d) => {
+                        const status: AccelSubmissionStatus =
+                          d.submission?.status ?? 'not_started';
+                        return (
+                          <tr key={d.id} className="hover:bg-neutral-900/30">
+                            <td className="px-4 py-3 text-neutral-200">{d.title}</td>
+                            <td
+                              className={`px-4 py-3 text-right text-xs font-medium ${STATUS_COLORS[status]}`}
+                            >
+                              {SUBMISSION_STATUS_LABELS[status]}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
           )}
 
