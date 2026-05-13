@@ -175,8 +175,9 @@ export function buildAccelInviteEmail(options: {
   teamName?: string;
   inviteUrl: string;
   platformUrl: string;
+  isExistingUser?: boolean;
 }): EmailMessage {
-  const { recipientName, recipientEmail, inviterName, role, teamName, inviteUrl, platformUrl } = options;
+  const { recipientName, recipientEmail, inviterName, role, teamName, inviteUrl, platformUrl, isExistingUser = false } = options;
 
   const roleLabel =
     role === 'founder' ? 'Founder'
@@ -187,18 +188,33 @@ export function buildAccelInviteEmail(options: {
   const teamLine = teamName ? `<p><strong>Team:</strong> ${teamName}</p>` : '';
   const teamText = teamName ? `Team: ${teamName}\n` : '';
 
-  return {
-    to: recipientEmail,
-    subject: `You're invited to AggieX Summer 2026`,
-    html: `
-      <p>Hi ${recipientName},</p>
-      <p>${inviterName} has invited you to the AggieX Summer 2026 platform as a <strong>${roleLabel}</strong>.</p>
+  const subject = isExistingUser
+    ? `You've been given access to AggieX Summer 2026`
+    : `You're invited to AggieX Summer 2026`;
+
+  const bodyHtml = isExistingUser
+    ? `<p>${inviterName} has added you to the AggieX Summer 2026 platform as a <strong>${roleLabel}</strong>. Your existing account has been connected — no new signup required.</p>
+      ${teamLine}
+      <p>Log in to complete your profile setup and get started.</p>
+      <p><a href="${inviteUrl}" style="display:inline-block;padding:10px 20px;background:#f5f5f5;color:#111;border-radius:6px;text-decoration:none;font-weight:600;">Log in and complete setup</a></p>`
+    : `<p>${inviterName} has invited you to the AggieX Summer 2026 platform as a <strong>${roleLabel}</strong>.</p>
       ${teamLine}
       <p>Click the link below to accept your invitation and set up your account. This link expires in 24 hours.</p>
-      <p><a href="${inviteUrl}" style="display:inline-block;padding:10px 20px;background:#f5f5f5;color:#111;border-radius:6px;text-decoration:none;font-weight:600;">Accept invitation</a></p>
-      <p style="color:#999;font-size:12px;">After accepting, you'll complete a short intake form before gaining access to the platform.<br>${platformUrl}/accelerator</p>
+      <p><a href="${inviteUrl}" style="display:inline-block;padding:10px 20px;background:#f5f5f5;color:#111;border-radius:6px;text-decoration:none;font-weight:600;">Accept invitation</a></p>`;
+
+  const bodyText = isExistingUser
+    ? `${inviterName} has added you to AggieX Summer 2026 as ${roleLabel}. Your existing account has been connected.\n${teamText}\nLog in to complete your profile setup: ${inviteUrl}`
+    : `${inviterName} invited you to AggieX Summer 2026 as ${roleLabel}.\n${teamText}\nAccept your invitation: ${inviteUrl}\n\nAfter accepting, you'll complete a short intake form.`;
+
+  return {
+    to: recipientEmail,
+    subject,
+    html: `
+      <p>Hi ${recipientName},</p>
+      ${bodyHtml}
+      <p style="color:#999;font-size:12px;">${platformUrl}/accelerator</p>
     `.trim(),
-    text: `Hi ${recipientName},\n\n${inviterName} invited you to AggieX Summer 2026 as ${roleLabel}.\n${teamText}\nAccept your invitation: ${inviteUrl}\n\nAfter accepting, you'll complete a short intake form.\n\n${platformUrl}/accelerator`,
+    text: `Hi ${recipientName},\n\n${bodyText}\n\n${platformUrl}/accelerator`,
   };
 }
 
