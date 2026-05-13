@@ -68,7 +68,11 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const supabase = await createClient();
-  const platformUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+
+  // Prefer an explicit env var; fall back to the request's own origin so the
+  // email links are never built from an empty string.
+  const requestOrigin = new URL(request.url).origin;
+  const platformUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || requestOrigin;
   const onboardingUrl = `${platformUrl}/accelerator/onboarding`;
   const loginUrl = `${platformUrl}/auth/login`;
 
