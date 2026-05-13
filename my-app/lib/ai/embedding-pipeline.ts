@@ -67,10 +67,14 @@ async function fetchExistingHashes(
 ): Promise<Map<string, string>> {
   const supabase = createAdminClient();
 
+  // Only consider rows that were embedded with the v2 chunking pipeline
+  // (chunk_text is non-empty). Rows migrated from v1 have chunk_text = ''
+  // and must be treated as stale so they get rechunked on the next sync.
   const { data, error } = await supabase
     .from('accel_embeddings')
     .select('source_id, content_hash')
-    .eq('source_table', sourceTable);
+    .eq('source_table', sourceTable)
+    .neq('chunk_text', '');
 
   if (error) {
     throw new Error(`Failed to fetch existing hashes for ${sourceTable}: ${error.message}`);
