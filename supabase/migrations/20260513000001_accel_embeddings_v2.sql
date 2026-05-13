@@ -37,9 +37,11 @@ ALTER TABLE accel_embeddings
 ALTER TABLE accel_embeddings
   DROP CONSTRAINT IF EXISTS accel_embeddings_source_table_source_id_key;
 
-ALTER TABLE accel_embeddings
-  ADD CONSTRAINT IF NOT EXISTS accel_embeddings_source_chunk_unique
-    UNIQUE (source_table, source_id, chunk_index);
+DO $$ BEGIN
+  ALTER TABLE accel_embeddings
+    ADD CONSTRAINT accel_embeddings_source_chunk_unique
+      UNIQUE (source_table, source_id, chunk_index);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─── GIN index for full-text search ──────────────────────────────────────────
 
