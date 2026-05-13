@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { FileText, Plus, Trash2, AlertCircle, Loader2, ChevronDown, X } from 'lucide-react';
+import { FileText, Plus, Trash2, AlertCircle, Loader2, ChevronDown, X, Link } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -12,6 +12,7 @@ interface ContextDoc {
   doc_type: string;
   team_id: string | null;
   created_at: string;
+  source_url: string | null;
   accel_teams: { name: string } | null;
 }
 
@@ -21,6 +22,7 @@ interface Team {
 }
 
 type FormStatus = 'idle' | 'submitting' | 'error';
+type InputTab = 'file' | 'url' | 'paste';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -52,10 +54,12 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
+  const [inputTab, setInputTab] = useState<InputTab>('file');
   const [title, setTitle] = useState('');
   const [docType, setDocType] = useState('general');
   const [teamId, setTeamId] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [urlInput, setUrlInput] = useState('');
   const [pastedContent, setPastedContent] = useState('');
   const [formStatus, setFormStatus] = useState<FormStatus>('idle');
   const [formError, setFormError] = useState<string | null>(null);
@@ -105,7 +109,7 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
 
     setSelectedFile(file);
 
-    // Pre-fill title from filename if the title field is still empty
+    // Pre-fill title from filename if the title field is still empty.
     if (!title.trim()) {
       setTitle(file.name.replace(/\.[^/.]+$/, ''));
     }
@@ -128,10 +132,11 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
     }
 
     const hasFile = selectedFile !== null;
+    const hasUrl = urlInput.trim().length > 0;
     const hasPaste = pastedContent.trim().length > 0;
 
-    if (!hasFile && !hasPaste) {
-      setFormError('Upload a file or paste content below.');
+    if (!hasFile && !hasUrl && !hasPaste) {
+      setFormError('Upload a file, provide a URL, or paste content.');
       return;
     }
 
@@ -142,9 +147,10 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
     formData.append('doc_type', docType);
     if (teamId) formData.append('team_id', teamId);
 
-    // File takes precedence over pasted content when both are present.
     if (hasFile) {
       formData.append('file', selectedFile!);
+    } else if (hasUrl) {
+      formData.append('url', urlInput.trim());
     } else {
       formData.append('content', pastedContent.trim());
     }
@@ -171,10 +177,12 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
 
   function resetForm() {
     setShowForm(false);
+    setInputTab('file');
     setTitle('');
     setDocType('general');
     setTeamId('');
     setSelectedFile(null);
+    setUrlInput('');
     setPastedContent('');
     setFormStatus('idle');
     setFormError(null);
@@ -211,8 +219,8 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
             <p className="text-sm font-medium text-neutral-100">Context Documents</p>
             <p className="mt-0.5 text-xs text-neutral-500">
               Program outlines, team applications, and reference material for the AI Advisor.
-              Accepts PDF, DOCX, TXT, MD, and CSV. After uploading, run &quot;Sync AI Knowledge
-              Base&quot; below to index the content.
+              Upload a file, fetch a URL, or paste text directly. After adding docs, run &quot;Sync
+              AI Knowledge Base&quot; below to index the content.
             </p>
           </div>
         </div>
@@ -270,57 +278,92 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
             </div>
           )}
 
-          {/* File picker */}
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_EXTENSIONS}
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {selectedFile ? (
-              <div className="flex items-center justify-between rounded-md border border-neutral-700 bg-neutral-900/60 px-3 py-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText size={12} className="shrink-0 text-purple-400" />
-                  <span className="truncate text-xs text-neutral-300">{selectedFile.name}</span>
-                  <span className="shrink-0 text-[10px] text-neutral-600">
-                    {formatFileSize(selectedFile.size)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearFile}
-                  className="ml-2 shrink-0 text-neutral-600 hover:text-neutral-400"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ) : (
+          {/* Input type tabs */}
+          <div className="flex gap-1 rounded-md border border-neutral-800 bg-neutral-950/60 p-0.5">
+            {(['file', 'url', 'paste'] as InputTab[]).map((tab) => (
               <button
+                key={tab}
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-md border border-dashed border-neutral-700 px-3 py-3 text-xs text-neutral-500 transition-colors hover:border-neutral-600 hover:text-neutral-400"
+                onClick={() => setInputTab(tab)}
+                className={`flex-1 rounded py-1.5 text-[11px] font-medium capitalize transition-colors ${
+                  inputTab === tab
+                    ? 'bg-neutral-800 text-neutral-100'
+                    : 'text-neutral-500 hover:text-neutral-400'
+                }`}
               >
-                Click to upload PDF, DOCX, TXT, MD, or CSV (max 10 MB)
+                {tab}
               </button>
-            )}
+            ))}
           </div>
 
-          {/* Paste area (shown when no file selected) */}
-          {!selectedFile && (
+          {/* File tab */}
+          {inputTab === 'file' && (
             <div>
-              <p className="mb-1.5 text-[10px] text-neutral-600 uppercase tracking-wide">
-                Or paste content directly
-              </p>
-              <textarea
-                value={pastedContent}
-                onChange={(e) => setPastedContent(e.target.value)}
-                placeholder="Paste document text here…"
-                rows={5}
-                className="w-full resize-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs text-neutral-300 placeholder:text-neutral-600 focus:border-neutral-600 focus:outline-none"
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_EXTENSIONS}
+                onChange={handleFileChange}
+                className="hidden"
               />
+              {selectedFile ? (
+                <div className="flex items-center justify-between rounded-md border border-neutral-700 bg-neutral-900/60 px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText size={12} className="shrink-0 text-purple-400" />
+                    <span className="truncate text-xs text-neutral-300">{selectedFile.name}</span>
+                    <span className="shrink-0 text-[10px] text-neutral-600">
+                      {formatFileSize(selectedFile.size)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearFile}
+                    className="ml-2 shrink-0 text-neutral-600 hover:text-neutral-400"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full rounded-md border border-dashed border-neutral-700 px-3 py-3 text-xs text-neutral-500 transition-colors hover:border-neutral-600 hover:text-neutral-400"
+                >
+                  Click to upload PDF, DOCX, TXT, MD, or CSV (max 10 MB)
+                </button>
+              )}
             </div>
+          )}
+
+          {/* URL tab */}
+          {inputTab === 'url' && (
+            <div>
+              <div className="flex items-center gap-2 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2">
+                <Link size={12} className="shrink-0 text-neutral-500" />
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://example.com/article"
+                  className="flex-1 bg-transparent text-xs text-neutral-100 placeholder:text-neutral-600 focus:outline-none"
+                />
+              </div>
+              <p className="mt-1.5 text-[10px] text-neutral-600">
+                Fetches content from a public URL using Jina Reader. Works with articles, docs, and
+                blog posts (e.g. Paul Graham essays, YC resources).
+              </p>
+            </div>
+          )}
+
+          {/* Paste tab */}
+          {inputTab === 'paste' && (
+            <textarea
+              value={pastedContent}
+              onChange={(e) => setPastedContent(e.target.value)}
+              placeholder="Paste document text here…"
+              rows={5}
+              className="w-full resize-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs text-neutral-300 placeholder:text-neutral-600 focus:border-neutral-600 focus:outline-none"
+            />
           )}
 
           {/* Error */}
@@ -346,7 +389,7 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
               className="flex items-center gap-1.5 rounded-md bg-purple-600 px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting && <Loader2 size={11} className="animate-spin" />}
-              {isSubmitting ? 'Uploading…' : 'Save document'}
+              {isSubmitting ? 'Saving…' : 'Save document'}
             </button>
           </div>
         </form>
@@ -366,7 +409,8 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
           </div>
         ) : docs.length === 0 ? (
           <p className="py-4 text-xs text-neutral-600">
-            No documents yet. Upload a program outline or team application to enrich the AI Advisor.
+            No documents yet. Upload a program outline, fetch a URL, or paste content to enrich the
+            AI Advisor.
           </p>
         ) : (
           <ul className="divide-y divide-neutral-800/60">
@@ -377,6 +421,7 @@ export default function ContextDocsPanel({ teams }: ContextDocsPanelProps) {
                   <p className="mt-0.5 text-[10px] text-neutral-600">
                     {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
                     {doc.accel_teams?.name ? ` · ${doc.accel_teams.name}` : ''}
+                    {doc.source_url ? ` · ${doc.source_url.replace(/^https?:\/\//, '').slice(0, 40)}` : ''}
                     {' · '}
                     {format(parseISO(doc.created_at), 'MMM d, yyyy')}
                   </p>

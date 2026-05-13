@@ -1,14 +1,23 @@
 /**
- * Embedding pipeline: fetches content from each source table, generates
- * Jina embeddings, and upserts into accel_embeddings.
+ * Embedding pipeline: fetches content from each source table, splits into
+ * overlapping chunks, generates Jina embeddings per chunk, and stores them
+ * in accel_embeddings.
  *
- * Content hashing (MD5) prevents re-embedding unchanged rows, making
- * repeated runs cheap and idempotent.
+ * Chunking strategy: each document is split into ~400-token windows with
+ * ~50-token overlap via chunkText(). Each chunk gets its own row in
+ * accel_embeddings with a unique (source_table, source_id, chunk_index) key.
+ *
+ * Idempotency: the MD5 of the full document text is stored on every chunk row
+ * as content_hash. If the hash is unchanged on a subsequent run, all chunks
+ * for that document are skipped. When the document changes, all existing chunk
+ * rows are deleted before the new chunks are inserted — this handles changes
+ * in chunk count cleanly.
  */
 
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { embedBatch } from '@/lib/ai/embedder';
+import { chunkText } from '@/lib/ai/chunker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +31,8 @@ type EmbeddingSource =
 interface EmbeddingRow {
   source_table: EmbeddingSource;
   source_id: string;
+  chunk_index: number;
+  chunk_text: string;
   content_hash: string;
   embedding: number[];
   embedded_at: string;
@@ -47,8 +58,9 @@ function md5(text: string): string {
 }
 
 /**
- * Fetches existing content_hash values for a source table so unchanged rows
- * can be skipped without re-embedding.
+ * Returns a map of source_id → content_hash for all existing rows in a source
+ * table. All chunks of a document share the same content_hash, so the first
+ * occurrence per source_id is used.
  */
 async function fetchExistingHashes(
   sourceTable: EmbeddingSource,
@@ -66,27 +78,85 @@ async function fetchExistingHashes(
 
   const hashes = new Map<string, string>();
   for (const row of data ?? []) {
-    hashes.set(row.source_id, row.content_hash);
+    if (!hashes.has(row.source_id)) {
+      hashes.set(row.source_id, row.content_hash);
+    }
   }
   return hashes;
 }
 
 /**
- * Upserts embedding rows into accel_embeddings.
- * ON CONFLICT on (source_table, source_id) updates existing rows in place.
+ * Deletes all chunk rows for the given source IDs, then inserts the new rows.
+ * Delete-before-insert (rather than upsert) is required because the chunk
+ * count can change when document content is updated.
  */
-async function upsertEmbeddings(rows: EmbeddingRow[]): Promise<void> {
+async function replaceEmbeddings(
+  sourceTable: EmbeddingSource,
+  changedIds: string[],
+  rows: EmbeddingRow[],
+): Promise<void> {
   if (rows.length === 0) return;
 
   const supabase = createAdminClient();
 
-  const { error } = await supabase
+  const { error: deleteError } = await supabase
     .from('accel_embeddings')
-    .upsert(rows, { onConflict: 'source_table,source_id' });
+    .delete()
+    .eq('source_table', sourceTable)
+    .in('source_id', changedIds);
 
-  if (error) {
-    throw new Error(`Failed to upsert embeddings: ${error.message}`);
+  if (deleteError) {
+    throw new Error(`Failed to delete stale embeddings for ${sourceTable}: ${deleteError.message}`);
   }
+
+  const { error: insertError } = await supabase
+    .from('accel_embeddings')
+    .insert(rows);
+
+  if (insertError) {
+    throw new Error(`Failed to insert embeddings for ${sourceTable}: ${insertError.message}`);
+  }
+}
+
+/**
+ * Splits each document into chunks, embeds all chunks in one Jina batch call,
+ * and returns the full set of EmbeddingRow objects ready for insertion.
+ */
+async function buildChunkedRows(
+  source: EmbeddingSource,
+  documents: Array<{ id: string; fullText: string }>,
+): Promise<EmbeddingRow[]> {
+  type FlatChunk = {
+    sourceId: string;
+    chunkIndex: number;
+    chunkText: string;
+    contentHash: string;
+  };
+
+  const flatChunks: FlatChunk[] = [];
+
+  for (const doc of documents) {
+    const chunks = chunkText(doc.fullText);
+    const contentHash = md5(doc.fullText);
+    for (let i = 0; i < chunks.length; i++) {
+      flatChunks.push({ sourceId: doc.id, chunkIndex: i, chunkText: chunks[i], contentHash });
+    }
+  }
+
+  if (flatChunks.length === 0) return [];
+
+  const embedded = await embedBatch(flatChunks.map((c) => c.chunkText));
+  const now = new Date().toISOString();
+
+  return flatChunks.map((chunk, i) => ({
+    source_table: source,
+    source_id: chunk.sourceId,
+    chunk_index: chunk.chunkIndex,
+    chunk_text: chunk.chunkText,
+    content_hash: chunk.contentHash,
+    embedding: embedded[i].vector,
+    embedded_at: now,
+  }));
 }
 
 // ─── Source-specific embedders ────────────────────────────────────────────────
@@ -105,28 +175,22 @@ async function embedCurriculumFiles(): Promise<EmbedSourceResult> {
 
   const existingHashes = await fetchExistingHashes(source);
 
-  const toEmbed = files.filter((file) => {
+  const changed = files.filter((file) => {
     const text = `${file.title}${file.description ? `: ${file.description}` : ''}`;
     return existingHashes.get(file.id) !== md5(text);
   });
 
-  if (toEmbed.length === 0) return { source, upserted: 0, skipped: files.length };
+  if (changed.length === 0) return { source, upserted: 0, skipped: files.length };
 
-  const texts = toEmbed.map(
-    (file) => `${file.title}${file.description ? `: ${file.description}` : ''}`,
-  );
-  const embedded = await embedBatch(texts);
-
-  const rows: EmbeddingRow[] = toEmbed.map((file, i) => ({
-    source_table: source,
-    source_id: file.id,
-    content_hash: md5(texts[i]),
-    embedding: embedded[i].vector,
-    embedded_at: new Date().toISOString(),
+  const documents = changed.map((file) => ({
+    id: file.id,
+    fullText: `${file.title}${file.description ? `: ${file.description}` : ''}`,
   }));
 
-  await upsertEmbeddings(rows);
-  return { source, upserted: rows.length, skipped: files.length - rows.length };
+  const rows = await buildChunkedRows(source, documents);
+  await replaceEmbeddings(source, changed.map((f) => f.id), rows);
+
+  return { source, upserted: rows.length, skipped: files.length - changed.length };
 }
 
 async function embedDeliverables(): Promise<EmbedSourceResult> {
@@ -142,34 +206,29 @@ async function embedDeliverables(): Promise<EmbedSourceResult> {
 
   const existingHashes = await fetchExistingHashes(source);
 
-  const toEmbed = deliverables.filter((d) => {
-    const text = `${d.title} (format: ${d.expected_format})`;
-    return existingHashes.get(d.id) !== md5(text);
+  const changed = deliverables.filter((deliverable) => {
+    const text = `${deliverable.title} (format: ${deliverable.expected_format})`;
+    return existingHashes.get(deliverable.id) !== md5(text);
   });
 
-  if (toEmbed.length === 0) return { source, upserted: 0, skipped: deliverables.length };
+  if (changed.length === 0) return { source, upserted: 0, skipped: deliverables.length };
 
-  const texts = toEmbed.map((d) => `${d.title} (format: ${d.expected_format})`);
-  const embedded = await embedBatch(texts);
-
-  const rows: EmbeddingRow[] = toEmbed.map((d, i) => ({
-    source_table: source,
-    source_id: d.id,
-    content_hash: md5(texts[i]),
-    embedding: embedded[i].vector,
-    embedded_at: new Date().toISOString(),
+  const documents = changed.map((deliverable) => ({
+    id: deliverable.id,
+    fullText: `${deliverable.title} (format: ${deliverable.expected_format})`,
   }));
 
-  await upsertEmbeddings(rows);
-  return { source, upserted: rows.length, skipped: deliverables.length - rows.length };
+  const rows = await buildChunkedRows(source, documents);
+  await replaceEmbeddings(source, changed.map((d) => d.id), rows);
+
+  return { source, upserted: rows.length, skipped: deliverables.length - changed.length };
 }
 
 async function embedSubmissions(): Promise<EmbedSourceResult> {
   const source: EmbeddingSource = 'accel_submissions';
   const supabase = createAdminClient();
 
-  // Only embed finalized submissions — in_progress drafts are unstable
-  // and empty text_content adds no signal.
+  // Only embed finalized submissions — in_progress drafts are unstable.
   const { data: submissions, error } = await supabase
     .from('accel_submissions')
     .select('id, text_content')
@@ -181,26 +240,22 @@ async function embedSubmissions(): Promise<EmbedSourceResult> {
 
   const existingHashes = await fetchExistingHashes(source);
 
-  const toEmbed = submissions.filter((s) => {
-    const text = s.text_content as string;
-    return existingHashes.get(s.id) !== md5(text);
+  const changed = submissions.filter((submission) => {
+    const text = submission.text_content as string;
+    return existingHashes.get(submission.id) !== md5(text);
   });
 
-  if (toEmbed.length === 0) return { source, upserted: 0, skipped: submissions.length };
+  if (changed.length === 0) return { source, upserted: 0, skipped: submissions.length };
 
-  const texts = toEmbed.map((s) => s.text_content as string);
-  const embedded = await embedBatch(texts);
-
-  const rows: EmbeddingRow[] = toEmbed.map((s, i) => ({
-    source_table: source,
-    source_id: s.id,
-    content_hash: md5(texts[i]),
-    embedding: embedded[i].vector,
-    embedded_at: new Date().toISOString(),
+  const documents = changed.map((submission) => ({
+    id: submission.id,
+    fullText: submission.text_content as string,
   }));
 
-  await upsertEmbeddings(rows);
-  return { source, upserted: rows.length, skipped: submissions.length - rows.length };
+  const rows = await buildChunkedRows(source, documents);
+  await replaceEmbeddings(source, changed.map((s) => s.id), rows);
+
+  return { source, upserted: rows.length, skipped: submissions.length - changed.length };
 }
 
 async function embedMeetingRecords(): Promise<EmbedSourceResult> {
@@ -217,26 +272,22 @@ async function embedMeetingRecords(): Promise<EmbedSourceResult> {
 
   const existingHashes = await fetchExistingHashes(source);
 
-  const toEmbed = meetings.filter((m) => {
-    const text = m.notes as string;
-    return existingHashes.get(m.id) !== md5(text);
+  const changed = meetings.filter((meeting) => {
+    const text = meeting.notes as string;
+    return existingHashes.get(meeting.id) !== md5(text);
   });
 
-  if (toEmbed.length === 0) return { source, upserted: 0, skipped: meetings.length };
+  if (changed.length === 0) return { source, upserted: 0, skipped: meetings.length };
 
-  const texts = toEmbed.map((m) => m.notes as string);
-  const embedded = await embedBatch(texts);
-
-  const rows: EmbeddingRow[] = toEmbed.map((m, i) => ({
-    source_table: source,
-    source_id: m.id,
-    content_hash: md5(texts[i]),
-    embedding: embedded[i].vector,
-    embedded_at: new Date().toISOString(),
+  const documents = changed.map((meeting) => ({
+    id: meeting.id,
+    fullText: meeting.notes as string,
   }));
 
-  await upsertEmbeddings(rows);
-  return { source, upserted: rows.length, skipped: meetings.length - rows.length };
+  const rows = await buildChunkedRows(source, documents);
+  await replaceEmbeddings(source, changed.map((m) => m.id), rows);
+
+  return { source, upserted: rows.length, skipped: meetings.length - changed.length };
 }
 
 async function embedContextDocs(): Promise<EmbedSourceResult> {
@@ -252,34 +303,29 @@ async function embedContextDocs(): Promise<EmbedSourceResult> {
 
   const existingHashes = await fetchExistingHashes(source);
 
-  const toEmbed = docs.filter((doc) => {
+  const changed = docs.filter((doc) => {
     const text = `${doc.title}\n\n${doc.content}`;
     return existingHashes.get(doc.id) !== md5(text);
   });
 
-  if (toEmbed.length === 0) return { source, upserted: 0, skipped: docs.length };
+  if (changed.length === 0) return { source, upserted: 0, skipped: docs.length };
 
-  const texts = toEmbed.map((doc) => `${doc.title}\n\n${doc.content}`);
-  const embedded = await embedBatch(texts);
-
-  const rows: EmbeddingRow[] = toEmbed.map((doc, i) => ({
-    source_table: source,
-    source_id: doc.id,
-    content_hash: md5(texts[i]),
-    embedding: embedded[i].vector,
-    embedded_at: new Date().toISOString(),
+  const documents = changed.map((doc) => ({
+    id: doc.id,
+    fullText: `${doc.title}\n\n${doc.content}`,
   }));
 
-  await upsertEmbeddings(rows);
-  return { source, upserted: rows.length, skipped: docs.length - rows.length };
+  const rows = await buildChunkedRows(source, documents);
+  await replaceEmbeddings(source, changed.map((doc) => doc.id), rows);
+
+  return { source, upserted: rows.length, skipped: docs.length - changed.length };
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Re-embeds all five source tables. Sources run in parallel since each
- * calls a separate Supabase table and a separate Jina batch — no shared
- * resource contention. Idempotent: unchanged rows are skipped via MD5 hash.
+ * Re-embeds all five source tables in parallel. Idempotent: documents whose
+ * full-text MD5 hash is unchanged are skipped entirely.
  */
 export async function embedAllSources(): Promise<EmbedAllResult> {
   const startTime = Date.now();
@@ -292,8 +338,8 @@ export async function embedAllSources(): Promise<EmbedAllResult> {
     embedContextDocs(),
   ]);
 
-  const totalUpserted = results.reduce((sum, r) => sum + r.upserted, 0);
-  const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
+  const totalUpserted = results.reduce((sum, result) => sum + result.upserted, 0);
+  const totalSkipped = results.reduce((sum, result) => sum + result.skipped, 0);
 
   return {
     results,

@@ -6,11 +6,13 @@ import { createClient } from '@/lib/supabase/server';
 
 const MAX_RAW_FILE_BYTES = 10 * 1024 * 1024; // 10 MB raw upload
 const MAX_EXTRACTED_CHARS = 200_000;          // ~200 KB of extracted text
+const JINA_READER_PREFIX = 'https://r.jina.ai/';
 
 const VALID_DOC_TYPES = ['program_outline', 'team_application', 'reference', 'general'] as const;
 type DocType = typeof VALID_DOC_TYPES[number];
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const URL_REGEX = /^https?:\/\/.+/i;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +42,29 @@ async function requireAggiexTeam() {
   return { error: null, supabase, user };
 }
 
-// ─── Text extraction ──────────────────────────────────────────────────────────
+// ─── Content extraction ───────────────────────────────────────────────────────
+
+/**
+ * Fetches the plain-text content of a publicly accessible URL using the
+ * Jina Reader API (r.jina.ai). Returns markdown-friendly plain text.
+ */
+async function fetchUrlContent(url: string): Promise<string> {
+  const readerUrl = `${JINA_READER_PREFIX}${url}`;
+  const response = await fetch(readerUrl, {
+    headers: {
+      Accept: 'text/plain',
+      ...(process.env.JINA_API_KEY ? { Authorization: `Bearer ${process.env.JINA_API_KEY}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch URL content (${response.status}). Ensure the URL is publicly accessible.`,
+    );
+  }
+
+  return response.text();
+}
 
 /**
  * Extracts plain text from an uploaded file.
@@ -83,7 +107,7 @@ export async function GET() {
 
   const { data, error: fetchError } = await supabase!
     .from('accel_context_docs')
-    .select('id, title, doc_type, team_id, created_at, accel_teams (name)')
+    .select('id, title, doc_type, team_id, created_at, source_url, accel_teams (name)')
     .order('created_at', { ascending: false });
 
   if (fetchError) return errorResponse(fetchError.message, 500);
@@ -115,6 +139,7 @@ export async function POST(request: NextRequest) {
   const docTypeRaw = formData.get('doc_type') as string | null;
   const teamIdRaw = formData.get('team_id') as string | null;
   const file = formData.get('file') as File | null;
+  const urlRaw = (formData.get('url') as string | null)?.trim() ?? '';
   const pastedContent = (formData.get('content') as string | null)?.trim() ?? '';
 
   // ── Validation ──
@@ -129,8 +154,13 @@ export async function POST(request: NextRequest) {
 
   const teamId = teamIdRaw && UUID_REGEX.test(teamIdRaw) ? teamIdRaw : null;
 
-  // ── Text resolution ──
+  if (urlRaw && !URL_REGEX.test(urlRaw)) {
+    return errorResponse('URL must start with http:// or https://.', 422);
+  }
+
+  // ── Text resolution — priority: file > url > paste ──
   let content: string;
+  let sourceUrl: string | null = null;
 
   if (file && file.size > 0) {
     try {
@@ -141,10 +171,18 @@ export async function POST(request: NextRequest) {
         : 'Failed to extract text from file.';
       return errorResponse(message, 422);
     }
+  } else if (urlRaw) {
+    try {
+      content = await fetchUrlContent(urlRaw);
+      sourceUrl = urlRaw;
+    } catch (fetchError) {
+      const message = fetchError instanceof Error ? fetchError.message : 'Failed to fetch URL.';
+      return errorResponse(message, 422);
+    }
   } else if (pastedContent) {
     content = pastedContent;
   } else {
-    return errorResponse('Provide a file or paste content directly.', 422);
+    return errorResponse('Provide a file, URL, or paste content directly.', 422);
   }
 
   content = content.trim();
@@ -171,8 +209,9 @@ export async function POST(request: NextRequest) {
       team_id: teamId,
       uploaded_by: user!.id,
       content_hash: contentHash,
+      source_url: sourceUrl,
     })
-    .select('id, title, doc_type, team_id, created_at')
+    .select('id, title, doc_type, team_id, created_at, source_url')
     .single();
 
   if (insertError) return errorResponse(insertError.message, 500);

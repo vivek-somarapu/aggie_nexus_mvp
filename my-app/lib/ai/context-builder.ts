@@ -522,11 +522,40 @@ const ROLE_PREAMBLES: Record<AccelRole, string> = {
     'Keep responses concise — founders are busy.',
 
   aggiex_team:
-    'You are an AI advisor for the AggieX program management team. ' +
-    'You have access to the full cohort data below. Help them identify which teams are behind, ' +
-    'summarize team progress for check-ins, assess who deserves more program funding based on ' +
-    'deliverable completion and traction, flag any concerns, and prepare talking points. ' +
-    'Be analytical and structured.',
+    'You are the AI co-founder of AggieX — the Aggie Experienced Innovators Accelerator at UC Davis. ' +
+    'You have full visibility into every team in the cohort: their submissions, traction data, ' +
+    'meeting notes, mentor assignments, funding status, and all uploaded knowledge base documents.\n\n' +
+
+    'Your job is not to summarize — it is to analyze, predict, and advise with conviction. ' +
+    'Be direct and opinionated. Name specific teams. Use data from the program context. ' +
+    'Hedge only when data is genuinely insufficient.\n\n' +
+
+    'CORE CAPABILITIES:\n\n' +
+
+    '1. TEAM SUCCESS PREDICTION\n' +
+    'Based on submission quality trends, traction momentum, mentor engagement frequency, ' +
+    'and cohort-wide norms — predict which teams are on a success trajectory and which are at risk. ' +
+    'Compare teams to each other when relevant. If a team is at risk of disqualification from funding, say so.\n\n' +
+
+    '2. SUBMISSION QUALITY SCORING (1–5 rubric)\n' +
+    '  1 = Missing or unusable — no meaningful content\n' +
+    '  2 = Weak — present but vague, lacks specifics, minimal effort\n' +
+    '  3 = Acceptable — meets baseline requirements, some gaps\n' +
+    '  4 = Strong — clear, specific, demonstrates founder understanding\n' +
+    '  5 = Exceptional — investor-grade, deep insight, supported by traction data\n' +
+    'When asked about a submission, assign a score and explain why with specific evidence.\n\n' +
+
+    '3. INVESTMENT POTENTIAL PREDICTION\n' +
+    'For any team, assess investment potential across these signals:\n' +
+    '  - Founder-market fit: do their submissions show lived expertise in the problem?\n' +
+    '  - Traction velocity: growth rate and consistency, not absolute numbers\n' +
+    '  - Market timing: is the vertical mature enough? Too early or too late?\n' +
+    '  - Engagement quality: meeting attendance, action item follow-through, mentor utilization\n' +
+    '  - Submission trajectory: improving over weeks, declining, or flatlined?\n' +
+    'Give a direct verdict: HIGH / MEDIUM / LOW potential, with 2–3 supporting data points.\n\n' +
+
+    'When you receive SEMANTICALLY RELEVANT CONTENT in the system prompt, treat it as ' +
+    'primary evidence — quote specific phrases to support your analysis.',
 
   mce_staff:
     'You are an AI advisor for MCE staff observing the AggieX Summer 2026 cohort. ' +
@@ -561,32 +590,33 @@ export async function buildSystemPrompt(userId: string, role: AccelRole): Promis
 
 // ─── Semantic context ─────────────────────────────────────────────────────────
 
-const SEMANTIC_SIMILARITY_THRESHOLD = 0.75;
-const SEMANTIC_MATCH_LIMIT = 5;
-// Truncate long submission text to keep injected tokens lean.
-const SUBMISSION_PREVIEW_LENGTH = 300;
+// Retrieve more candidates than needed so the reranker has a rich pool to work with.
+const HYBRID_CANDIDATE_COUNT = 15;
+const RERANKED_TOP_N = 5;
 
-interface SemanticMatch {
-  sourceTable: string;
-  sourceId: string;
-  similarity: number;
-  snippet: string;
-}
+type HybridMatch = {
+  source_table: string;
+  source_id: string;
+  chunk_index: number;
+  chunk_text: string;
+  rrf_score: number;
+};
 
 /**
- * Embeds the user's latest query, runs a cosine similarity search across all
- * embedded content, and returns a formatted block ready to append to the
- * system prompt. Returns an empty string if Jina is unconfigured, the query
- * is empty, or no matches exceed the similarity threshold.
+ * Retrieves semantically relevant chunks for the user's query using a
+ * hybrid BM25 + vector search (Reciprocal Rank Fusion), then reranks
+ * the top candidates with the Jina cross-encoder to maximize precision.
  *
- * This is an opt-in helper — the core buildSystemPrompt() path is unaffected.
+ * Returns a formatted block ready to append to the system prompt, or an
+ * empty string if Jina is unconfigured, the query is empty, or nothing matches.
  */
 export async function buildSemanticContext(query: string): Promise<string> {
   if (!query.trim()) return '';
   if (!process.env.JINA_API_KEY) return '';
 
-  // Dynamic import avoids loading the embedder on paths that never use it.
+  // Dynamic imports keep these modules off paths that never use them.
   const { embedText } = await import('@/lib/ai/embedder');
+  const { rerankChunks } = await import('@/lib/ai/reranker');
   const supabase = await createClient();
 
   let queryVector: number[];
@@ -597,107 +627,37 @@ export async function buildSemanticContext(query: string): Promise<string> {
     return '';
   }
 
-  const { data: matches, error: rpcError } = await supabase.rpc('match_embeddings', {
+  const { data: matches, error: rpcError } = await supabase.rpc('match_embeddings_hybrid', {
     query_embedding: queryVector,
-    match_threshold: SEMANTIC_SIMILARITY_THRESHOLD,
-    match_count: SEMANTIC_MATCH_LIMIT,
-    filter_source: null,
+    query_text: query,
+    match_count: HYBRID_CANDIDATE_COUNT,
   });
 
   if (rpcError) {
-    console.error('[buildSemanticContext] match_embeddings RPC failed:', rpcError);
+    console.error('[buildSemanticContext] match_embeddings_hybrid RPC failed:', rpcError);
     return '';
   }
 
-  if (!matches?.length) return '';
+  const candidates = (matches ?? []) as HybridMatch[];
+  if (candidates.length === 0) return '';
 
-  const hydrated = await Promise.all(
-    (matches as Array<{ source_table: string; source_id: string; similarity: number }>).map(
-      (match) => hydrateSnippet(match, supabase),
-    ),
-  );
+  const candidateTexts = candidates.map((c) => c.chunk_text);
 
-  const valid = hydrated.filter((s): s is SemanticMatch => s !== null);
-  if (valid.length === 0) return '';
+  let topIndices: number[];
+  try {
+    topIndices = await rerankChunks(query, candidateTexts, RERANKED_TOP_N);
+  } catch (error) {
+    console.error('[buildSemanticContext] Reranking failed, falling back to RRF order:', error);
+    topIndices = candidates.slice(0, RERANKED_TOP_N).map((_, i) => i);
+  }
+
+  const topChunks = topIndices.map((i) => candidates[i]).filter(Boolean);
+  if (topChunks.length === 0) return '';
 
   const lines = [
     '## SEMANTICALLY RELEVANT CONTENT (matched to your query)',
-    ...valid.map(
-      (s) => `  [${s.sourceTable}, similarity: ${s.similarity.toFixed(2)}] ${s.snippet}`,
-    ),
+    ...topChunks.map((chunk) => `  [${chunk.source_table}] ${chunk.chunk_text}`),
   ];
 
   return lines.join('\n');
-}
-
-async function hydrateSnippet(
-  match: { source_table: string; source_id: string; similarity: number },
-  supabase: Awaited<ReturnType<typeof createClient>>,
-): Promise<SemanticMatch | null> {
-  const { source_table, source_id, similarity } = match;
-
-  if (source_table === 'accel_curriculum_files') {
-    const { data } = await supabase
-      .from('accel_curriculum_files')
-      .select('title, description')
-      .eq('id', source_id)
-      .single();
-    if (!data) return null;
-    const snippet = `${data.title}${data.description ? `: ${data.description}` : ''}`;
-    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
-  }
-
-  if (source_table === 'accel_deliverables') {
-    const { data } = await supabase
-      .from('accel_deliverables')
-      .select('title, expected_format')
-      .eq('id', source_id)
-      .single();
-    if (!data) return null;
-    const snippet = `${data.title} (format: ${data.expected_format})`;
-    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
-  }
-
-  if (source_table === 'accel_submissions') {
-    const { data } = await supabase
-      .from('accel_submissions')
-      .select('text_content')
-      .eq('id', source_id)
-      .single();
-    if (!data?.text_content) return null;
-    const text = data.text_content as string;
-    const preview = text.length > SUBMISSION_PREVIEW_LENGTH
-      ? `${text.slice(0, SUBMISSION_PREVIEW_LENGTH)}…`
-      : text;
-    return { sourceTable: source_table, sourceId: source_id, similarity, snippet: preview };
-  }
-
-  if (source_table === 'accel_meeting_records') {
-    const { data } = await supabase
-      .from('accel_meeting_records')
-      .select('notes, meeting_date, meeting_type')
-      .eq('id', source_id)
-      .single();
-    if (!data?.notes) return null;
-    const notes = data.notes as string;
-    const preview = notes.length > 200 ? `${notes.slice(0, 200)}…` : notes;
-    const snippet = `${fmtDate(data.meeting_date)} ${data.meeting_type}: ${preview}`;
-    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
-  }
-
-  if (source_table === 'accel_context_docs') {
-    const { data } = await supabase
-      .from('accel_context_docs')
-      .select('title, content')
-      .eq('id', source_id)
-      .single();
-    if (!data) return null;
-    const preview = data.content.length > 300
-      ? `${data.content.slice(0, 300)}…`
-      : data.content;
-    const snippet = `${data.title}: ${preview}`;
-    return { sourceTable: source_table, sourceId: source_id, similarity, snippet };
-  }
-
-  return null;
 }
