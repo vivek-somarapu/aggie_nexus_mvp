@@ -44,16 +44,13 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─── GIN index for full-text search ──────────────────────────────────────────
--- Session-level SET so it takes effect in autocommit mode (Supabase SQL editor).
-
-SET maintenance_work_mem = '64MB';
-
-CREATE INDEX IF NOT EXISTS accel_embeddings_search_vector_idx
-  ON accel_embeddings
-  USING GIN (search_vector);
-
--- Reset to a safe default after the index build.
-SET maintenance_work_mem = '32MB';
+-- Intentionally omitted from this migration. Supabase's default
+-- maintenance_work_mem (32 MB) is too low to build the index inline.
+-- The match_embeddings_hybrid() function works without it via sequential
+-- scan — acceptable for cohort-scale data (~hundreds of rows).
+-- Create manually when needed:
+--   SET maintenance_work_mem = '128MB';
+--   CREATE INDEX accel_embeddings_search_vector_idx ON accel_embeddings USING GIN (search_vector);
 
 -- ─── Drop old match_embeddings() ─────────────────────────────────────────────
 
