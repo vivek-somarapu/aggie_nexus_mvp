@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import WeekUnlockList from './components/week-unlock-list';
 import EmbedContentPanel from './components/embed-content-panel';
 import ContextDocsPanel from './components/context-docs-panel';
+import CacheClearPanel from './components/cache-clear-panel';
 
 async function fetchSettingsData() {
   const supabase = await createClient();
@@ -66,6 +67,7 @@ export default async function SettingsPage() {
         <div className="space-y-4">
           <ContextDocsPanel teams={teams} />
           <EmbedContentPanel />
+          <CacheClearPanel />
         </div>
       </section>
     </div>
