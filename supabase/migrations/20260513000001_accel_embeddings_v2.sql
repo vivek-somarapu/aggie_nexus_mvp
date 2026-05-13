@@ -44,6 +44,9 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─── GIN index for full-text search ──────────────────────────────────────────
+-- Raise maintenance_work_mem for this transaction so the GIN build succeeds.
+
+SET LOCAL maintenance_work_mem = '64MB';
 
 CREATE INDEX IF NOT EXISTS accel_embeddings_search_vector_idx
   ON accel_embeddings
