@@ -74,7 +74,10 @@ export async function POST(request: NextRequest) {
   const requestOrigin = new URL(request.url).origin;
   const platformUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || requestOrigin;
   const onboardingUrl = `${platformUrl}/accelerator/onboarding`;
-  const loginUrl = `${platformUrl}/auth/login`;
+  // Existing users already have credentials — send them straight to onboarding.
+  // signIn() also detects the accel_profile and routes there, but a direct link
+  // is clearer for the user.
+  const loginUrl = `${platformUrl}/accelerator/onboarding`;
 
   // ── Step 1: Reject if an accel_profile already exists for this email ─────────
   // This is the definitive "already on the platform" check.

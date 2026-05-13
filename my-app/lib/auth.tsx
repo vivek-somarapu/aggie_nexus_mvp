@@ -509,9 +509,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authLog("signIn: User profile ready - checking completeness");
       setProfile(userProfile);
 
-      // Redirect based on the profile's completeness
+      // Accelerator users are routed into the accelerator flow first.
+      // This takes priority over main-app profile completeness checks so that
+      // invited founders/mentors/staff are never sent to /profile/setup.
+      const { data: accelProfile } = await supabase
+        .from('accel_profiles')
+        .select('onboarding_completed_at, is_active')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (accelProfile && !(window as any).isPasswordResetPage) {
+        if (!accelProfile.onboarding_completed_at) {
+          authLog("signIn: Accel profile found — redirecting to onboarding");
+          router.push('/accelerator/onboarding');
+        } else if (accelProfile.is_active) {
+          authLog("signIn: Accel profile active — redirecting to dashboard");
+          router.push('/accelerator/dashboard');
+        } else {
+          authLog("signIn: Accel profile pending approval");
+          router.push('/accelerator/pending-approval');
+        }
+        return true;
+      }
+
+      // No accelerator profile — normal main-app routing based on profile completeness.
       if (
-        !userProfile.email || 
+        !userProfile.email ||
         userProfile.email == '' ||
         !userProfile.bio ||
         !userProfile.skills ||

@@ -67,38 +67,59 @@ export async function GET(request: NextRequest) {
     if (type === 'signup' || type === 'invite') {
       callbackLog('Email verification callback detected.');
       const { data: { user }, error: userErr } = await supabase.auth.getUser()
-      
+
       if (userErr) callbackError('Could not fetch user after verification', userErr)
 
       if (user) {
-
         const { data: existing, error: selErr } = await supabase
           .from('users')
           .select('id')
           .eq('id', user.id)
           .single()
 
-          if (selErr?.code === 'PGRST116' || !existing) {
+        if (selErr?.code === 'PGRST116' || !existing) {
+          callbackLog('No user row yet — inserting placeholder profile')
+          await supabase.from('users').insert({
+            id: user.id,
+            full_name: user.user_metadata?.full_name || 'User',
+            email: user.email,
+            email_verified: !!user.email_confirmed_at,
+            industry: [],
+            skills: [],
+            contact: { email: user.email },
+            views: 0,
+            is_texas_am_affiliate: false,
+            deleted: false,
+            last_login_at: new Date().toISOString(),
+            profile_setup_completed: false,
+            profile_setup_skipped: false,
+          })
+        }
 
-            callbackLog('No user row yet — inserting placeholder profile')
-            await supabase.from('users').insert({
-              id: user.id,
-              full_name: user.user_metadata?.full_name || 'User',
-              email: user.email,
-              email_verified: !!user.email_confirmed_at,
-              industry: [],
-              skills: [],
-              contact: { email: user.email },
-              views: 0,
-              is_texas_am_affiliate: false,
-              deleted: false,
-              last_login_at: new Date().toISOString(),
-              profile_setup_completed: false,
-              profile_setup_skipped: false
+        // For accelerator invites: route directly into the accelerator flow
+        // rather than to the generic /auth/verified page.
+        if (type === 'invite') {
+          const { data: accelProfile } = await supabase
+            .from('accel_profiles')
+            .select('onboarding_completed_at, is_active')
+            .eq('id', user.id)
+            .maybeSingle()
 
-            })
+          if (accelProfile) {
+            if (!accelProfile.onboarding_completed_at) {
+              callbackLog('Accelerator invite — redirecting to onboarding')
+              return NextResponse.redirect(new URL('/accelerator/onboarding', requestUrl.origin))
+            }
+            if (accelProfile.is_active) {
+              callbackLog('Accelerator invite — onboarding done, redirecting to dashboard')
+              return NextResponse.redirect(new URL('/accelerator/dashboard', requestUrl.origin))
+            }
+            callbackLog('Accelerator invite — awaiting approval')
+            return NextResponse.redirect(new URL('/accelerator/pending-approval', requestUrl.origin))
           }
         }
+      }
+
       return NextResponse.redirect(new URL('/auth/verified', requestUrl.origin))
     }
 
