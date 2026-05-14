@@ -18,16 +18,6 @@ const InviteSchema = z.object({
   mentor_team_ids: z.array(z.string().uuid()).nullable().optional(),
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Returns true for roles that are active immediately upon profile creation.
- * Founders and mentors start inactive and require onboarding + approval.
- */
-function isImmediatelyActive(role: string): boolean {
-  return role === 'aggiex_team' || role === 'mce_staff';
-}
-
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -69,44 +59,26 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const supabase = await createClient();
 
-  // Prefer an explicit env var; fall back to the request's own origin so the
-  // email links are never built from an empty string.
   const requestOrigin = new URL(request.url).origin;
   const platformUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || requestOrigin;
+  const loginUrl = `${platformUrl}/auth/login`;
   const onboardingUrl = `${platformUrl}/accelerator/onboarding`;
-  // Existing users already have credentials — send them straight to onboarding.
-  // signIn() also detects the accel_profile and routes there, but a direct link
-  // is clearer for the user.
-  const loginUrl = `${platformUrl}/accelerator/onboarding`;
 
-  // ── Step 1: Reject if an accel_profile already exists for this email ─────────
-  // This is the definitive "already on the platform" check.
-  const { data: existingProfile } = await admin
+  // ── Step 1: Reject if already on the accelerator platform ────────────────────
+  const { data: existingAccelProfile } = await admin
     .from('accel_profiles')
-    .select('id, role')
+    .select('id')
     .eq('email', normalizedEmail)
     .maybeSingle();
 
-  if (existingProfile) {
+  if (existingAccelProfile) {
     return NextResponse.json(
       { error: 'This person already has an AggieX profile on the platform.' },
       { status: 409 }
     );
   }
 
-  // ── Step 2: Check if the email exists in auth.users ───────────────────────────
-  // inviteUserByEmail fails with "User already registered" when the email exists
-  // in auth.users, even if there is no accel_profile yet. We detect this upfront
-  // and create the profile directly instead of sending an invite link.
-  const { data: { users: authUsers } } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-  const existingAuthUser = authUsers.find(
-    (u) => u.email?.toLowerCase() === normalizedEmail
-  );
-
-  // ── Fetch team name for the invite email (used in both paths) ─────────────────
+  // ── Fetch team name for the invite email ──────────────────────────────────────
   let teamName: string | undefined;
   if (team_id) {
     const { data: team } = await supabase
@@ -117,58 +89,101 @@ export async function POST(request: NextRequest) {
     teamName = team?.name;
   }
 
-  let newUserId: string;
-  let isExistingAuthUser = false;
+  // ── Step 2: Check if email exists in the main users table ────────────────────
+  // Users found here already have AggieX credentials and a full app profile.
+  // They get immediate accelerator access — no invite link, no onboarding form.
+  const { data: existingAppUser } = await admin
+    .from('users')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
 
-  if (existingAuthUser) {
-    // ── Path A: Auth account exists, no accel_profile ─────────────────────────
-    // The user already has credentials — no invite link needed. Create their
-    // accel_profile directly so they can log in and be routed to onboarding.
+  if (existingAppUser) {
+    // ── Path A: existing AggieX user → grant immediate access ────────────────
     const { error: profileError } = await admin
       .from('accel_profiles')
       .insert({
-        id: existingAuthUser.id,
+        id: existingAppUser.id,
         role,
         full_name,
         email: normalizedEmail,
         team_id: team_id ?? null,
         invited_by: inviterProfile.id,
-        is_active: isImmediatelyActive(role),
+        is_active: true,
+        onboarding_completed_at: new Date().toISOString(),
       });
 
     if (profileError) {
-      console.error('[ACCEL INVITE] Profile insert failed for existing auth user', profileError);
+      console.error('[ACCEL INVITE] Profile insert failed for existing user', profileError);
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
-    newUserId = existingAuthUser.id;
-    isExistingAuthUser = true;
-  } else {
-    // ── Path B: No auth account yet ───────────────────────────────────────────
-    // Send a Supabase invite so the user can set a password. The trigger
-    // handle_accel_new_user() creates the accel_profile on their first sign-in.
-    const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        data: {
-          accel_role: role,
-          full_name,
-          accel_team_id: team_id ?? null,
-          accel_invited_by: inviterProfile.id,
-        },
-        redirectTo: onboardingUrl,
+    // Mentor assignments
+    if (role === 'mentor' && mentor_tier && mentor_team_ids && mentor_team_ids.length > 0) {
+      const assignmentRows = mentor_team_ids.map((assignedTeamId) => ({
+        mentor_id: existingAppUser.id,
+        team_id: assignedTeamId,
+        tier: mentor_tier,
+        assigned_by: inviterProfile.id,
+      }));
+      const { error: assignmentError } = await admin
+        .from('accel_mentor_assignments')
+        .insert(assignmentRows);
+      if (assignmentError) {
+        console.error('[ACCEL INVITE] Mentor assignment insert failed', assignmentError);
       }
-    );
-
-    if (inviteError) {
-      console.error('[ACCEL INVITE] Supabase invite error', inviteError);
-      return NextResponse.json({ error: inviteError.message }, { status: 500 });
     }
 
-    newUserId = inviteData.user.id;
+    try {
+      await emailService.send(
+        buildAccelInviteEmail({
+          recipientName: full_name,
+          recipientEmail: email,
+          inviterName: inviterProfile.full_name,
+          role,
+          teamName,
+          inviteUrl: loginUrl,
+          platformUrl,
+          isExistingUser: true,
+        })
+      );
+    } catch (emailError) {
+      console.error('[ACCEL INVITE] Email failed for existing user', emailError);
+    }
+
+    return NextResponse.json(
+      { message: 'Access granted — existing AggieX user added to accelerator', user_id: existingAppUser.id },
+      { status: 201 }
+    );
   }
 
-  // ── Mentor team assignments (both paths) ─────────────────────────────────────
+  // ── Step 3: No AggieX account — send a Supabase invite ───────────────────────
+  // inviteUserByEmail creates the auth.users row immediately, which fires the
+  // handle_accel_new_user trigger and creates the accel_profile. Supabase then
+  // sends the invite email with a magic link to set their password.
+  // After clicking the link, auth/callback detects the accel_profile and routes
+  // the user to /accelerator/onboarding to complete their intake form.
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+    email,
+    {
+      data: {
+        accel_role: role,
+        full_name,
+        accel_team_id: team_id ?? null,
+        accel_invited_by: inviterProfile.id,
+      },
+      redirectTo: onboardingUrl,
+    }
+  );
+
+  if (inviteError) {
+    console.error('[ACCEL INVITE] Supabase invite error', inviteError);
+    return NextResponse.json({ error: inviteError.message }, { status: 500 });
+  }
+
+  const newUserId = inviteData.user.id;
+
+  // Mentor assignments for new users (profile already created by trigger)
   if (role === 'mentor' && mentor_tier && mentor_team_ids && mentor_team_ids.length > 0) {
     const assignmentRows = mentor_team_ids.map((assignedTeamId) => ({
       mentor_id: newUserId,
@@ -176,38 +191,13 @@ export async function POST(request: NextRequest) {
       tier: mentor_tier,
       assigned_by: inviterProfile.id,
     }));
-
     const { error: assignmentError } = await admin
       .from('accel_mentor_assignments')
       .insert(assignmentRows);
-
     if (assignmentError) {
-      // Non-fatal — profile already created, log and continue
       console.error('[ACCEL INVITE] Mentor assignment insert failed', assignmentError);
     }
   }
 
-  // ── Send notification email ───────────────────────────────────────────────────
-  try {
-    await emailService.send(
-      buildAccelInviteEmail({
-        recipientName: full_name,
-        recipientEmail: email,
-        inviterName: inviterProfile.full_name,
-        role,
-        teamName,
-        inviteUrl: isExistingAuthUser ? loginUrl : onboardingUrl,
-        platformUrl,
-        isExistingUser: isExistingAuthUser,
-      })
-    );
-  } catch (emailError) {
-    console.error('[ACCEL INVITE] Email notification failed', emailError);
-  }
-
-  const message = isExistingAuthUser
-    ? 'Access granted — profile created for existing user'
-    : 'Invite sent';
-
-  return NextResponse.json({ message, user_id: newUserId }, { status: 201 });
+  return NextResponse.json({ message: 'Invite sent', user_id: newUserId }, { status: 201 });
 }
