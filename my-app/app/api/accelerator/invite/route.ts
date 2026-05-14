@@ -59,10 +59,11 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const supabase = await createClient();
 
-  const requestOrigin = new URL(request.url).origin;
-  const platformUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || requestOrigin;
-  const loginUrl = `${platformUrl}/auth/login`;
-  const onboardingUrl = `${platformUrl}/accelerator/onboarding`;
+  // ACCEL_URL must be set on Vercel to https://accelerator.aggiex.org.
+  // Falling back to the request origin keeps local dev working without it.
+  const accelUrl = process.env.ACCEL_URL || new URL(request.url).origin;
+  const loginUrl = `${accelUrl}/auth/login`;
+  const onboardingUrl = `${accelUrl}/accelerator/onboarding`;
 
   // ── Step 1: Reject if already on the accelerator platform ────────────────────
   const { data: existingAccelProfile } = await admin

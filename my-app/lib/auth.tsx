@@ -79,7 +79,7 @@ type AuthContextType = {
   isLoading: boolean;
   isAuthReady: boolean;
   error: string | null;
-  signIn: (email: string, password: string) => Promise<boolean>;
+  signIn: (email: string, password: string, afterLoginUrl?: string) => Promise<boolean>;
   signUp: (
     email: string,
     password: string,
@@ -398,7 +398,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /**
    * Sign in with email and password
    */
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, afterLoginUrl?: string) => {
     authLog("signIn: Starting sign in process", { email });
     try {
       setIsLoading(true);
@@ -506,36 +506,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       
-      authLog("signIn: User profile ready - checking completeness");
+      authLog("signIn: User profile ready - routing");
       setProfile(userProfile);
 
-      // Accelerator users are routed into the accelerator flow first.
-      // This takes priority over main-app profile completeness checks so that
-      // invited founders/mentors/staff are never sent to /profile/setup.
-      const { data: accelProfile } = await supabase
-        .from('accel_profiles')
-        .select('onboarding_completed_at, is_active')
-        .eq('id', data.user.id)
-        .maybeSingle();
+      if ((window as any).isPasswordResetPage) return true;
 
-      if (accelProfile && !(window as any).isPasswordResetPage) {
-        if (!accelProfile.onboarding_completed_at) {
-          authLog("signIn: Accel profile found — redirecting to onboarding");
-          router.push('/accelerator/onboarding');
-        } else if (accelProfile.is_active) {
-          authLog("signIn: Accel profile active — redirecting to dashboard");
-          router.push('/accelerator/dashboard');
-        } else {
-          authLog("signIn: Accel profile pending approval");
-          router.push('/accelerator/pending-approval');
-        }
+      // If the caller supplied an explicit destination (e.g. from the ?redirect
+      // param the middleware appended), use a hard navigation so server
+      // components (AcceleratorLayout etc.) run fresh and handle all routing.
+      if (afterLoginUrl) {
+        authLog("signIn: Using caller-supplied redirect", { afterLoginUrl });
+        window.location.href = afterLoginUrl;
         return true;
       }
 
-      // No accelerator profile — normal main-app routing based on profile completeness.
+      // No explicit destination — default main-app routing.
       if (
         !userProfile.email ||
-        userProfile.email == '' ||
+        userProfile.email === '' ||
         !userProfile.bio ||
         !userProfile.skills ||
         userProfile.skills.length === 0 ||
@@ -544,14 +532,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userProfile.full_name === "User"
       ) {
         authLog("signIn: Profile incomplete, redirecting to setup");
-        if (!(window as any).isPasswordResetPage) {
-          router.push("/profile/setup");
-        }
+        router.push("/profile/setup");
       } else {
         authLog("signIn: Profile complete, redirecting to home");
-        if (!(window as any).isPasswordResetPage) {
-          router.push("/");
-        }
+        router.push("/");
       }
 
       return true;
