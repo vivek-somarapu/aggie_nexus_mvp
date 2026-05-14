@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
   // ACCEL_URL must be set on Vercel to https://accelerator.aggiex.org.
   // Falling back to the request origin keeps local dev working without it.
   const accelUrl = process.env.ACCEL_URL || new URL(request.url).origin;
-  const loginUrl = `${accelUrl}/auth/login`;
+  // Include redirect param so login page forwards them straight to the dashboard.
+  // AcceleratorLayout handles onboarding / pending-approval from there.
+  const loginUrl = `${accelUrl}/auth/login?redirect=/accelerator/dashboard`;
   const onboardingUrl = `${accelUrl}/accelerator/onboarding`;
 
   // ── Step 1: Reject if already on the accelerator platform ────────────────────
