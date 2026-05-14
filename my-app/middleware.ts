@@ -26,7 +26,12 @@ function hasAuthCookie(request: NextRequest): boolean {
   const cookieHeader = request.headers.get('cookie') ?? '';
   return cookieHeader.split(';').some((part) => {
     const name = part.trim().split('=')[0].trim();
-    return name.startsWith('sb-') && name.endsWith('-auth-token');
+    // @supabase/ssr splits long JWTs into chunked cookies:
+    //   sb-<ref>-auth-token        (short token, fits in one cookie)
+    //   sb-<ref>-auth-token.0      (chunk 0)
+    //   sb-<ref>-auth-token.1      (chunk 1)  …etc.
+    // Using includes() catches both forms.
+    return name.startsWith('sb-') && name.includes('-auth-token');
   });
 }
 

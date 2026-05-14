@@ -512,11 +512,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if ((window as any).isPasswordResetPage) return true;
 
       // If the caller supplied an explicit destination (e.g. from the ?redirect
-      // param the middleware appended), use a hard navigation so server
-      // components (AcceleratorLayout etc.) run fresh and handle all routing.
+      // param the middleware appended), navigate there directly.
+      // AcceleratorLayout will handle onboarding / pending-approval server-side.
       if (afterLoginUrl) {
         authLog("signIn: Using caller-supplied redirect", { afterLoginUrl });
-        window.location.href = afterLoginUrl;
+        router.push(afterLoginUrl);
         return true;
       }
 

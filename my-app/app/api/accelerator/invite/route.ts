@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
           role,
           teamName,
           inviteUrl: loginUrl,
-          platformUrl,
+          platformUrl: accelUrl,
           isExistingUser: true,
         })
       );
