@@ -52,19 +52,21 @@ export async function createClient() {
           set(name: string, value: string, options: CookieOptions = {}) {
             serverLog("Cookie set", { name });
             try {
+              // PKCE code-verifier cookies must use SameSite=None so Safari stores
+              // them when the Set-Cookie arrives on the same response that immediately
+              // redirects cross-site to Google. Safari drops SameSite=Lax cookies in
+              // that scenario; Chrome does not. Without None, Safari falls back to a
+              // stale verifier → "code challenge does not match previously saved code
+              // verifier". Session/auth cookies keep SameSite=Lax (CSRF protection).
+              const isPkceVerifier = name.includes('code-verifier')
               cookieStore.set({
                 name,
                 value,
                 ...options,
                 domain: SHARED_COOKIE_DOMAIN,
                 httpOnly: options.httpOnly ?? true,
-                // Always Secure: both production and the local dev server run on HTTPS
-                // (https://localhost:10000). Without Secure, Safari rejects or mishandles
-                // cookies set on HTTPS pages during cross-site redirects (the OAuth PKCE
-                // flow), causing "code challenge does not match previously saved code
-                // verifier". Chrome is lenient; Safari is not.
-                secure: options.secure ?? true,
-                sameSite: options.sameSite ?? 'lax',
+                secure: true,
+                sameSite: isPkceVerifier ? 'none' : (options.sameSite ?? 'lax'),
                 path: options.path ?? '/'
               });
             } catch (error) {
@@ -74,6 +76,7 @@ export async function createClient() {
           remove(name: string, options: CookieOptions = {}) {
             serverLog("Cookie remove", { name });
             try {
+              const isPkceVerifier = name.includes('code-verifier')
               cookieStore.set({
                 name,
                 value: '',
@@ -81,6 +84,8 @@ export async function createClient() {
                 domain: SHARED_COOKIE_DOMAIN,
                 expires: new Date(0),
                 maxAge: 0,
+                secure: true,
+                sameSite: isPkceVerifier ? 'none' : (options.sameSite ?? 'lax'),
                 path: options.path ?? '/'
               });
             } catch (error) {
