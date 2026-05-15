@@ -25,9 +25,10 @@ const serverError = (message: string, error?: any) => {
 
 // Share auth cookies across all *.aggiex.org subdomains in production so
 // that a session established on aggiex.org works on accelerator.aggiex.org
-// and vice-versa. ACCEL_URL is only set in production (Render), so its
-// presence is a reliable signal that we're not in local dev.
-const SHARED_COOKIE_DOMAIN = process.env.ACCEL_URL ? '.aggiex.org' : undefined;
+// and vice-versa. Guarded by NODE_ENV rather than ACCEL_URL because ACCEL_URL
+// is also present in .env.local, which would cause browsers to reject
+// Set-Cookie with Domain=.aggiex.org on localhost (different eTLD+1).
+const SHARED_COOKIE_DOMAIN = process.env.NODE_ENV === 'production' ? '.aggiex.org' : undefined;
 
 /**
  * Creates a Supabase client for server-side operations.
@@ -57,7 +58,12 @@ export async function createClient() {
                 ...options,
                 domain: SHARED_COOKIE_DOMAIN,
                 httpOnly: options.httpOnly ?? true,
-                secure: options.secure ?? process.env.NODE_ENV === 'production',
+                // Always Secure: both production and the local dev server run on HTTPS
+                // (https://localhost:10000). Without Secure, Safari rejects or mishandles
+                // cookies set on HTTPS pages during cross-site redirects (the OAuth PKCE
+                // flow), causing "code challenge does not match previously saved code
+                // verifier". Chrome is lenient; Safari is not.
+                secure: options.secure ?? true,
                 sameSite: options.sameSite ?? 'lax',
                 path: options.path ?? '/'
               });
