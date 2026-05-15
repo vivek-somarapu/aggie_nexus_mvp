@@ -177,11 +177,26 @@ export async function GET(request: NextRequest) {
       // and route into the accelerator flow before the main-app profile checks.
       // This handles the case where the ?redirect param was lost through the
       // OAuth redirect chain.
-      const { data: accelProfile } = await supabase
+      //
+      // Primary lookup is by user.id. If that misses (can happen when Supabase
+      // "Automatic identity linking" is off and OAuth creates a new auth row
+      // with a different UUID than the invited user's original row), we fall
+      // back to email so invited users who sign in via OAuth still land in the
+      // accelerator flow.
+      let { data: accelProfile } = await supabase
         .from('accel_profiles')
         .select('onboarding_completed_at, is_active')
         .eq('id', user.id)
         .maybeSingle()
+
+      if (!accelProfile && user.email) {
+        const { data: profileByEmail } = await supabase
+          .from('accel_profiles')
+          .select('onboarding_completed_at, is_active')
+          .eq('email', user.email.toLowerCase())
+          .maybeSingle()
+        accelProfile = profileByEmail ?? null
+      }
 
       if (accelProfile) {
         callbackLog('OAuth login — accel_profile found, routing into accelerator')

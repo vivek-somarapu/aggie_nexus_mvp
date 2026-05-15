@@ -1,0 +1,113 @@
+[2026-05-11T21:24:53.242Z] [error] Failed to load resource: the server responded with a status of 500 ()
+[2026-05-11T21:26:32.296Z] [log] [AUTH 2026-05-11T21:26:32.290Z] AuthProvider: Rendering with state {hasAuthUser: false, hasProfile: false, isLoading: true, hasError: false, isInitialized: false}
+[2026-05-11T21:26:32.297Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.294Z] ClientLayout: Rendering with auth state {hasAuthUser: false, authLoading: true, hasError: false, showLoadingUI: true, timeoutReached: false}
+[2026-05-11T21:26:32.297Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.294Z] ClientLayout: Showing loading UI
+[2026-05-11T21:26:32.297Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.296Z] ClientLayout: Setting up loading timeout {authLoading: true, showLoadingUI: true}
+[2026-05-11T21:26:32.298Z] [log] [AUTH 2026-05-11T21:26:32.296Z] useEffect: Auth initialization triggered (Phase 4) {isInitialized: false, initializationRefCurrent: false, isLoading: true}
+[2026-05-11T21:26:32.298Z] [log] [SUPABASE CLIENT 2026-05-11T21:26:32.296Z] Creating new Supabase browser client
+[2026-05-11T21:26:32.299Z] [log] [SUPABASE CLIENT 2026-05-11T21:26:32.298Z] Supabase browser client created successfully
+[2026-05-11T21:26:32.299Z] [log] [AUTH 2026-05-11T21:26:32.298Z] useEffect: Getting unified client auth state
+[2026-05-11T21:26:32.299Z] [log] [CLIENT AUTH STATE 2026-05-11T21:26:32.298Z] Getting client-side auth state
+[2026-05-11T21:26:32.299Z] [log] [SUPABASE CLIENT 2026-05-11T21:26:32.299Z] Reusing existing Supabase browser client
+[2026-05-11T21:26:32.306Z] [log] [SUPABASE CLIENT 2026-05-11T21:26:32.306Z] Auth state change in client {event: INITIAL_SESSION, hasSession: false, userId: undefined, isEmailConfirmed: false, timestamp: 2026-05-11T21:26:32.306Z}
+[2026-05-11T21:26:32.307Z] [error] [CLIENT AUTH STATE ERROR 2026-05-11T21:26:32.306Z] Client user auth error {message: Auth session missing!, status: 400, name: AuthSessionMissingError}
+[2026-05-11T21:26:32.307Z] [log] [AUTH 2026-05-11T21:26:32.306Z] useEffect: Unified auth state retrieved {isAuthenticated: false, userId: undefined, isEmailVerified: false, hasProfile: false}
+[2026-05-11T21:26:32.307Z] [log] [AUTH 2026-05-11T21:26:32.307Z] useEffect: Setting up auth state change listener
+[2026-05-11T21:26:32.307Z] [log] [AUTH 2026-05-11T21:26:32.307Z] useEffect: Auth initialization completed
+[2026-05-11T21:26:32.307Z] [log] [AUTH 2026-05-11T21:26:32.307Z] AuthProvider: Rendering with state {hasAuthUser: false, hasProfile: false, isLoading: false, hasError: false, isInitialized: true}
+[2026-05-11T21:26:32.316Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.315Z] ClientLayout: Rendering with auth state {hasAuthUser: false, authLoading: false, hasError: false, showLoadingUI: true, timeoutReached: false}
+[2026-05-11T21:26:32.316Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.315Z] ClientLayout: Evaluating user data {hasMinimalUserData: false, authUserId: undefined, authUserEmail: undefined}
+[2026-05-11T21:26:32.316Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.315Z] ClientLayout: Rendering main layout {hasMinimalUserData: false, hasError: false, timeoutReached: false}
+[2026-05-11T21:26:32.324Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.324Z] ClientLayout: Cleaning up loading timeout
+[2026-05-11T21:26:32.324Z] [log] [AUTH 2026-05-11T21:26:32.324Z] useEffect: Cleaning up auth initialization
+[2026-05-11T21:26:32.328Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.325Z] ClientLayout: Setting up loading timeout {authLoading: false, showLoadingUI: true}
+[2026-05-11T21:26:32.328Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.326Z] ClientLayout: Auth loading complete, hiding loading UI
+[2026-05-11T21:26:32.328Z] [log] [AUTH 2026-05-11T21:26:32.326Z] useEffect: Auth initialization triggered (Phase 4) {isInitialized: true, initializationRefCurrent: false, isLoading: false}
+[2026-05-11T21:26:32.328Z] [log] [AUTH 2026-05-11T21:26:32.326Z] useEffect: Already initialized or initialization in progress, skipping
+[2026-05-11T21:26:32.328Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.326Z] ClientLayout: Rendering with auth state {hasAuthUser: false, authLoading: false, hasError: false, showLoadingUI: false, timeoutReached: false}
+[2026-05-11T21:26:32.328Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.326Z] ClientLayout: Evaluating user data {hasMinimalUserData: false, authUserId: undefined, authUserEmail: undefined}
+[2026-05-11T21:26:32.328Z] [log] [CLIENT LAYOUT 2026-05-11T21:26:32.326Z] ClientLayout: Rendering main layout {hasMinimalUserData: false, hasError: false, timeoutReached: false}
+[2026-05-11T21:26:37.338Z] [log] [AUTH SYNC 2026-05-11T21:26:37.328Z] Starting optimized auth state sync check
+[2026-05-11T21:26:37.338Z] [log] [CLIENT AUTH STATE 2026-05-11T21:26:37.328Z] Getting client-side auth state
+[2026-05-11T21:26:37.338Z] [log] [SUPABASE CLIENT 2026-05-11T21:26:37.328Z] Reusing existing Supabase browser client
+[2026-05-11T21:26:37.338Z] [error] [CLIENT AUTH STATE ERROR 2026-05-11T21:26:37.330Z] Client user auth error {message: Auth session missing!, status: 400, name: AuthSessionMissingError}
+[2026-05-11T21:26:37.338Z] [log] [AUTH SYNC 2026-05-11T21:26:37.330Z] Comparing auth states {clientAuthenticated: false, contextAuthenticated: false, clientUserId: undefined, contextUserId: undefined, clientProfileId: undefined}
+[2026-05-11T21:26:37.338Z] [log] [AUTH SYNC 2026-05-11T21:26:37.330Z] Auth states are consistent
+[2026-05-11T21:31:32.374Z] [log] [AUTH SYNC 2026-05-11T21:31:32.327Z] Starting optimized auth state sync check
+[2026-05-11T21:31:32.374Z] [log] [CLIENT AUTH STATE 2026-05-11T21:31:32.340Z] Getting client-side auth state
+[2026-05-11T21:31:32.374Z] [log] [SUPABASE CLIENT 2026-05-11T21:31:32.342Z] Reusing existing Supabase browser client
+[2026-05-11T21:31:32.374Z] [error] [CLIENT AUTH STATE ERROR 2026-05-11T21:31:32.352Z] Client user auth error {message: Auth session missing!, status: 400, name: AuthSessionMissingError}
+[2026-05-11T21:31:32.374Z] [log] [AUTH SYNC 2026-05-11T21:31:32.355Z] Comparing auth states {clientAuthenticated: false, contextAuthenticated: false, clientUserId: undefined, contextUserId: undefined, clientProfileId: undefined}
+[2026-05-11T21:31:32.374Z] [log] [AUTH SYNC 2026-05-11T21:31:32.355Z] Auth states are consistent
+[2026-05-11T21:34:07.182Z] [error] Loading the font 'https://k2mkucxia43oc7fa.public.blob.vercel-storage.com/front/fonts/space-mono/space-mono-v11-latin-regular.woff2' violates the following Content Security Policy directive: "font-src 'self' *.vercel.com *.gstatic.com vercel.live *.vercel.sh". The action has been blocked.
+[2026-05-11T21:34:07.305Z] [log] %c
+▲
+
+    ________   _ __ _          ____           __
+   /  _/ __/  (_) /( )_____   / __/___ ______/ /_
+   / // /_   / / __/// ___/  / /_/ __ `/ ___/ __/
+ _/ // __/  / / /_  (__  )  / __/ /_/ (__  ) /_
+/___/_/    /_/\__/ /____/  /_/  \__,_/____/\__/
+    _ __ _                         _    __                    __
+   (_) /( )_____   ____  ____     | |  / /__  _____________  / /
+  / / __/// ___/  / __ \/ __ \    | | / / _ \/ ___/ ___/ _ \/ /
+ / / /_  (__  )  / /_/ / / / /    | |/ /  __/ /  / /__/  __/ /
+/_/\__/ /____/   \____/_/ /_/     |___/\___/_/   \___/\___/_/
+  
+
+Hello!
+
+- Open Source https://vercel.com/oss
+- Careers https://vercel.com/careers
+- Status https://vercel-status.com
+
+ font-family: "Geist Mono", monospace; white-space: pre; line-height: 1;
+[2026-05-11T21:34:07.779Z] [error] Failed to load resource: the server responded with a status of 403 ()
+[2026-05-11T21:34:08.020Z] [warning] Deprecated API for given entry type.
+[2026-05-11T21:34:08.094Z] [error] Failed to load resource: the server responded with a status of 429 ()
+[2026-05-11T21:34:08.125Z] [warning] [remote-components:SharedModules]: No webpack require found for bundle "vercel-remote-components" — shared module deduplication skipped. The remote may load its own copy of shared dependencies.
+[2026-05-11T21:34:11.385Z] [warning] The resource https://vercel-docs.vercel.sh/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:34:11.385Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/05ukjk40yt31z.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:34:11.385Z] [warning] The resource https://vercel.com/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:34:11.385Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/1k1n5o3btrkgy.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:34:21.123Z] [warning] The resource https://vercel-docs.vercel.sh/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:34:21.123Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/05ukjk40yt31z.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:34:21.123Z] [warning] The resource https://vercel.com/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:34:21.123Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/1k1n5o3btrkgy.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:47:53.111Z] [error] Failed to load resource: the server responded with a status of 404 ()
+[2026-05-11T21:48:19.976Z] [error] Loading the font 'https://k2mkucxia43oc7fa.public.blob.vercel-storage.com/front/fonts/space-mono/space-mono-v11-latin-regular.woff2' violates the following Content Security Policy directive: "font-src 'self' *.vercel.com *.gstatic.com vercel.live *.vercel.sh". The action has been blocked.
+[2026-05-11T21:48:20.105Z] [log] %c
+▲
+
+    ____                               _ __
+   / __ \________  ____ _____ ___     (_) /_
+  / / / / ___/ _ \/ __ `/ __ `__ \   / / __/
+ / /_/ / /  /  __/ /_/ / / / / / /  / / /__
+/_____/_/   \___/\__,_/_/ /_/ /_/  /_/\__( )
+   _____ __    _          _ __           |/
+  / ___// /_  (_)___     (_) /_
+  \__ \/ __ \/ / __ \   / / __/
+ ___/ / / / / / /_/ /  / / /_
+/____/_/ /_/_/ .___/  /_/\__/
+            /_/
+  
+
+Hello!
+
+- Open Source https://vercel.com/oss
+- Careers https://vercel.com/careers
+- Status https://vercel-status.com
+
+ font-family: "Geist Mono", monospace; white-space: pre; line-height: 1;
+[2026-05-11T21:48:20.593Z] [error] Failed to load resource: the server responded with a status of 403 ()
+[2026-05-11T21:48:20.809Z] [warning] [remote-components:SharedModules]: No webpack require found for bundle "vercel-remote-components" — shared module deduplication skipped. The remote may load its own copy of shared dependencies.
+[2026-05-11T21:48:20.877Z] [warning] Deprecated API for given entry type.
+[2026-05-11T21:48:20.957Z] [error] Failed to load resource: the server responded with a status of 429 ()
+[2026-05-11T21:48:24.324Z] [warning] The resource https://vercel-docs.vercel.sh/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:48:24.324Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/05ukjk40yt31z.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:48:24.324Z] [warning] The resource https://vercel.com/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:48:24.324Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/1k1n5o3btrkgy.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:48:33.835Z] [warning] The resource https://vercel-docs.vercel.sh/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:48:33.835Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/05ukjk40yt31z.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:48:33.835Z] [warning] The resource https://vercel.com/vc-ap-0cca3e/_next/static/immutable/chunks/0sghdlyg3fpyp.js was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+[2026-05-11T21:48:33.835Z] [warning] The resource https://vercel.com/vc-ap-vercel-docs/_next/static/immutable/chunks/1k1n5o3btrkgy.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
