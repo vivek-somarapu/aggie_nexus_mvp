@@ -23,16 +23,22 @@ const serverError = (message: string, error?: any) => {
   }
 };
 
+// Share auth cookies across all *.aggiex.org subdomains in production so
+// that a session established on aggiex.org works on accelerator.aggiex.org
+// and vice-versa. ACCEL_URL is only set in production (Render), so its
+// presence is a reliable signal that we're not in local dev.
+const SHARED_COOKIE_DOMAIN = process.env.ACCEL_URL ? '.aggiex.org' : undefined;
+
 /**
  * Creates a Supabase client for server-side operations.
  * Optimized to reduce excessive cookie operations.
  */
 export async function createClient() {
   serverLog("Creating server-side Supabase client");
-  
+
   try {
     const cookieStore = await cookies();
-    
+
     return createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,17 +46,16 @@ export async function createClient() {
         cookies: {
           get(name: string) {
             const value = cookieStore.get(name)?.value;
-            // Removed verbose logging for every cookie read
             return value;
           },
           set(name: string, value: string, options: CookieOptions = {}) {
             serverLog("Cookie set", { name });
             try {
-              cookieStore.set({ 
-                name, 
-                value, 
+              cookieStore.set({
+                name,
+                value,
                 ...options,
-                // Ensure secure defaults for auth cookies
+                domain: SHARED_COOKIE_DOMAIN,
                 httpOnly: options.httpOnly ?? true,
                 secure: options.secure ?? process.env.NODE_ENV === 'production',
                 sameSite: options.sameSite ?? 'lax',
@@ -63,10 +68,11 @@ export async function createClient() {
           remove(name: string, options: CookieOptions = {}) {
             serverLog("Cookie remove", { name });
             try {
-              cookieStore.set({ 
-                name, 
-                value: '', 
+              cookieStore.set({
+                name,
+                value: '',
                 ...options,
+                domain: SHARED_COOKIE_DOMAIN,
                 expires: new Date(0),
                 maxAge: 0,
                 path: options.path ?? '/'

@@ -64,9 +64,26 @@ export function createClient() {
     }
     
     try {
+      // Share auth cookies across all *.aggiex.org subdomains so that a
+      // session (and PKCE verifier) set on accelerator.aggiex.org is also
+      // readable on aggiex.org and vice-versa. Falls back to undefined for
+      // local dev where the hostname won't match.
+      const cookieDomain =
+        typeof window !== 'undefined' &&
+        window.location.hostname.includes('aggiex.org')
+          ? '.aggiex.org'
+          : undefined;
+
       browserClient = createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookieOptions: {
+            domain: cookieDomain,
+            sameSite: 'lax',
+            secure: true,
+          },
+        }
       );
       
       clientCreatedAt = Date.now();
