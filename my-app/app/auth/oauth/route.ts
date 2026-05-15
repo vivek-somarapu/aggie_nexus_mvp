@@ -27,10 +27,18 @@ export async function GET(request: NextRequest) {
   // Always send accelerator OAuth back to the accelerator domain.
   // For the main site, fall back to the request origin so www.aggiex.org
   // OAuth stays on www.aggiex.org.
+  //
+  // isAcceleratorHost is derived from the actual Host header only — NOT from
+  // ACCEL_URL — because ACCEL_URL is present in .env.local and would
+  // incorrectly route localhost OAuth to the production accelerator URL.
+  // In production, the Host header on accelerator.aggiex.org is sufficient.
   const host = request.headers.get('host') ?? ''
-  const isAccelerator = host.includes('accelerator') || !!process.env.ACCEL_URL
-  const redirectTo = isAccelerator
-    ? `${process.env.ACCEL_URL ?? origin}/auth/callback`
+  const isAcceleratorHost = host.includes('accelerator')
+  const accelBase = isAcceleratorHost && process.env.NODE_ENV === 'production' && process.env.ACCEL_URL
+    ? process.env.ACCEL_URL
+    : origin
+  const redirectTo = isAcceleratorHost
+    ? `${accelBase}/auth/callback`
     : `${origin}/auth/callback`
 
   const { data, error } = await supabase.auth.signInWithOAuth({
