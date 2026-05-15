@@ -33,36 +33,44 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const type = requestUrl.searchParams.get('type')
-  
-  callbackLog("Auth callback initiated", { 
-    hasCode: !!code, 
-    origin: requestUrl.origin 
+
+  // Build the public-facing origin from headers.
+  // On Render, request.url is the internal process URL (https://localhost:10000/...)
+  // so publicOrigin would send all redirects to localhost. The host header
+  // always carries the real public hostname; x-forwarded-proto carries the protocol.
+  const host = request.headers.get('host') ?? ''
+  const proto = request.headers.get('x-forwarded-proto')?.split(',')[0].trim() ?? 'https'
+  const publicOrigin = `${proto}://${host}`
+
+  callbackLog("Auth callback initiated", {
+    hasCode: !!code,
+    publicOrigin,
   });
-  
+
   // If no code provided, redirect to home page
   if (!code) {
     callbackLog("No auth code provided, redirecting to home");
-    return NextResponse.redirect(new URL('/', requestUrl.origin))
+    return NextResponse.redirect(new URL('/', publicOrigin))
   }
 
   try {
     const supabase = await createClient()
-    
+
     callbackLog("Exchanging code for session");
-    // Exchange the code for a session 
+    // Exchange the code for a session
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-    
+
     if (exchangeError) {
       callbackError("Code exchange failed", exchangeError);
       return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, requestUrl.origin)
+        new URL(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`, publicOrigin)
       )
     }
 
     // Handle password recovery flow
     if (type === 'recovery') {
       callbackLog('Password recovery callback detected, redirecting to reset password page');
-      return NextResponse.redirect(new URL('/auth/reset-password', requestUrl.origin))
+      return NextResponse.redirect(new URL('/auth/reset-password', publicOrigin))
     }
 
     if (type === 'signup' || type === 'invite') {
@@ -110,7 +118,7 @@ export async function GET(request: NextRequest) {
             .maybeSingle()
 
           if (accelProfile) {
-            const accelOrigin = process.env.ACCEL_URL ?? requestUrl.origin
+            const accelOrigin = process.env.ACCEL_URL ?? publicOrigin
             if (!accelProfile.onboarding_completed_at) {
               callbackLog('Accelerator invite — redirecting to onboarding')
               return NextResponse.redirect(new URL('/accelerator/onboarding', accelOrigin))
@@ -125,7 +133,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      return NextResponse.redirect(new URL('/auth/verified', requestUrl.origin))
+      return NextResponse.redirect(new URL('/auth/verified', publicOrigin))
     }
 
     callbackLog("Code exchange successful, retrieving user session");
@@ -134,7 +142,7 @@ export async function GET(request: NextRequest) {
     
     if (userError || !user) {
       callbackError("Failed to retrieve user after code exchange", userError);
-      return NextResponse.redirect(`${requestUrl.origin}/?auth_error=callback_failed`)
+      return NextResponse.redirect(`${publicOrigin}/?auth_error=callback_failed`)
     }
     
     callbackLog("User session established", {
@@ -146,7 +154,7 @@ export async function GET(request: NextRequest) {
     // Check email verification status first
     if (!user.email_confirmed_at) {
       callbackLog("User email not verified, redirecting to waiting page");
-      return NextResponse.redirect(new URL('/auth/waiting', requestUrl.origin))
+      return NextResponse.redirect(new URL('/auth/waiting', publicOrigin))
     }
     
     // After OAuth login, check/create user profile and determine redirect
@@ -209,7 +217,7 @@ export async function GET(request: NextRequest) {
         callbackLog('OAuth login — accel_profile found, routing into accelerator')
         // Always redirect accelerator users to the accelerator domain, even if
         // this callback was reached via www.aggiex.org (Supabase Site URL fallback).
-        const accelOrigin = process.env.ACCEL_URL ?? requestUrl.origin
+        const accelOrigin = process.env.ACCEL_URL ?? publicOrigin
         if (!accelProfile.onboarding_completed_at) {
           return NextResponse.redirect(new URL('/accelerator/onboarding', accelOrigin))
         }
@@ -249,10 +257,10 @@ export async function GET(request: NextRequest) {
         // Redirect based on profile status
         if (status.shouldSetupProfile) {
           callbackLog("Profile setup needed, redirecting to setup");
-          return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
+          return NextResponse.redirect(new URL('/profile/setup', publicOrigin))
         } else {
           callbackLog("Profile complete, redirecting to home");
-          return NextResponse.redirect(new URL('/', requestUrl.origin))
+          return NextResponse.redirect(new URL('/', publicOrigin))
         }
       } else {
         // The user doesn't exist in the users table yet, create them
@@ -291,17 +299,17 @@ export async function GET(request: NextRequest) {
         
         // New users always need to complete profile setup
         callbackLog("New user created, redirecting to profile setup");
-        return NextResponse.redirect(new URL('/profile/setup', requestUrl.origin))
+        return NextResponse.redirect(new URL('/profile/setup', publicOrigin))
       }
     } catch (err) {
       callbackError("Error in user profile check", err);
       // On error, default to redirecting to the home page
-      return NextResponse.redirect(new URL('/', requestUrl.origin))
+      return NextResponse.redirect(new URL('/', publicOrigin))
     }
   } catch (err) {
     callbackError("Auth callback exception", err);
     return NextResponse.redirect(
-      new URL('/auth/login?error=Authentication+failed', requestUrl.origin)
+      new URL('/auth/login?error=Authentication+failed', publicOrigin)
     )
   }
 } 
