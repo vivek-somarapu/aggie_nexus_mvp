@@ -696,33 +696,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const signInWithGoogle = async () => {
     authLog("signInWithGoogle: Starting Google OAuth flow");
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        authError("signInWithGoogle: OAuth failed", error);
-        setError(error.message);
-        return false;
-      }
-
-      authLog("signInWithGoogle: OAuth initiated successfully");
-      return true;
-    } catch (err: any) {
-      authError("signInWithGoogle: Exception during Google OAuth", err);
-      setError(err.message || "Failed to sign in with Google");
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
+    setIsLoading(true);
+    setError(null);
+    // Server-side OAuth: the server stores the PKCE verifier in cookies scoped
+    // to .aggiex.org, so the callback can always read it regardless of domain.
+    window.location.href = '/auth/oauth?provider=google';
+    return true;
   };
 
   /**
@@ -730,33 +709,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const signInWithGitHub = async () => {
     authLog("signInWithGitHub: Starting GitHub OAuth flow");
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        authError("signInWithGitHub: OAuth failed", error);
-        setError(error.message);
-        return false;
-      }
-
-      authLog("signInWithGitHub: OAuth initiated successfully");
-      return true;
-    } catch (err: any) {
-      authError("signInWithGitHub: Exception during GitHub OAuth", err);
-      setError(err.message || "Failed to sign in with GitHub");
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
+    setIsLoading(true);
+    setError(null);
+    window.location.href = '/auth/oauth?provider=github';
+    return true;
   };
 
   /**

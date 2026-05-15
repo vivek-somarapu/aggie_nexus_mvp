@@ -168,27 +168,14 @@ export default function CanecktLandingPage() {
     resolver: zodResolver(signInSchema),
   });
 
-  const handleOAuthSignIn = async (provider: 'google' | 'github') => {
+  const handleOAuthSignIn = (provider: 'google' | 'github') => {
     setIsOAuthLoading(provider);
     setAccessError(null);
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        // Hard-coded to the accelerator domain — this component is only ever
-        // rendered on accelerator.aggiex.org, and the PKCE verifier must land
-        // on the same domain as the callback. Using window.location.origin was
-        // unsafe because Supabase falls back to its Site URL (www.aggiex.org)
-        // when the redirectTo is unrecognised, causing a cross-domain mismatch.
-        redirectTo: 'https://accelerator.aggiex.org/auth/callback',
-      },
-    });
-
-    if (error) {
-      setAccessError(`Failed to sign in with ${provider === 'google' ? 'Google' : 'GitHub'}. Please try again.`);
-      setIsOAuthLoading(null);
-    }
-    // On success the browser redirects — no further state update needed.
+    // Navigate to the server-side OAuth route. The server initiates the OAuth
+    // flow and stores the PKCE verifier in server-controlled cookies (scoped to
+    // .aggiex.org), eliminating the cross-domain verifier mismatch that occurs
+    // when the browser stores it client-side on a different subdomain.
+    window.location.href = `/auth/oauth?provider=${provider}`;
   };
 
   const handleSignIn = async ({ email, password }: SignInFormValues) => {
