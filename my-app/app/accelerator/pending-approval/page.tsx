@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 
 // Standalone page — NOT wrapped in AcceleratorLayout.
 // Shown after onboarding is complete while waiting for AggieX approval.
@@ -10,11 +11,26 @@ export default async function PendingApprovalPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
-  const { data: profile } = await supabase
+  const admin = createAdminClient();
+
+  let profile = null;
+
+  const { data: profileById } = await admin
     .from('accel_profiles')
     .select('full_name, is_active, onboarding_completed_at')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
+
+  if (profileById) {
+    profile = profileById;
+  } else if (user.email) {
+    const { data: profileByEmail } = await admin
+      .from('accel_profiles')
+      .select('full_name, is_active, onboarding_completed_at')
+      .eq('email', user.email.toLowerCase())
+      .maybeSingle();
+    profile = profileByEmail ?? null;
+  }
 
   if (!profile) redirect('/accelerator/access-denied');
 

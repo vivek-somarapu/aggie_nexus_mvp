@@ -110,16 +110,17 @@ export async function GET(request: NextRequest) {
             .maybeSingle()
 
           if (accelProfile) {
+            const accelOrigin = process.env.ACCEL_URL ?? requestUrl.origin
             if (!accelProfile.onboarding_completed_at) {
               callbackLog('Accelerator invite — redirecting to onboarding')
-              return NextResponse.redirect(new URL('/accelerator/onboarding', requestUrl.origin))
+              return NextResponse.redirect(new URL('/accelerator/onboarding', accelOrigin))
             }
             if (accelProfile.is_active) {
               callbackLog('Accelerator invite — onboarding done, redirecting to dashboard')
-              return NextResponse.redirect(new URL('/accelerator/dashboard', requestUrl.origin))
+              return NextResponse.redirect(new URL('/accelerator/dashboard', accelOrigin))
             }
             callbackLog('Accelerator invite — awaiting approval')
-            return NextResponse.redirect(new URL('/accelerator/pending-approval', requestUrl.origin))
+            return NextResponse.redirect(new URL('/accelerator/pending-approval', accelOrigin))
           }
         }
       }
@@ -206,13 +207,16 @@ export async function GET(request: NextRequest) {
 
       if (accelProfile) {
         callbackLog('OAuth login — accel_profile found, routing into accelerator')
+        // Always redirect accelerator users to the accelerator domain, even if
+        // this callback was reached via www.aggiex.org (Supabase Site URL fallback).
+        const accelOrigin = process.env.ACCEL_URL ?? requestUrl.origin
         if (!accelProfile.onboarding_completed_at) {
-          return NextResponse.redirect(new URL('/accelerator/onboarding', requestUrl.origin))
+          return NextResponse.redirect(new URL('/accelerator/onboarding', accelOrigin))
         }
         if (accelProfile.is_active) {
-          return NextResponse.redirect(new URL('/accelerator/dashboard', requestUrl.origin))
+          return NextResponse.redirect(new URL('/accelerator/dashboard', accelOrigin))
         }
-        return NextResponse.redirect(new URL('/accelerator/pending-approval', requestUrl.origin))
+        return NextResponse.redirect(new URL('/accelerator/pending-approval', accelOrigin))
       }
 
       // If the user exists, use simplified profile status logic

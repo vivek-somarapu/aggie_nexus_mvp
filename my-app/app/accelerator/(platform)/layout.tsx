@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import type { AccelProfile, AccelRole } from '@/lib/accel-types';
 import AccelShell from './components/accel-shell';
 
@@ -9,13 +10,28 @@ async function fetchAccelProfile(): Promise<AccelProfile | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data } = await supabase
+  const admin = createAdminClient();
+
+  // Primary lookup by user.id
+  const { data: profileById } = await admin
     .from('accel_profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  return data ?? null;
+  if (profileById) return profileById;
+
+  // Email fallback: handles the case where the accel_profile was created
+  // with a different UUID (e.g. invite email → OAuth login with auto-linking off)
+  if (!user.email) return null;
+
+  const { data: profileByEmail } = await admin
+    .from('accel_profiles')
+    .select('*')
+    .eq('email', user.email.toLowerCase())
+    .maybeSingle();
+
+  return profileByEmail ?? null;
 }
 
 export default async function AcceleratorLayout({

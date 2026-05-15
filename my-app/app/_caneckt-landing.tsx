@@ -175,7 +175,12 @@ export default function CanecktLandingPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        // Hard-coded to the accelerator domain — this component is only ever
+        // rendered on accelerator.aggiex.org, and the PKCE verifier must land
+        // on the same domain as the callback. Using window.location.origin was
+        // unsafe because Supabase falls back to its Site URL (www.aggiex.org)
+        // when the redirectTo is unrecognised, causing a cross-domain mismatch.
+        redirectTo: 'https://accelerator.aggiex.org/auth/callback',
       },
     });
 
