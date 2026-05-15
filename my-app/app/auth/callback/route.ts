@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/accel-admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { profileSetupStatus } from '@/lib/profile-utils'
 
@@ -98,8 +99,11 @@ export async function GET(request: NextRequest) {
 
         // For accelerator invites: route directly into the accelerator flow
         // rather than to the generic /auth/verified page.
+        // Uses admin client to bypass RLS in case the profile's id differs
+        // from the authenticated user's id (e.g. after identity re-linking).
         if (type === 'invite') {
-          const { data: accelProfile } = await supabase
+          const inviteAdmin = createAdminClient()
+          const { data: accelProfile } = await inviteAdmin
             .from('accel_profiles')
             .select('onboarding_completed_at, is_active')
             .eq('id', user.id)
@@ -178,19 +182,21 @@ export async function GET(request: NextRequest) {
       // This handles the case where the ?redirect param was lost through the
       // OAuth redirect chain.
       //
-      // Primary lookup is by user.id. If that misses (can happen when Supabase
-      // "Automatic identity linking" is off and OAuth creates a new auth row
-      // with a different UUID than the invited user's original row), we fall
-      // back to email so invited users who sign in via OAuth still land in the
-      // accelerator flow.
-      let { data: accelProfile } = await supabase
+      // Uses admin client to bypass RLS — necessary because when Supabase
+      // "Automatic identity linking" is off, OAuth creates a new auth row with
+      // a different UUID than the invited user's original row. RLS would block
+      // the email-fallback query (auth.uid() ≠ accel_profile.id), so we need
+      // service-role access to reliably find the profile by either id or email.
+      const admin = createAdminClient()
+
+      let { data: accelProfile } = await admin
         .from('accel_profiles')
         .select('onboarding_completed_at, is_active')
         .eq('id', user.id)
         .maybeSingle()
 
       if (!accelProfile && user.email) {
-        const { data: profileByEmail } = await supabase
+        const { data: profileByEmail } = await admin
           .from('accel_profiles')
           .select('onboarding_completed_at, is_active')
           .eq('email', user.email.toLowerCase())
