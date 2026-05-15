@@ -173,6 +173,27 @@ export async function GET(request: NextRequest) {
         callbackLog("Last login timestamp updated successfully");
       }
 
+      // For accelerator users logging in via OAuth: check for an accel_profile
+      // and route into the accelerator flow before the main-app profile checks.
+      // This handles the case where the ?redirect param was lost through the
+      // OAuth redirect chain.
+      const { data: accelProfile } = await supabase
+        .from('accel_profiles')
+        .select('onboarding_completed_at, is_active')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (accelProfile) {
+        callbackLog('OAuth login — accel_profile found, routing into accelerator')
+        if (!accelProfile.onboarding_completed_at) {
+          return NextResponse.redirect(new URL('/accelerator/onboarding', requestUrl.origin))
+        }
+        if (accelProfile.is_active) {
+          return NextResponse.redirect(new URL('/accelerator/dashboard', requestUrl.origin))
+        }
+        return NextResponse.redirect(new URL('/accelerator/pending-approval', requestUrl.origin))
+      }
+
       // If the user exists, use simplified profile status logic
       if (existingUser) {
         callbackLog("Existing user found, checking profile status");
