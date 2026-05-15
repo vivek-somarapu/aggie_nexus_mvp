@@ -58,7 +58,12 @@ export async function createClient() {
                 ...options,
                 domain: SHARED_COOKIE_DOMAIN,
                 httpOnly: options.httpOnly ?? true,
-                secure: options.secure ?? process.env.NODE_ENV === 'production',
+                // Always Secure: both production and the local dev server run on HTTPS
+                // (https://localhost:10000). Without Secure, Safari rejects or mishandles
+                // cookies set on HTTPS pages during cross-site redirects (the OAuth PKCE
+                // flow), causing "code challenge does not match previously saved code
+                // verifier". Chrome is lenient; Safari is not.
+                secure: options.secure ?? true,
                 sameSite: options.sameSite ?? 'lax',
                 path: options.path ?? '/'
               });
