@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import type { AccelRole, AccelExpectedFormat } from '@/lib/accel-types';
 import { AGGIEX_2026_PROGRAM_ID } from '@/lib/accel-types';
 import CreateDeliverablePanel from './components/create-deliverable-panel';
@@ -17,8 +19,9 @@ interface WeekGroup {
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
 
-async function fetchDeliverablesData() {
-  const supabase = await createClient();
+const fetchDeliverablesData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
 
   const [weeksResult, deliverablesResult, teamsResult, submissionsResult] = await Promise.all([
     supabase
@@ -95,7 +98,10 @@ async function fetchDeliverablesData() {
   });
 
   return { weekGroups, teams, weeks };
-}
+  },
+  ['accel-deliverables-data'],
+  { revalidate: 30, tags: ['accel-deliverables'] }
+);
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 

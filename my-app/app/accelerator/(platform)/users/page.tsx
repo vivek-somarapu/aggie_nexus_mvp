@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { ACCEL_ROLES } from '@/lib/accel-types';
 import type { AccelProfile } from '@/lib/accel-types';
 import InviteUserModal from './components/invite-user-modal';
@@ -21,13 +23,52 @@ const MENTOR_TIER_LABELS: Record<string, string> = {
 
 // ─── Data fetcher ─────────────────────────────────────────────
 
-async function fetchUsersPageData() {
-  const supabase = await createClient();
+const fetchUsersData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
+    const [profilesResult, teamsResult, assignmentsResult] = await Promise.all([
+      supabase
+        .from('accel_profiles')
+        .select('*')
+        .order('created_at', { ascending: false }),
 
+      supabase
+        .from('accel_teams')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name'),
+
+      supabase
+        .from('accel_mentor_assignments')
+        .select('mentor_id, team_id, tier, accel_teams(name)'),
+    ]);
+
+    const assignmentsByMentor: Record<string, MentorAssignment[]> = {};
+    for (const row of assignmentsResult.data ?? []) {
+      const existing = assignmentsByMentor[row.mentor_id] ?? [];
+      existing.push(row as MentorAssignment);
+      assignmentsByMentor[row.mentor_id] = existing;
+    }
+
+    return {
+      profiles: (profilesResult.data ?? []) as AccelProfile[],
+      teams: teamsResult.data ?? [],
+      assignmentsByMentor,
+    };
+  },
+  ['accel-users-data'],
+  { revalidate: 30, tags: ['accel-users'] }
+);
+
+// ─── Page ─────────────────────────────────────────────────────
+
+export default async function UsersPage() {
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
-  const { data: callerProfile } = await supabase
+  const adminClient = createAdminClient();
+  const { data: callerProfile } = await adminClient
     .from('accel_profiles')
     .select('role')
     .eq('id', user.id)
@@ -37,41 +78,7 @@ async function fetchUsersPageData() {
     redirect('/accelerator/dashboard');
   }
 
-  const [profilesResult, teamsResult, assignmentsResult] = await Promise.all([
-    supabase
-      .from('accel_profiles')
-      .select('*')
-      .order('created_at', { ascending: false }),
-
-    supabase
-      .from('accel_teams')
-      .select('id, name')
-      .eq('is_active', true)
-      .order('name'),
-
-    supabase
-      .from('accel_mentor_assignments')
-      .select('mentor_id, team_id, tier, accel_teams(name)'),
-  ]);
-
-  const assignmentsByMentor = new Map<string, MentorAssignment[]>();
-  for (const row of assignmentsResult.data ?? []) {
-    const existing = assignmentsByMentor.get(row.mentor_id) ?? [];
-    existing.push(row as MentorAssignment);
-    assignmentsByMentor.set(row.mentor_id, existing);
-  }
-
-  return {
-    profiles: (profilesResult.data ?? []) as AccelProfile[],
-    teams: teamsResult.data ?? [],
-    assignmentsByMentor,
-  };
-}
-
-// ─── Page ─────────────────────────────────────────────────────
-
-export default async function UsersPage() {
-  const { profiles, teams, assignmentsByMentor } = await fetchUsersPageData();
+  const { profiles, teams, assignmentsByMentor } = await fetchUsersData();
 
   const pendingApprovals = profiles.filter(
     (profile) => !profile.is_active && profile.onboarding_completed_at
@@ -174,7 +181,7 @@ export default async function UsersPage() {
                   </thead>
                   <tbody className="divide-y divide-neutral-800/50">
                     {members.map((profile) => {
-                      const mentorAssignments = assignmentsByMentor.get(profile.id) ?? [];
+                      const mentorAssignments = assignmentsByMentor[profile.id] ?? [];
 
                       return (
                         <tr key={profile.id} className="hover:bg-neutral-900/50">

@@ -1,7 +1,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { FUNDING_STATUS_LABELS } from '@/lib/accel-types';
 import type { AccelFundingStatus } from '@/lib/accel-types';
 
@@ -12,12 +14,31 @@ const FUNDING_STATUS_COLORS: Record<AccelFundingStatus, string> = {
   exited: 'text-neutral-500',
 };
 
-async function fetchTeamsPageData() {
+const fetchTeamsData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
+    const { data: teams } = await supabase
+      .from('accel_teams')
+      .select(`
+        id, name, logo_url, industry_vertical, venture_stage,
+        crucible_outcome, is_active, created_at,
+        accel_milestone_funding (funding_status, amount_unlocked, total_award),
+        accel_founders (id)
+      `)
+      .order('name');
+    return teams ?? [];
+  },
+  ['accel-teams-data'],
+  { revalidate: 30, tags: ['accel-teams'] }
+);
+
+export default async function TeamsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient();
+  const { data: profile } = await adminClient
     .from('accel_profiles')
     .select('role')
     .eq('id', user.id)
@@ -27,21 +48,8 @@ async function fetchTeamsPageData() {
     redirect('/accelerator/dashboard');
   }
 
-  const { data: teams } = await supabase
-    .from('accel_teams')
-    .select(`
-      id, name, logo_url, industry_vertical, venture_stage,
-      crucible_outcome, is_active, created_at,
-      accel_milestone_funding (funding_status, amount_unlocked, total_award),
-      accel_founders (id)
-    `)
-    .order('name');
-
-  return { teams: teams ?? [], role: profile.role };
-}
-
-export default async function TeamsPage() {
-  const { teams, role } = await fetchTeamsPageData();
+  const teams = await fetchTeamsData();
+  const role = profile.role;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">

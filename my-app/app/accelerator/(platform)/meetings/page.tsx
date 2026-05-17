@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { format, parseISO } from 'date-fns';
 import type { AccelMeetingType, AccelRole } from '@/lib/accel-types';
 
@@ -14,8 +16,9 @@ const MEETING_TYPE_LABELS: Record<AccelMeetingType, string> = {
 
 const ALLOWED_ROLES: AccelRole[] = ['aggiex_team', 'mce_staff', 'mentor'];
 
-async function fetchMeetingsData(role: AccelRole, userId: string) {
-  const supabase = await createClient();
+const fetchMeetingsData = unstable_cache(
+  async (role: AccelRole, userId: string) => {
+    const supabase = createAdminClient();
 
   if (role === 'mentor') {
     // Mentors see meetings for their assigned teams only
@@ -72,7 +75,10 @@ async function fetchMeetingsData(role: AccelRole, userId: string) {
   ]);
 
   return { meetings: meetingsResult.data ?? [], teams: teamsResult.data ?? [] };
-}
+  },
+  ['accel-meetings-data'],
+  { revalidate: 30, tags: ['accel-meetings'] }
+);
 
 export default async function MeetingsPage() {
   const supabase = await createClient();

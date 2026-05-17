@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { format, parseISO } from 'date-fns';
 import type { AccelRole, AccelMetricType } from '@/lib/accel-types';
 
@@ -27,32 +29,36 @@ const ALLOWED_ROLES: AccelRole[] = ['aggiex_team', 'mce_staff'];
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
 
-async function fetchTractionData() {
-  const supabase = await createClient();
+const fetchTractionData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
 
-  const [entriesResult, teamsResult] = await Promise.all([
-    supabase
-      .from('accel_traction_entries')
-      .select(`
-        id, team_id, metric_type, value, unit, entry_date, notes, source_evidence_url,
-        accel_teams (name),
-        accel_weeks (week_number)
-      `)
-      .order('entry_date', { ascending: false })
-      .limit(200),
+    const [entriesResult, teamsResult] = await Promise.all([
+      supabase
+        .from('accel_traction_entries')
+        .select(`
+          id, team_id, metric_type, value, unit, entry_date, notes, source_evidence_url,
+          accel_teams (name),
+          accel_weeks (week_number)
+        `)
+        .order('entry_date', { ascending: false })
+        .limit(200),
 
-    supabase
-      .from('accel_teams')
-      .select('id, name')
-      .eq('is_active', true)
-      .order('name'),
-  ]);
+      supabase
+        .from('accel_teams')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name'),
+    ]);
 
-  return {
-    entries: entriesResult.data ?? [],
-    teams: teamsResult.data ?? [],
-  };
-}
+    return {
+      entries: entriesResult.data ?? [],
+      teams: teamsResult.data ?? [],
+    };
+  },
+  ['accel-traction-data'],
+  { revalidate: 30, tags: ['accel-traction'] }
+);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

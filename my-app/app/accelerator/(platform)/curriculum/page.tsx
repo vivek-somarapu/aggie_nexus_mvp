@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import type { AccelRole, AccelWeek, AccelTeam } from '@/lib/accel-types';
 import { AGGIEX_2026_PROGRAM_ID } from '@/lib/accel-types';
 import UploadCurriculumForm from './components/upload-curriculum-form';
@@ -48,8 +50,9 @@ function groupFilesByWeek(files: CurriculumFileData[]): WeekGroup[] {
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
 
-async function fetchCurriculumData(role: AccelRole) {
-  const supabase = await createClient();
+const fetchCurriculumData = unstable_cache(
+  async (role: AccelRole) => {
+    const supabase = createAdminClient();
 
   const { data: files, error } = await supabase
     .from('accel_curriculum_files')
@@ -88,7 +91,10 @@ async function fetchCurriculumData(role: AccelRole) {
     allWeeks,
     allTeams,
   };
-}
+  },
+  ['accel-curriculum-data'],
+  { revalidate: 60, tags: ['accel-curriculum'] }
+);
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
