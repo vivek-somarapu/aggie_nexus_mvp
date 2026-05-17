@@ -1,16 +1,43 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import WeekUnlockList from './components/week-unlock-list';
 import EmbedContentPanel from './components/embed-content-panel';
 import ContextDocsPanel from './components/context-docs-panel';
 import CacheClearPanel from './components/cache-clear-panel';
 
-async function fetchSettingsData() {
+const fetchSettingsData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
+    const [weeksResult, teamsResult] = await Promise.all([
+      supabase
+        .from('accel_weeks')
+        .select('id, week_number, theme, start_date, end_date, is_unlocked, unlocked_at, intensity')
+        .order('week_number'),
+
+      supabase
+        .from('accel_teams')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name'),
+    ]);
+    return {
+      weeks: weeksResult.data ?? [],
+      teams: teamsResult.data ?? [],
+    };
+  },
+  ['accel-settings-data'],
+  { revalidate: 60, tags: ['accel-settings'] }
+);
+
+export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient();
+  const { data: profile } = await adminClient
     .from('accel_profiles')
     .select('role')
     .eq('id', user.id)
@@ -18,26 +45,6 @@ async function fetchSettingsData() {
 
   if (profile?.role !== 'aggiex_team') redirect('/accelerator/dashboard');
 
-  const [weeksResult, teamsResult] = await Promise.all([
-    supabase
-      .from('accel_weeks')
-      .select('id, week_number, theme, start_date, end_date, is_unlocked, unlocked_at, intensity')
-      .order('week_number'),
-
-    supabase
-      .from('accel_teams')
-      .select('id, name')
-      .eq('is_active', true)
-      .order('name'),
-  ]);
-
-  return {
-    weeks: weeksResult.data ?? [],
-    teams: teamsResult.data ?? [],
-  };
-}
-
-export default async function SettingsPage() {
   const { weeks, teams } = await fetchSettingsData();
 
   return (

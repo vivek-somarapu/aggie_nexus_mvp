@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { format, parseISO } from 'date-fns';
 import type { AccelRole, AccelFundType, AccelFundingStatus } from '@/lib/accel-types';
 import {
@@ -55,8 +57,9 @@ interface TeamFundingData {
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
 
-async function fetchFundingPageData() {
-  const supabase = await createClient();
+const fetchFundingPageData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
 
   const [teamsResult, milestonesResult, eventsResult, deliverableCountResult, submissionsResult] =
     await Promise.all([
@@ -141,7 +144,10 @@ async function fetchFundingPageData() {
   });
 
   return { teamFundingData, teams, totalDeliverableCount };
-}
+  },
+  ['accel-funding-data'],
+  { revalidate: 30, tags: ['accel-funding'] }
+);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

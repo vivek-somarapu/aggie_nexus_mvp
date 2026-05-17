@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import type { AccelRole } from '@/lib/accel-types';
 import { AGGIEX_2026_PROGRAM_ID } from '@/lib/accel-types';
 import AddDocForm from './components/add-doc-form';
@@ -33,13 +35,33 @@ const STATUS_COLORS = {
 
 // ─── Data fetcher ─────────────────────────────────────────────
 
-async function fetchDocsPageData() {
-  const supabase = await createClient();
+const fetchDocsData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
+    const { data: docs } = await supabase
+      .from('accel_internal_docs')
+      .select(`
+        id, title, description, file_url, file_type,
+        visibility, status, created_at,
+        accel_profiles!accel_internal_docs_uploader_id_fkey (full_name)
+      `)
+      .eq('program_id', AGGIEX_2026_PROGRAM_ID)
+      .order('created_at', { ascending: false });
+    return (docs ?? []) as InternalDoc[];
+  },
+  ['accel-internal-docs-data'],
+  { revalidate: 30, tags: ['accel-internal-docs'] }
+);
 
+// ─── Page ─────────────────────────────────────────────────────
+
+export default async function InternalDocsPage() {
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient();
+  const { data: profile } = await adminClient
     .from('accel_profiles')
     .select('role')
     .eq('id', user.id)
@@ -49,26 +71,8 @@ async function fetchDocsPageData() {
     redirect('/accelerator/dashboard');
   }
 
-  const { data: docs } = await supabase
-    .from('accel_internal_docs')
-    .select(`
-      id, title, description, file_url, file_type,
-      visibility, status, created_at,
-      accel_profiles!accel_internal_docs_uploader_id_fkey (full_name)
-    `)
-    .eq('program_id', AGGIEX_2026_PROGRAM_ID)
-    .order('created_at', { ascending: false });
-
-  return {
-    docs: (docs ?? []) as InternalDoc[],
-    role: profile.role as AccelRole,
-  };
-}
-
-// ─── Page ─────────────────────────────────────────────────────
-
-export default async function InternalDocsPage() {
-  const { docs, role } = await fetchDocsPageData();
+  const docs = await fetchDocsData();
+  const role = profile.role as AccelRole;
 
   const isAdmin = role === 'aggiex_team';
 

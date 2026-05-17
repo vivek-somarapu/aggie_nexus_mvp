@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { format, parseISO } from 'date-fns';
 import { ExternalLink } from 'lucide-react';
 import type { AccelRole, AccelMentorTier } from '@/lib/accel-types';
@@ -41,8 +43,9 @@ interface MentorWithAssignments {
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
 
-async function fetchMentorsData() {
-  const supabase = await createClient();
+const fetchMentorsData = unstable_cache(
+  async () => {
+    const supabase = createAdminClient();
 
   const [mentorProfilesResult, assignmentsResult, teamsResult, accelProfilesResult] =
     await Promise.all([
@@ -147,7 +150,10 @@ async function fetchMentorsData() {
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   return { mentors, teams };
-}
+  },
+  ['accel-mentors-data'],
+  { revalidate: 60, tags: ['accel-mentors'] }
+);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
