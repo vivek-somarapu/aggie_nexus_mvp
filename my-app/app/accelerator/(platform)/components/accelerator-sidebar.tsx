@@ -20,6 +20,7 @@ import {
   ChevronRight,
   ArrowUpLeft,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -348,6 +349,37 @@ export default function AcceleratorSidebar({
               AI Advisor
             </span>
           </button>
+        </div>
+
+        {/* ── Trendformation external link ── */}
+        <div>
+          {!isCollapsed && (
+            <p className="mb-1 px-2.5 text-[9px] font-mono uppercase tracking-[0.35em] text-neutral-700">
+              Resources
+            </p>
+          )}
+          <a
+            href="https://trendformation.onrender.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            title={isCollapsed ? 'Trendformation' : undefined}
+            className={[
+              'w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors',
+              isCollapsed ? 'justify-center' : '',
+              'text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200',
+            ].join(' ')}
+          >
+            <ExternalLink size={15} strokeWidth={1.75} className="shrink-0" />
+            <span
+              className={`
+                whitespace-nowrap overflow-hidden
+                transition-all duration-150 ease-in-out
+                ${isCollapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100'}
+              `}
+            >
+              Trendformation
+            </span>
+          </a>
         </div>
       </nav>
 
