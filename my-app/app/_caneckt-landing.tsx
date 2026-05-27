@@ -207,7 +207,7 @@ export default function CanecktLandingPage() {
 
   return (
     <div
-      className={`${spaceGrotesk.variable} h-screen flex flex-col overflow-hidden`}
+      className={`${spaceGrotesk.variable} relative min-h-screen flex flex-col overflow-x-hidden`}
       style={{
         background: '#030308',
         backgroundImage: 'radial-gradient(rgba(255,255,255,0.055) 1px, transparent 1px)',
@@ -239,7 +239,7 @@ export default function CanecktLandingPage() {
       </motion.header>
 
       {/* ── Two-column layout ── */}
-      <main className="relative z-10 flex-1 min-h-0 flex flex-col lg:flex-row">
+      <main className="relative z-10 flex-1 flex flex-col lg:flex-row">
 
         {/* Left: wordmark + descriptor */}
         <div className="flex-1 flex flex-col justify-center px-8 md:px-14 lg:px-20 xl:px-28 pt-8 pb-10 lg:py-0">
@@ -259,7 +259,7 @@ export default function CanecktLandingPage() {
             className="font-extrabold leading-none tracking-tighter mb-6"
             style={{
               fontFamily: 'var(--font-space-grotesk, sans-serif)',
-              fontSize: 'clamp(4.5rem, 13vw, 10rem)',
+              fontSize: 'clamp(2.5rem, 13vw, 10rem)',
               background: 'linear-gradient(145deg, #ffffff 0%, #c8c8d8 55%, #5a5a7a 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',

@@ -3,18 +3,18 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
 import type { Metadata, Viewport } from "next";
+import ClientLayout from "@/components/client-layout";
+import ConditionalNavbar from "@/components/conditional-navbar";
+import { Toaster } from "@/components/ui/sonner";
+import RootCodeRedirect from "./root-code-redirect";
+import AuthDebug from "@/components/auth-debug";
+import AuthStateSync from "../components/auth-state-sync";
+import { Analytics } from "@vercel/analytics/next";
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
 };
-import ClientLayout from "@/components/client-layout";
-import ConditionalNavbar from "@/components/conditional-navbar";
-import { Toaster } from "@/components/ui/sonner";
-import RootCodeRedirect from "./root-code-redirect"; // already imported
-import AuthDebug from "@/components/auth-debug"; // Import the debug component
-import AuthStateSync from "../components/auth-state-sync";
-import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
