@@ -82,7 +82,7 @@ export default function MceStaffDashboard({ data }: MceStaffDashboardProps) {
       </div>
 
       {/* ── Cohort health stats ── */}
-      <div className="mb-8 grid grid-cols-4 gap-3">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Teams" value={String(totalTeams)} />
         <StatCard label="Fully submitted" value={String(fullySubmittedTeams)} color="text-emerald-400" />
         <StatCard
@@ -125,8 +125,8 @@ export default function MceStaffDashboard({ data }: MceStaffDashboardProps) {
             No teams in this cohort yet.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-neutral-800">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-800">
+            <table className="w-full min-w-[480px] text-sm">
               <thead>
                 <tr className="border-b border-neutral-800 text-left text-xs uppercase tracking-wider text-neutral-600">
                   <th className="px-4 py-2.5 font-medium">Team</th>
@@ -220,7 +220,7 @@ export default function MceStaffDashboard({ data }: MceStaffDashboardProps) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-5xl px-6 py-8">{children}</div>;
+  return <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>;
 }
 
 function StatCard({

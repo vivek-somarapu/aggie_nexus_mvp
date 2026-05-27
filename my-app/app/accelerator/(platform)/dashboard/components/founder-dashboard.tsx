@@ -269,7 +269,7 @@ export default function FounderDashboard({ data }: FounderDashboardProps) {
       </section>
 
       {/* ── Stats row ── */}
-      <div className="mb-8 grid grid-cols-4 gap-2">
+      <div className="mb-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatCard label="Approved" value={String(approvedCount)} color="text-emerald-400" />
         <StatCard
           label="Needs revision"
@@ -494,7 +494,7 @@ export default function FounderDashboard({ data }: FounderDashboardProps) {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-2xl px-6 py-8">{children}</div>;
+  return <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>;
 }
 
 function SectionHeader({

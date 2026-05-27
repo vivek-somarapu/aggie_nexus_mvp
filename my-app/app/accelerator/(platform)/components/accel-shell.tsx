@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Menu } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 import AcceleratorSidebar from './accelerator-sidebar';
 import AiAdvisorChat from '../ai-advisor/components/ai-advisor-chat';
@@ -66,22 +67,71 @@ function BackgroundRings() {
 export default function AccelShell({ role, userName, children }: AccelShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAdvisorOpen, setIsAdvisorOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-neutral-950 text-neutral-100">
       {/* Ghosted rings — pure texture, won't distract during actual work */}
       <BackgroundRings />
 
-      <AcceleratorSidebar
-        role={role}
-        isCollapsed={isCollapsed}
-        onToggle={() => setIsCollapsed((prev) => !prev)}
-        isAdvisorOpen={isAdvisorOpen}
-        onAdvisorToggle={() => setIsAdvisorOpen((prev) => !prev)}
+      {/* Desktop sidebar — hidden on mobile */}
+      <div className="hidden sm:contents">
+        <AcceleratorSidebar
+          role={role}
+          isCollapsed={isCollapsed}
+          onToggle={() => setIsCollapsed((prev) => !prev)}
+          isAdvisorOpen={isAdvisorOpen}
+          onAdvisorToggle={() => setIsAdvisorOpen((prev) => !prev)}
+        />
+      </div>
+
+      {/* Mobile nav backdrop */}
+      <div
+        className={[
+          'sm:hidden fixed inset-0 z-40 bg-black/60',
+          'transition-opacity duration-200',
+          isMobileNavOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        ].join(' ')}
+        onClick={() => setIsMobileNavOpen(false)}
       />
+
+      {/* Mobile nav drawer */}
+      <div
+        className={[
+          'sm:hidden fixed inset-y-0 left-0 z-50 flex',
+          'transition-transform duration-200 ease-in-out',
+          isMobileNavOpen ? 'translate-x-0' : '-translate-x-full',
+        ].join(' ')}
+      >
+        <AcceleratorSidebar
+          role={role}
+          isCollapsed={false}
+          onToggle={() => {}}
+          isAdvisorOpen={isAdvisorOpen}
+          onAdvisorToggle={() => {
+            setIsAdvisorOpen((prev) => !prev);
+            setIsMobileNavOpen(false);
+          }}
+          onMobileClose={() => setIsMobileNavOpen(false)}
+        />
+      </div>
 
       {/* Content column: main scrolls, footer stays pinned */}
       <div className="relative z-10 flex flex-1 min-w-0 flex-col overflow-hidden">
+        {/* Mobile top bar — hidden on sm+ */}
+        <div className="sm:hidden shrink-0 flex h-12 items-center gap-3 border-b border-neutral-800 px-4 bg-neutral-950">
+          <button
+            onClick={() => setIsMobileNavOpen(true)}
+            aria-label="Open navigation"
+            className="flex items-center justify-center w-8 h-8 rounded-md
+              text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800
+              transition-colors"
+          >
+            <Menu size={18} />
+          </button>
+          <span className="text-sm font-semibold text-neutral-100 tracking-tight">Caneckt</span>
+        </div>
+
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
@@ -98,7 +148,7 @@ export default function AccelShell({ role, userName, children }: AccelShellProps
         <div
           className={[
             'absolute right-0 inset-y-0 flex flex-col',
-            'w-[440px] max-w-[calc(100vw-5rem)]',
+            'w-full sm:w-[440px] sm:max-w-[calc(100vw-5rem)]',
             'bg-neutral-950 border-l border-neutral-800',
             'shadow-[-12px_0_32px_rgba(0,0,0,0.5)]',
             'transition-transform duration-300 ease-in-out z-30',

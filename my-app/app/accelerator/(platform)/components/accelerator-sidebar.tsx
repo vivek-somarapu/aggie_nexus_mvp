@@ -21,6 +21,7 @@ import {
   ArrowUpLeft,
   Sparkles,
   ExternalLink,
+  X,
 } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -183,6 +184,7 @@ interface AcceleratorSidebarProps {
   onToggle: () => void;
   isAdvisorOpen: boolean;
   onAdvisorToggle: () => void;
+  onMobileClose?: () => void;
 }
 
 export default function AcceleratorSidebar({
@@ -191,6 +193,7 @@ export default function AcceleratorSidebar({
   onToggle,
   isAdvisorOpen,
   onAdvisorToggle,
+  onMobileClose,
 }: AcceleratorSidebarProps) {
   const pathname = usePathname();
 
@@ -258,15 +261,27 @@ export default function AcceleratorSidebar({
               </div>
             </div>
 
-            <button
-              onClick={onToggle}
-              aria-label="Collapse sidebar"
-              className="flex items-center justify-center w-6 h-6 rounded shrink-0
-                text-neutral-600 hover:text-neutral-300 hover:bg-neutral-800
-                transition-colors"
-            >
-              <ChevronLeft size={14} />
-            </button>
+            {onMobileClose ? (
+              <button
+                onClick={onMobileClose}
+                aria-label="Close navigation"
+                className="flex items-center justify-center w-6 h-6 rounded shrink-0
+                  text-neutral-600 hover:text-neutral-300 hover:bg-neutral-800
+                  transition-colors"
+              >
+                <X size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={onToggle}
+                aria-label="Collapse sidebar"
+                className="flex items-center justify-center w-6 h-6 rounded shrink-0
+                  text-neutral-600 hover:text-neutral-300 hover:bg-neutral-800
+                  transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+            )}
           </>
         )}
       </div>
@@ -378,6 +393,28 @@ export default function AcceleratorSidebar({
               `}
             >
               Trendformation
+            </span>
+          </a>
+          <a
+            href="https://axr-1.onrender.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            title={isCollapsed ? 'Key Card Access' : undefined}
+            className={[
+              'w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors',
+              isCollapsed ? 'justify-center' : '',
+              'text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200',
+            ].join(' ')}
+          >
+            <ExternalLink size={15} strokeWidth={1.75} className="shrink-0" />
+            <span
+              className={`
+                whitespace-nowrap overflow-hidden
+                transition-all duration-150 ease-in-out
+                ${isCollapsed ? 'max-w-0 opacity-0' : 'max-w-xs opacity-100'}
+              `}
+            >
+              Key Card Access
             </span>
           </a>
         </div>
