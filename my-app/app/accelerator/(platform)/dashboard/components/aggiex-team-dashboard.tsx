@@ -111,8 +111,8 @@ export default function AggiexTeamDashboard({ data }: AggiexTeamDashboardProps) 
         {teams.length === 0 ? (
           <EmptyState message="No teams in this cohort yet." />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-neutral-800">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-800">
+            <table className="w-full min-w-[520px] text-sm">
               <thead>
                 <tr className="border-b border-neutral-800 text-left text-xs uppercase tracking-wider text-neutral-500">
                   <th className="px-4 py-3 font-medium">Team</th>
@@ -183,8 +183,8 @@ export default function AggiexTeamDashboard({ data }: AggiexTeamDashboardProps) 
             Mentors ({mentors.length})
           </h2>
 
-          <div className="overflow-hidden rounded-lg border border-neutral-800">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-neutral-800">
+            <table className="w-full min-w-[360px] text-sm">
               <thead>
                 <tr className="border-b border-neutral-800 text-left text-xs uppercase tracking-wider text-neutral-500">
                   <th className="px-4 py-3 font-medium">Name</th>
@@ -307,7 +307,7 @@ function EventRow({ event }: { event: AccelProgramEvent }) {
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
       {children}
     </div>
   );

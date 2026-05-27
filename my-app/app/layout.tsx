@@ -2,7 +2,12 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
 import ClientLayout from "@/components/client-layout";
 import ConditionalNavbar from "@/components/conditional-navbar";
 import { Toaster } from "@/components/ui/sonner";

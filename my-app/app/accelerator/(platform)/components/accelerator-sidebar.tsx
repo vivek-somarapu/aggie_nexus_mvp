@@ -21,6 +21,7 @@ import {
   ArrowUpLeft,
   Sparkles,
   ExternalLink,
+  X,
 } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -183,6 +184,7 @@ interface AcceleratorSidebarProps {
   onToggle: () => void;
   isAdvisorOpen: boolean;
   onAdvisorToggle: () => void;
+  onMobileClose?: () => void;
 }
 
 export default function AcceleratorSidebar({
@@ -191,6 +193,7 @@ export default function AcceleratorSidebar({
   onToggle,
   isAdvisorOpen,
   onAdvisorToggle,
+  onMobileClose,
 }: AcceleratorSidebarProps) {
   const pathname = usePathname();
 
@@ -258,15 +261,27 @@ export default function AcceleratorSidebar({
               </div>
             </div>
 
-            <button
-              onClick={onToggle}
-              aria-label="Collapse sidebar"
-              className="flex items-center justify-center w-6 h-6 rounded shrink-0
-                text-neutral-600 hover:text-neutral-300 hover:bg-neutral-800
-                transition-colors"
-            >
-              <ChevronLeft size={14} />
-            </button>
+            {onMobileClose ? (
+              <button
+                onClick={onMobileClose}
+                aria-label="Close navigation"
+                className="flex items-center justify-center w-6 h-6 rounded shrink-0
+                  text-neutral-600 hover:text-neutral-300 hover:bg-neutral-800
+                  transition-colors"
+              >
+                <X size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={onToggle}
+                aria-label="Collapse sidebar"
+                className="flex items-center justify-center w-6 h-6 rounded shrink-0
+                  text-neutral-600 hover:text-neutral-300 hover:bg-neutral-800
+                  transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+            )}
           </>
         )}
       </div>
