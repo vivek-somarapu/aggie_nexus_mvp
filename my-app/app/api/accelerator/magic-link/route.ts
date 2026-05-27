@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { emailService } from '@/lib/email';
 
-const AXR_ORIGIN = 'https://axr-1.onrender.com';
+const AXR_ORIGIN = 'https://axr-live.onrender.com';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': AXR_ORIGIN,
