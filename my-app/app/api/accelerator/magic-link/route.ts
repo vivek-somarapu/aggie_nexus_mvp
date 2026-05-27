@@ -5,6 +5,16 @@ import { emailService } from '@/lib/email';
 
 const AXR_ORIGIN = 'https://axr-1.onrender.com';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': AXR_ORIGIN,
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 200, headers: CORS_HEADERS });
+}
+
 const BodySchema = z.object({
   email: z.string().email(),
 });
@@ -14,12 +24,12 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400, headers: CORS_HEADERS });
   }
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Valid email required' }, { status: 422 });
+    return NextResponse.json({ error: 'Valid email required' }, { status: 422, headers: CORS_HEADERS });
   }
 
   const { email } = parsed.data;
@@ -34,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   if (!profile) {
     // Return 200 regardless to avoid leaking which emails have access.
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
   }
 
   const { data, error } = await admin.auth.admin.generateLink({
@@ -45,7 +55,7 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error('[MAGIC LINK] generateLink failed', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });
   }
 
   const magicLink = data.properties.action_link;
@@ -73,5 +83,5 @@ export async function POST(request: NextRequest) {
     `.trim(),
   });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
 }
