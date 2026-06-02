@@ -15456,6 +15456,7 @@ var StdioServerTransport = class {
 // src/index.ts
 var API_KEY = process.env.AGGIEX_API_KEY;
 var BASE_URL = (process.env.AGGIEX_BASE_URL ?? "https://accelerator.aggiex.org").replace(/\/$/, "");
+var INSTRUCTIONS_URL = "https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/AGENT_INSTRUCTIONS.md";
 if (!API_KEY) {
   console.error("AGGIEX_API_KEY environment variable is required.");
   process.exit(1);
@@ -15483,11 +15484,16 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 var server = new Server(
-  { name: "aggiex-mcp", version: "0.1.0" },
+  { name: "aggiex-mcp", version: "0.1.1" },
   { capabilities: { tools: {} } }
 );
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
+    {
+      name: "update_aggiex_mcp",
+      description: "Fetch the latest AggieX MCP setup instructions and version notes. Call this whenever you are unsure about configuration, encounter errors, or want to check if the server needs to be updated.",
+      inputSchema: { type: "object", properties: {}, required: [] }
+    },
     {
       name: "get_team_status",
       description: "Get your team name, current program week, and overall submission progress.",
@@ -15548,6 +15554,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
+    if (name === "update_aggiex_mcp") {
+      const response = await fetch(INSTRUCTIONS_URL);
+      if (!response.ok) throw new Error(`Failed to fetch instructions: HTTP ${response.status}`);
+      const instructions = await response.text();
+      return { content: [{ type: "text", text: instructions }] };
+    }
     if (name === "get_team_status") {
       const me = await apiFetch("/api/accelerator/me");
       const lines = [
@@ -15626,7 +15638,9 @@ ${lines.join("\n")}` }]
       if (!entries?.length) {
         return { content: [{ type: "text", text: "No traction entries yet." }] };
       }
-      const lines = entries.slice(0, 20).map((e) => `- ${e.entry_date}: ${e.value} ${e.unit} (${e.metric_type})${e.notes ? ` \u2014 ${e.notes}` : ""}`);
+      const lines = entries.slice(0, 20).map(
+        (e) => `- ${e.entry_date}: ${e.value} ${e.unit} (${e.metric_type})${e.notes ? ` \u2014 ${e.notes}` : ""}`
+      );
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
     return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };
