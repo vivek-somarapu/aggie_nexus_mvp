@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, Trash2 } from 'lucide-react';
+import { Copy, Check, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface ApiKeyRow {
   id: string;
@@ -11,6 +11,9 @@ interface ApiKeyRow {
 }
 
 type Platform = 'mac' | 'windows';
+type KeyStatus = 'idle' | 'verifying' | 'ok' | 'error';
+
+const SESSION_STORAGE_KEY = 'aggiex_dev_raw_key';
 
 const INSTALL_COMMANDS: Record<Platform, string> = {
   mac: 'mkdir -p ~/.aggiex && curl -fsSL https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/dist/index.js -o ~/.aggiex/server.js && chmod +x ~/.aggiex/server.js',
@@ -94,13 +97,21 @@ export default function DeveloperPanel() {
   const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [newKey, setNewKey] = useState<string | null>(null);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [keyStatus, setKeyStatus] = useState<KeyStatus>('idle');
+  const [keyStatusMessage, setKeyStatusMessage] = useState<string>('');
   const [platform, setPlatform] = useState<Platform>('mac');
   const [promptCopied, setPromptCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   useEffect(() => {
     setPlatform(detectPlatform());
+    // Restore key from session storage so page refreshes don't break the flow
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (stored) {
+      setActiveKey(stored);
+      setKeyStatus('ok');
+    }
   }, []);
 
   const loadKeys = useCallback(async () => {
@@ -117,25 +128,45 @@ export default function DeveloperPanel() {
     loadKeys();
   }, [loadKeys]);
 
+  async function verifyKey(rawKey: string) {
+    setKeyStatus('verifying');
+    setKeyStatusMessage('');
+    const response = await fetch('/api/accelerator/api-keys/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw_key: rawKey }),
+    });
+    const data = await response.json() as { valid: boolean; reason?: string; label?: string };
+    if (data.valid) {
+      setKeyStatus('ok');
+      setKeyStatusMessage('');
+    } else {
+      setKeyStatus('error');
+      setKeyStatusMessage(data.reason ?? 'Verification failed — contact support.');
+    }
+  }
+
   async function generateKey() {
     setIsGenerating(true);
-    setError(null);
+    setGenerateError(null);
     const response = await fetch('/api/accelerator/api-keys', { method: 'POST' });
     if (!response.ok) {
       const data = await response.json() as { error?: string };
-      setError(data.error ?? 'Failed to generate key.');
+      setGenerateError(data.error ?? 'Failed to generate key.');
       setIsGenerating(false);
       return;
     }
     const data = await response.json() as { raw_key: string };
-    setNewKey(data.raw_key);
+    sessionStorage.setItem(SESSION_STORAGE_KEY, data.raw_key);
+    setActiveKey(data.raw_key);
     await loadKeys();
     setIsGenerating(false);
+    verifyKey(data.raw_key);
   }
 
   async function copyPrompt() {
-    if (!newKey) return;
-    await navigator.clipboard.writeText(buildFullPrompt(newKey, platform));
+    if (!activeKey) return;
+    await navigator.clipboard.writeText(buildFullPrompt(activeKey, platform));
     setPromptCopied(true);
     setTimeout(() => setPromptCopied(false), 2000);
   }
@@ -144,14 +175,24 @@ export default function DeveloperPanel() {
     const response = await fetch(`/api/accelerator/api-keys/${id}`, { method: 'DELETE' });
     if (response.ok) {
       setKeys((prev) => prev.filter((key) => key.id !== id));
-      if (newKey) setNewKey(null);
+      // If the active key was the revoked one, clear it
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      setActiveKey(null);
+      setKeyStatus('idle');
     }
+  }
+
+  function resetToGenerate() {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    setActiveKey(null);
+    setKeyStatus('idle');
+    setKeyStatusMessage('');
   }
 
   return (
     <div className="flex flex-col gap-8">
 
-      {!newKey ? (
+      {!activeKey ? (
         <div>
           <p className="mb-4 text-sm text-neutral-400">
             Generate an API key to get your one-click setup prompt for Claude Code, Cursor, or any
@@ -164,16 +205,48 @@ export default function DeveloperPanel() {
           >
             {isGenerating ? 'Generating…' : 'Generate API key'}
           </button>
-          {error && (
-            <p className="mt-3 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
+          {generateError && (
+            <p className="mt-3 rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400">
+              {generateError}
+            </p>
           )}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
+          {/* Verification status */}
+          {keyStatus === 'verifying' && (
+            <div className="flex items-center gap-2 text-xs text-neutral-500">
+              <Loader2 size={12} className="animate-spin" />
+              Verifying key…
+            </div>
+          )}
+          {keyStatus === 'ok' && (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-500">
+              <Check size={12} />
+              Key verified — ready to use
+            </div>
+          )}
+          {keyStatus === 'error' && (
+            <div className="rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-red-400">
+                <AlertTriangle size={12} />
+                Key verification failed
+              </div>
+              <p className="mt-1 text-xs text-red-400/80">{keyStatusMessage}</p>
+              <p className="mt-1 text-xs text-neutral-600">
+                This usually means the database migration hasn&apos;t been applied or the
+                server environment is misconfigured. Contact the AggieX team.
+              </p>
+            </div>
+          )}
+
           <p className="text-sm text-neutral-400">
             Your setup prompt is ready. Paste it into your project&apos;s{' '}
-            <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-300">CLAUDE.md</code>
-            {' '}— it includes the install command, MCP config, and agent context with your API key embedded.
+            <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-300">
+              CLAUDE.md
+            </code>{' '}
+            — it includes the install command, MCP config, and agent context with your API key
+            embedded.
           </p>
 
           {/* Platform toggle */}
@@ -202,7 +275,8 @@ export default function DeveloperPanel() {
 
           <button
             onClick={copyPrompt}
-            className="flex w-fit items-center gap-2 rounded-md border border-neutral-600 bg-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-400 hover:bg-neutral-700"
+            disabled={keyStatus === 'error'}
+            className="flex w-fit items-center gap-2 rounded-md border border-neutral-600 bg-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-400 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {promptCopied ? (
               <>
@@ -218,12 +292,12 @@ export default function DeveloperPanel() {
           </button>
 
           <p className="text-xs text-neutral-600">
-            Need to generate another?{' '}
+            Need a new key?{' '}
             <button
-              onClick={() => setNewKey(null)}
+              onClick={resetToGenerate}
               className="text-neutral-500 underline underline-offset-2 hover:text-neutral-300"
             >
-              Go back
+              Generate another
             </button>
           </p>
         </div>
