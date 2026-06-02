@@ -33,7 +33,7 @@ Add to \`.claude/settings.json\`:
       "args": ["~/.aggiex/server.js"],
       "env": {
         "AGGIEX_API_KEY": "${apiKey}",
-        "AGGIEX_BASE_URL": "https://caneckt.aggiex.org"
+        "AGGIEX_BASE_URL": "https://accelerator.aggiex.org"
       }
     }
   }
