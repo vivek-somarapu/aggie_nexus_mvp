@@ -22,6 +22,7 @@ import {
   Sparkles,
   ExternalLink,
   X,
+  Code2,
 } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -149,6 +150,12 @@ const NAV_GROUPS: NavGroup[] = [
         label: 'My Meetings',
         href: '/accelerator/my-team/meetings',
         icon: MessageSquare,
+        roles: ['founder'],
+      },
+      {
+        label: 'Developer API',
+        href: '/accelerator/my-team/developer',
+        icon: Code2,
         roles: ['founder'],
       },
     ],

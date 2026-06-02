@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAccelRole } from '@/lib/accel-auth';
+import { requireAccelRole, requireAccelAuth } from '@/lib/accel-auth';
 import { createClient } from '@/lib/supabase/server';
 
 const CreateDeliverableSchema = z.object({
@@ -15,7 +15,7 @@ const CreateDeliverableSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const { error } = await requireAccelRole(['aggiex_team', 'mce_staff']);
+  const { error } = await requireAccelAuth(request, ['aggiex_team', 'mce_staff', 'founder']);
   if (error) return error;
 
   const { searchParams } = new URL(request.url);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAccelRole } from '@/lib/accel-auth';
+import { requireAccelRole, requireAccelAuth } from '@/lib/accel-auth';
 import { createClient } from '@/lib/supabase/server';
 
 const CreateTractionSchema = z.object({
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { profile, error } = await requireAccelRole([
+  const { profile, error } = await requireAccelAuth(request, [
     'founder', 'aggiex_team',
   ]);
   if (error) return error;

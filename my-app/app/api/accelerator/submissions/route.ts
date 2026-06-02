@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAccelRole } from '@/lib/accel-auth';
+import { requireAccelRole, requireAccelAuth } from '@/lib/accel-auth';
 import { createClient } from '@/lib/supabase/server';
 
 const UpsertSubmissionSchema = z.object({
@@ -13,8 +13,36 @@ const UpsertSubmissionSchema = z.object({
   text_content: z.string().optional(),
 });
 
+export async function GET(request: NextRequest) {
+  const { profile, error } = await requireAccelAuth(request, [
+    'founder', 'aggiex_team', 'mce_staff',
+  ]);
+  if (error) return error;
+
+  const { searchParams } = new URL(request.url);
+  const teamId = searchParams.get('team_id');
+
+  // Founders can only read their own team's submissions
+  const resolvedTeamId =
+    profile.role === 'founder' ? profile.team_id : (teamId ?? null);
+
+  if (!resolvedTeamId) {
+    return NextResponse.json({ error: 'team_id required' }, { status: 400 });
+  }
+
+  const supabase = await createClient();
+  const { data, error: dbError } = await supabase
+    .from('accel_submissions')
+    .select('id, deliverable_id, status, version, submitted_at')
+    .eq('team_id', resolvedTeamId)
+    .order('version', { ascending: false });
+
+  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  return NextResponse.json(data ?? []);
+}
+
 export async function POST(request: NextRequest) {
-  const { profile, error } = await requireAccelRole([
+  const { profile, error } = await requireAccelAuth(request, [
     'founder', 'aggiex_team', 'mce_staff',
   ]);
   if (error) return error;
