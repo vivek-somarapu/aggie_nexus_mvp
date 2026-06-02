@@ -73,11 +73,15 @@ export async function requireAccelAuth(
   if (bearerToken) {
     const keyHash = createHash('sha256').update(bearerToken).digest('hex');
     const admin = createAdminClient();
-    const { data: keyRow } = await admin
+    const { data: keyRow, error: keyLookupError } = await admin
       .from('accel_api_keys')
       .select('profile_id, team_id')
       .eq('key_hash', keyHash)
       .single();
+
+    if (keyLookupError) {
+      console.error('[requireAccelAuth] API key lookup failed:', keyLookupError.message);
+    }
 
     if (!keyRow) {
       return {
