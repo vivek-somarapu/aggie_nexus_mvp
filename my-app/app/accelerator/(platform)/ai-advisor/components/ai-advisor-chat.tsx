@@ -102,7 +102,32 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
     if (!text || isLoading) return;
     setInput('');
     sendMessage({ text });
+    // Silently run extraction in the background for founders — no loading state.
+    // ActionCard appears only when something actionable is actually detected.
+    if (isFounder && !actionPhase) runExtractionSilently(text);
   };
+
+  async function runExtractionSilently(text: string) {
+    try {
+      const response = await fetch('/api/accelerator/ai-advisor/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: text }),
+      });
+      if (!response.ok) return;
+      const extraction = await response.json() as ExtractionWithTeam;
+      if (extraction.deliverables.length === 0 && extraction.traction.length === 0) return;
+      const totalItems = extraction.deliverables.length + extraction.traction.length;
+      setActionPhase({
+        tag: 'review',
+        transcript: text,
+        extraction,
+        selected: new Set(Array.from({ length: totalItems }, (_, i) => i)),
+      });
+    } catch {
+      // Silent failure — don't surface extraction errors for background runs
+    }
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
