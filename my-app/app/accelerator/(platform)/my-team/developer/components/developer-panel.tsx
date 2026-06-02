@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Copy, Check, Trash2, Key, Terminal, Settings, FileText } from 'lucide-react';
+import { Copy, Check, Trash2, Key, Terminal, FileText } from 'lucide-react';
 
 interface ApiKeyRow {
   id: string;
@@ -15,25 +15,13 @@ const INSTALL_COMMAND =
   'https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/dist/index.js ' +
   '-o ~/.aggiex/server.js && chmod +x ~/.aggiex/server.js';
 
-const AGENT_CONTEXT = `## AggieX Accelerator Integration
+function buildSetupPrompt(apiKey: string): string {
+  return `## AggieX MCP Setup
 
-You have access to the AggieX accelerator platform via the \`aggiex\` MCP server.
+Add the following to your \`.claude/settings.json\`:
 
-**Available tools:**
-- \`get_team_status\` — Team name, current program week, and submission progress
-- \`get_pending_deliverables\` — Deliverables not yet submitted or needing revision
-- \`submit_deliverable(deliverable_id, text_content)\` — Submit a written response for a deliverable
-- \`log_traction(metric_type, value, unit, notes?)\` — Log metrics: users, revenue, LOIs, pilots, retention
-- \`get_traction_history\` — View recent traction log entries
-
-**Use these proactively:**
-- Session start: check \`get_team_status\` and \`get_pending_deliverables\`
-- User mentions growth metrics ("200 users", "closed 3 LOIs", "$5k MRR"): offer to \`log_traction\`
-- Work completes on something matching a deliverable: offer to \`submit_deliverable\`
-- Always confirm with the user before submitting or logging`;
-
-function buildConfigJson(apiKey: string): string {
-  return `{
+\`\`\`json
+{
   "mcpServers": {
     "aggiex": {
       "command": "node",
@@ -44,30 +32,32 @@ function buildConfigJson(apiKey: string): string {
       }
     }
   }
-}`;
+}
+\`\`\`
+
+## AggieX Accelerator Integration
+
+You have access to the AggieX accelerator platform via the \`aggiex\` MCP server.
+
+**Available tools:**
+- \`get_team_status\` — Team name, current program week, and submission progress
+- \`get_pending_deliverables\` — Deliverables not yet submitted or needing revision
+- \`submit_deliverable(deliverable_id, text_content)\` — Submit a written response for a deliverable
+- \`log_traction(metric_type, value, unit, notes?)\` — Log metrics: users, revenue, LOIs, pilots, retention
+- \`get_traction_history\` — View recent traction log entries
+
+**Use proactively:**
+- Session start: check \`get_team_status\` and \`get_pending_deliverables\`
+- User mentions growth metrics ("200 users", "closed 3 LOIs", "$5k MRR"): offer to \`log_traction\`
+- Work completes on a deliverable: offer to \`submit_deliverable\`
+- Always confirm with the user before submitting or logging`;
 }
 
-function CopyButton({ text, id, copied, onCopy }: {
-  text: string;
-  id: string;
-  copied: Record<string, boolean>;
-  onCopy: (text: string, id: string) => void;
+function StepHeader({ number, icon, title }: {
+  number: number;
+  icon: React.ReactNode;
+  title: string;
 }) {
-  return (
-    <button
-      onClick={() => onCopy(text, id)}
-      className="absolute right-2 top-2 flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
-    >
-      {copied[id] ? (
-        <Check size={11} className="text-emerald-400" />
-      ) : (
-        <Copy size={11} />
-      )}
-    </button>
-  );
-}
-
-function StepHeader({ number, icon, title }: { number: number; icon: React.ReactNode; title: string }) {
   return (
     <div className="mb-3 flex items-center gap-2">
       <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800 text-[10px] font-semibold text-neutral-400">
@@ -133,7 +123,7 @@ export default function DeveloperPanel() {
     }
   }
 
-  const configJson = buildConfigJson(newKey ?? 'ak_your_key_here');
+  const setupPrompt = buildSetupPrompt(newKey ?? 'ak_your_key_here');
 
   return (
     <div className="flex flex-col gap-10">
@@ -152,7 +142,12 @@ export default function DeveloperPanel() {
           <pre className="overflow-x-auto px-4 py-3 pr-12 font-mono text-xs text-neutral-300">
             {INSTALL_COMMAND}
           </pre>
-          <CopyButton text={INSTALL_COMMAND} id="install" copied={copied} onCopy={copyToClipboard} />
+          <button
+            onClick={() => copyToClipboard(INSTALL_COMMAND, 'install')}
+            className="absolute right-2 top-2 flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
+          >
+            {copied['install'] ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+          </button>
         </div>
       </section>
 
@@ -169,7 +164,7 @@ export default function DeveloperPanel() {
             <div className="mb-2 flex items-center gap-2">
               <Key size={13} className="text-amber-400" />
               <p className="text-xs font-medium text-amber-300">
-                Copy this key now — it won&apos;t be shown again.
+                Key generated — it&apos;s embedded in the setup prompt below. Copy it before leaving this page.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -177,28 +172,18 @@ export default function DeveloperPanel() {
                 {newKey}
               </code>
               <button
-                onClick={() => copyToClipboard(newKey, 'newkey')}
+                onClick={() => copyToClipboard(newKey, 'rawkey')}
                 className="flex items-center gap-1.5 rounded-md border border-neutral-700 px-3 py-2 text-xs text-neutral-300 transition-colors hover:border-neutral-500 hover:text-white"
               >
-                {copied['newkey'] ? (
-                  <Check size={12} className="text-emerald-400" />
-                ) : (
-                  <Copy size={12} />
-                )}
-                {copied['newkey'] ? 'Copied' : 'Copy'}
+                {copied['rawkey'] ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                {copied['rawkey'] ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <button
-              onClick={() => setNewKey(null)}
-              className="mt-2 text-xs text-neutral-600 hover:text-neutral-400"
-            >
-              Dismiss
-            </button>
           </div>
         ) : (
           <div>
             <p className="mb-3 text-xs text-neutral-500">
-              Keys authenticate your coding agent with the AggieX platform. A key is shown only once when generated.
+              Generate a key first — it will be automatically embedded in the setup prompt below.
             </p>
             <button
               onClick={generateKey}
@@ -243,57 +228,49 @@ export default function DeveloperPanel() {
         )}
       </section>
 
-      {/* Step 3: Configure coding agent */}
+      {/* Step 3: Setup prompt */}
       <section>
         <StepHeader
           number={3}
-          icon={<Settings size={13} className="text-neutral-500" />}
-          title="Configure your coding agent"
-        />
-        <p className="mb-3 text-xs text-neutral-500">
-          Add this to{' '}
-          <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-400">
-            .claude/settings.json
-          </code>{' '}
-          for Claude Code, or your agent&apos;s MCP settings file.
-          {newKey && (
-            <span className="ml-1 text-emerald-500">Your API key has been pre-filled above.</span>
-          )}
-        </p>
-        <div className="relative rounded-lg border border-neutral-800 bg-neutral-950">
-          <pre className="overflow-x-auto px-4 py-4 pr-12 font-mono text-xs text-neutral-300">
-            {configJson}
-          </pre>
-          <CopyButton text={configJson} id="config" copied={copied} onCopy={copyToClipboard} />
-        </div>
-        <p className="mt-2 text-xs text-neutral-600">
-          If{' '}
-          <code className="font-mono">~/.aggiex/server.js</code> doesn&apos;t resolve, replace{' '}
-          <code className="font-mono">~</code> with your full home path (e.g.{' '}
-          <code className="font-mono">/Users/yourname</code>).
-        </p>
-      </section>
-
-      {/* Step 4: Agent context prompt */}
-      <section>
-        <StepHeader
-          number={4}
           icon={<FileText size={13} className="text-neutral-500" />}
-          title="Add agent context"
+          title="Copy setup prompt"
         />
         <p className="mb-3 text-xs text-neutral-500">
           Paste this into your project&apos;s{' '}
-          <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-400">
-            CLAUDE.md
-          </code>{' '}
-          (or agent system prompt) so your agent knows when and how to use the AggieX tools automatically.
+          <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-400">CLAUDE.md</code>.
+          It configures the MCP server and tells your agent when and how to use the AggieX tools
+          — with your API key already embedded.
         </p>
-        <div className="relative rounded-lg border border-neutral-800 bg-neutral-950">
+        <div className={`relative rounded-lg border bg-neutral-950 transition-colors ${
+          newKey ? 'border-emerald-800/50' : 'border-neutral-800'
+        }`}>
+          {newKey && (
+            <div className="flex items-center gap-1.5 border-b border-emerald-800/50 px-4 py-2">
+              <Check size={11} className="text-emerald-400" />
+              <span className="text-xs text-emerald-500">API key filled in</span>
+            </div>
+          )}
+          {!newKey && (
+            <div className="flex items-center gap-1.5 border-b border-neutral-800 px-4 py-2">
+              <Key size={11} className="text-neutral-600" />
+              <span className="text-xs text-neutral-600">Generate a key above to fill in your API key</span>
+            </div>
+          )}
           <pre className="overflow-x-auto whitespace-pre-wrap px-4 py-4 pr-12 font-mono text-xs text-neutral-300">
-            {AGENT_CONTEXT}
+            {setupPrompt}
           </pre>
-          <CopyButton text={AGENT_CONTEXT} id="context" copied={copied} onCopy={copyToClipboard} />
+          <button
+            onClick={() => copyToClipboard(setupPrompt, 'prompt')}
+            className="absolute right-2 top-10 flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
+          >
+            {copied['prompt'] ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+          </button>
         </div>
+        <p className="mt-2 text-xs text-neutral-600">
+          If <code className="font-mono">~/.aggiex/server.js</code> doesn&apos;t resolve, replace{' '}
+          <code className="font-mono">~</code> with your full home path (e.g.{' '}
+          <code className="font-mono">/Users/yourname</code>).
+        </p>
       </section>
 
     </div>
