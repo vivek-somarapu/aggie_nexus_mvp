@@ -4,8 +4,11 @@ import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
 import Image from 'next/image';
-import { Send, Loader2, RotateCcw, X, AlertCircle } from 'lucide-react';
+import { Send, Loader2, RotateCcw, X, AlertCircle, Mic, MicOff, CheckCircle2, Sparkles } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
+import type { ExtractionResult } from '@/app/api/accelerator/ai-advisor/extract/route';
+
+type ExtractionWithTeam = ExtractionResult & { team_id: string };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -45,6 +48,16 @@ const ROLE_LABELS: Record<AccelRole, string> = {
   mentor: 'Mentor Advisor',
 };
 
+// ─── Action card state ────────────────────────────────────────────────────────
+
+type ActionPhase =
+  | { tag: 'recording' }
+  | { tag: 'transcribing' }
+  | { tag: 'extracting'; transcript: string }
+  | { tag: 'review'; transcript: string; extraction: ExtractionWithTeam; selected: Set<number> }
+  | { tag: 'submitting' }
+  | { tag: 'done'; count: number };
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface AiAdvisorChatProps {
@@ -55,10 +68,9 @@ interface AiAdvisorChatProps {
 
 export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChatProps) {
   const accelRole = role as AccelRole;
+  const isFounder = accelRole === 'founder';
   const starterPrompts = ROLE_STARTER_PROMPTS[accelRole] ?? [];
 
-  // TextStreamChatTransport pairs with toTextStreamResponse() on the server.
-  // Plain text stream — simpler and more reliable than UIMessage chunk protocol.
   const { messages, sendMessage, setMessages, status, error } = useChat({
     transport: new TextStreamChatTransport({ api: '/api/accelerator/ai-advisor' }),
   });
@@ -66,15 +78,18 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   const isLoading = status === 'submitted' || status === 'streaming';
 
   const [input, setInput] = useState('');
+  const [actionPhase, setActionPhase] = useState<ActionPhase | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  // Auto-scroll to latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, actionPhase]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -109,9 +124,151 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   const reset = () => {
     setMessages([]);
     setInput('');
+    setActionPhase(null);
+    setActionError(null);
   };
 
+  // ── Voice + extraction flow (founder only) ────────────────────────────────
+
+  async function startRecording() {
+    setActionError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        await handleAudioReady(blob);
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setActionPhase({ tag: 'recording' });
+    } catch {
+      setActionError('Microphone access denied. Please allow mic access and try again.');
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+  }
+
+  async function handleAudioReady(blob: Blob) {
+    setActionPhase({ tag: 'transcribing' });
+
+    const form = new FormData();
+    form.append('audio', blob, 'audio.webm');
+    const transcribeResponse = await fetch('/api/accelerator/transcribe', {
+      method: 'POST',
+      body: form,
+    });
+
+    if (!transcribeResponse.ok) {
+      const data = await transcribeResponse.json();
+      setActionPhase(null);
+      setActionError(data.error ?? 'Transcription failed.');
+      return;
+    }
+
+    const { transcript } = await transcribeResponse.json() as { transcript: string };
+    await runExtraction(transcript);
+  }
+
+  async function runExtraction(transcript: string) {
+    setActionPhase({ tag: 'extracting', transcript });
+
+    const extractResponse = await fetch('/api/accelerator/ai-advisor/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript }),
+    });
+
+    if (!extractResponse.ok) {
+      const data = await extractResponse.json();
+      setActionPhase(null);
+      setActionError(data.error ?? 'Extraction failed.');
+      return;
+    }
+
+    const extraction = await extractResponse.json() as ExtractionWithTeam;
+
+    if (extraction.deliverables.length === 0 && extraction.traction.length === 0) {
+      setActionPhase(null);
+      setActionError('No deliverables or traction detected in your message. Try being more specific (e.g. "We submitted our pitch deck and hit 200 users").');
+      return;
+    }
+
+    const totalItems = extraction.deliverables.length + extraction.traction.length;
+    setActionPhase({
+      tag: 'review',
+      transcript,
+      extraction,
+      selected: new Set(Array.from({ length: totalItems }, (_, i) => i)),
+    });
+  }
+
+  async function confirmExtraction(phase: Extract<ActionPhase, { tag: 'review' }>) {
+    const { extraction, selected } = phase;
+    setActionPhase({ tag: 'submitting' });
+    setActionError(null);
+
+    let submittedCount = 0;
+
+    const deliverablePromises = extraction.deliverables.map(async (item, index) => {
+      if (!selected.has(index)) return;
+      const response = await fetch('/api/accelerator/submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deliverable_id: item.id,
+          team_id: extraction.team_id,
+          status: 'submitted',
+          text_content: item.text_content,
+        }),
+      });
+      if (response.ok) submittedCount++;
+    });
+
+    const tractionOffset = extraction.deliverables.length;
+    const tractionPromises = extraction.traction.map(async (item, index) => {
+      if (!selected.has(tractionOffset + index)) return;
+      const response = await fetch('/api/accelerator/traction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team_id: extraction.team_id,
+          metric_type: item.metric_type,
+          value: item.value,
+          unit: item.unit,
+          notes: item.notes ?? '',
+          entry_date: new Date().toISOString().split('T')[0],
+        }),
+      });
+      if (response.ok) submittedCount++;
+    });
+
+    await Promise.all([...deliverablePromises, ...tractionPromises]);
+    setActionPhase({ tag: 'done', count: submittedCount });
+  }
+
+  function toggleSelected(phase: Extract<ActionPhase, { tag: 'review' }>, index: number) {
+    const next = new Set(phase.selected);
+    if (next.has(index)) {
+      next.delete(index);
+    } else {
+      next.add(index);
+    }
+    setActionPhase({ ...phase, selected: next });
+  }
+
   const hasMessages = messages.length > 0;
+  const isInActionFlow = actionPhase !== null;
 
   return (
     <div className="flex h-full flex-col">
@@ -137,7 +294,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {hasMessages && (
+          {(hasMessages || isInActionFlow) && (
             <button
               onClick={reset}
               title="New chat"
@@ -160,7 +317,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
 
       {/* ── Message area ── */}
       <div className="flex flex-1 flex-col overflow-y-auto px-6 py-6">
-        {!hasMessages ? (
+        {!hasMessages && !isInActionFlow ? (
           /* Empty state — starter prompts */
           <div className="my-auto flex flex-col items-center">
             <div className="mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white">
@@ -177,6 +334,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
             </p>
             <p className="mt-1 text-xs text-neutral-600">
               I have access to your live program data.
+              {isFounder && ' Hit the mic to submit via voice.'}
             </p>
 
             <div className="mt-8 flex max-w-md flex-wrap justify-center gap-2">
@@ -192,7 +350,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
             </div>
           </div>
         ) : (
-          /* Message thread */
+          /* Message thread + action card */
           <div className="mx-auto w-full max-w-2xl flex flex-col gap-4">
             {messages.map((message) => {
               const textContent = extractText(message);
@@ -251,7 +409,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
               </div>
             )}
 
-            {/* Error state */}
+            {/* Chat error */}
             {status === 'error' && error && (
               <div className="flex items-start gap-2.5 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3">
                 <AlertCircle size={13} className="mt-0.5 shrink-0 text-red-400" />
@@ -259,6 +417,27 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
                   <p className="text-xs font-medium text-red-300">Something went wrong</p>
                   <p className="mt-0.5 text-xs text-red-400/70">{error.message}</p>
                 </div>
+              </div>
+            )}
+
+            {/* ── Action card ── */}
+            {actionPhase && (
+              <ActionCard
+                phase={actionPhase}
+                onToggle={(i) => {
+                  if (actionPhase.tag === 'review') toggleSelected(actionPhase, i);
+                }}
+                onConfirm={() => {
+                  if (actionPhase.tag === 'review') confirmExtraction(actionPhase);
+                }}
+                onDismiss={() => { setActionPhase(null); setActionError(null); }}
+              />
+            )}
+
+            {actionError && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-amber-900/50 bg-amber-950/20 px-4 py-3">
+                <AlertCircle size={13} className="mt-0.5 shrink-0 text-amber-400" />
+                <p className="text-xs text-amber-300">{actionError}</p>
               </div>
             )}
 
@@ -271,13 +450,45 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
       <div className="shrink-0 border-t border-neutral-800 px-6 py-4">
         <div className="mx-auto max-w-2xl">
           <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
+            {/* Mic button (founder only) */}
+            {isFounder && (
+              <button
+                type="button"
+                title={actionPhase?.tag === 'recording' ? 'Stop recording' : 'Submit via voice'}
+                disabled={
+                  actionPhase !== null && actionPhase.tag !== 'recording'
+                }
+                onClick={() => {
+                  if (actionPhase?.tag === 'recording') {
+                    stopRecording();
+                  } else {
+                    startRecording();
+                  }
+                }}
+                className={[
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors',
+                  actionPhase?.tag === 'recording'
+                    ? 'animate-pulse bg-red-500 text-white'
+                    : actionPhase !== null
+                    ? 'bg-neutral-800 text-neutral-600 cursor-not-allowed opacity-50'
+                    : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200',
+                ].join(' ')}
+              >
+                {actionPhase?.tag === 'recording' ? <MicOff size={15} /> : <Mic size={15} />}
+              </button>
+            )}
+
             <div className="flex-1 overflow-hidden rounded-2xl border border-neutral-700 bg-neutral-900 focus-within:border-neutral-600 transition-colors">
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about deliverables, traction, curriculum, team progress…"
+                placeholder={
+                  isFounder
+                    ? 'Ask a question or hit the mic to submit progress…'
+                    : 'Ask about deliverables, traction, curriculum, team progress…'
+                }
                 rows={1}
                 className="w-full resize-none bg-transparent px-4 py-3 text-sm text-neutral-100 placeholder:text-neutral-600 focus:outline-none"
                 style={{ maxHeight: '160px' }}
@@ -296,7 +507,9 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
             </button>
           </form>
           <p className="mt-2 text-center text-[10px] text-neutral-700">
-            Enter to send · Shift+Enter for new line
+            {isFounder
+              ? 'Enter to send · Shift+Enter for new line · Mic to submit progress by voice'
+              : 'Enter to send · Shift+Enter for new line'}
           </p>
         </div>
       </div>
@@ -304,11 +517,160 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   );
 }
 
+// ─── Action Card ─────────────────────────────────────────────────────────────
+
+interface ActionCardProps {
+  phase: ActionPhase;
+  onToggle: (index: number) => void;
+  onConfirm: () => void;
+  onDismiss: () => void;
+}
+
+function ActionCard({ phase, onToggle, onConfirm, onDismiss }: ActionCardProps) {
+  if (phase.tag === 'recording') {
+    return (
+      <StatusCard icon="mic" label="Listening…" sublabel="Click the mic button to stop recording." />
+    );
+  }
+
+  if (phase.tag === 'transcribing') {
+    return <StatusCard icon="spinner" label="Transcribing audio…" />;
+  }
+
+  if (phase.tag === 'extracting') {
+    return (
+      <StatusCard
+        icon="spinner"
+        label="Analyzing your update…"
+        sublabel={`"${phase.transcript.slice(0, 80)}${phase.transcript.length > 80 ? '…' : ''}"`}
+      />
+    );
+  }
+
+  if (phase.tag === 'submitting') {
+    return <StatusCard icon="spinner" label="Submitting…" />;
+  }
+
+  if (phase.tag === 'done') {
+    return (
+      <div className="rounded-2xl rounded-tl-sm border border-emerald-500/25 bg-emerald-500/5 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />
+          <p className="text-sm font-medium text-emerald-300">
+            Submitted {phase.count} item{phase.count !== 1 ? 's' : ''} successfully.
+          </p>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="mt-2 text-xs text-neutral-600 hover:text-neutral-400 transition-colors"
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
+  if (phase.tag === 'review') {
+    const { extraction, selected } = phase;
+    const hasSelection = selected.size > 0;
+
+    return (
+      <div className="rounded-2xl rounded-tl-sm border border-neutral-700 bg-neutral-900 px-4 py-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles size={13} className="shrink-0 text-purple-400" />
+          <p className="text-xs font-medium text-neutral-200">
+            {extraction.summary}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 mb-4">
+          {extraction.deliverables.map((item, index) => (
+            <label
+              key={item.id}
+              className="flex items-start gap-2.5 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(index)}
+                onChange={() => onToggle(index)}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-purple-500"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-neutral-200">{item.title}</p>
+                <p className="text-xs text-neutral-500 mt-0.5 line-clamp-2">{item.text_content}</p>
+              </div>
+            </label>
+          ))}
+
+          {extraction.traction.map((item, index) => {
+            const globalIndex = extraction.deliverables.length + index;
+            return (
+              <label
+                key={`${item.metric_type}-${index}`}
+                className="flex items-start gap-2.5 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(globalIndex)}
+                  onChange={() => onToggle(globalIndex)}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-purple-500"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-neutral-200 capitalize">
+                    Traction: {item.metric_type}
+                  </p>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {item.value} {item.unit}{item.notes ? ` — ${item.notes}` : ''}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onConfirm}
+            disabled={!hasSelection}
+            className="rounded-md bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-900 transition-colors hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Confirm & Submit
+          </button>
+          <button
+            onClick={onDismiss}
+            className="text-xs text-neutral-600 hover:text-neutral-400 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function StatusCard({ icon, label, sublabel }: { icon: 'mic' | 'spinner'; label: string; sublabel?: string }) {
+  return (
+    <div className="rounded-2xl rounded-tl-sm border border-neutral-800 bg-neutral-900 px-4 py-3">
+      <div className="flex items-center gap-2">
+        {icon === 'spinner' ? (
+          <Loader2 size={13} className="shrink-0 animate-spin text-neutral-500" />
+        ) : (
+          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500" />
+        )}
+        <p className="text-xs text-neutral-400">{label}</p>
+      </div>
+      {sublabel && (
+        <p className="mt-1 text-xs text-neutral-600 italic pl-5">{sublabel}</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Text extraction ───────────────────────────────────────────────────────────
-// Handles both the UIMessage parts-based format and any legacy content field.
 
 function extractText(message: { parts?: unknown; content?: unknown }): string {
-  // Primary path: parts array (AI SDK v6 format)
   if (Array.isArray(message.parts)) {
     const text = message.parts
       .filter((p): p is { type: string; text: string } =>
@@ -319,14 +681,11 @@ function extractText(message: { parts?: unknown; content?: unknown }): string {
     if (text) return text;
   }
 
-  // Fallback: legacy string content field
   if (typeof message.content === 'string') return message.content;
-
   return '';
 }
 
 // ─── Message content renderer ─────────────────────────────────────────────────
-// Lightweight markdown: headers, bold, code, and bullet lists.
 
 function MessageContent({ content }: { content: string }) {
   const lines = content.split('\n');
