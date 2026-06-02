@@ -21,8 +21,7 @@ export default async function DeveloperPage() {
         <p className="text-xs uppercase tracking-widest text-neutral-500">My Team</p>
         <h1 className="mt-1 text-xl font-semibold text-neutral-100">Developer API</h1>
         <p className="mt-0.5 text-sm text-neutral-500">
-          Connect Claude Code, Cursor, or any coding agent to AggieX — automate deliverable
-          submissions and traction logging while you build.
+          Connect Claude Code, Cursor, or any coding agent to AggieX.
         </p>
       </div>
       <DeveloperPanel />
