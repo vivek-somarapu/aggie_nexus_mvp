@@ -8,38 +8,99 @@ import { z } from 'zod';
 const AddDocSchema = z.object({
   title: z.string().min(1, 'Required').max(200),
   description: z.string().max(1000).optional(),
-  file_url: z.string().url('Must be a valid URL'),
+  file_url: z.string().optional(),
   file_type: z.enum(['pdf', 'docx', 'link', 'other']),
   visibility: z.enum(['aggiex_only', 'aggiex_mce']),
 });
 
 type AddDocValues = z.infer<typeof AddDocSchema>;
+type SourceMode = 'file' | 'url';
+
+function detectFileType(filename: string): 'pdf' | 'docx' | 'other' {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'docx' || ext === 'doc') return 'docx';
+  return 'other';
+}
 
 export default function AddDocForm() {
   const [isOpen, setIsOpen] = useState(false);
+  const [sourceMode, setSourceMode] = useState<SourceMode>('file');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [addedTitle, setAddedTitle] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } =
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } =
     useForm<AddDocValues>({
       resolver: zodResolver(AddDocSchema),
       defaultValues: { file_type: 'pdf', visibility: 'aggiex_mce' },
     });
 
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    if (file) {
+      setValue('file_type', detectFileType(file.name));
+    }
+  }
+
+  function handleClose() {
+    setIsOpen(false);
+    reset();
+    setServerError(null);
+    setSelectedFile(null);
+  }
+
   const onSubmit = async (values: AddDocValues) => {
     setServerError(null);
+
+    let fileUrl: string;
+
+    if (sourceMode === 'file') {
+      if (!selectedFile) {
+        setServerError('Please select a file to upload.');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const uploadResponse = await fetch('/api/upload/internal-docs', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!uploadResponse.ok) {
+        const uploadData = await uploadResponse.json();
+        setServerError(uploadData.error ?? 'File upload failed.');
+        return;
+      }
+      const { publicUrl } = await uploadResponse.json();
+      fileUrl = publicUrl;
+    } else {
+      if (!values.file_url) {
+        setServerError('Please enter a URL.');
+        return;
+      }
+      try {
+        new URL(values.file_url);
+      } catch {
+        setServerError('Please enter a valid URL.');
+        return;
+      }
+      fileUrl = values.file_url;
+    }
+
     const response = await fetch('/api/accelerator/internal-docs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
+      body: JSON.stringify({ ...values, file_url: fileUrl }),
     });
     if (!response.ok) {
-      const data = await response.json();
-      setServerError(data.error ?? 'Upload failed.');
+      const responseData = await response.json();
+      setServerError(responseData.error ?? 'Failed to save document.');
       return;
     }
     setAddedTitle(values.title);
     reset();
+    setSelectedFile(null);
     setIsOpen(false);
   };
 
@@ -67,7 +128,7 @@ export default function AddDocForm() {
         <p className="text-sm font-medium text-neutral-100">Add document</p>
         <button
           type="button"
-          onClick={() => { setIsOpen(false); reset(); setServerError(null); }}
+          onClick={handleClose}
           className="text-xs text-neutral-500 hover:text-neutral-300"
         >
           Cancel
@@ -83,25 +144,66 @@ export default function AddDocForm() {
           <textarea {...register('description')} rows={2} className={TEXTAREA} />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Type">
-            <select {...register('file_type')} className={INPUT}>
-              <option value="pdf">PDF</option>
-              <option value="docx">DOCX</option>
-              <option value="link">Link</option>
-              <option value="other">Other</option>
-            </select>
-          </Field>
-          <Field label="Visible to">
-            <select {...register('visibility')} className={INPUT}>
-              <option value="aggiex_mce">AggieX + MCE</option>
-              <option value="aggiex_only">AggieX only</option>
-            </select>
-          </Field>
+        {/* Source toggle */}
+        <div className="flex rounded-md border border-neutral-800 overflow-hidden text-xs">
+          <button
+            type="button"
+            onClick={() => setSourceMode('file')}
+            className={`flex-1 py-1.5 transition-colors ${
+              sourceMode === 'file'
+                ? 'bg-neutral-700 text-neutral-100'
+                : 'text-neutral-500 hover:text-neutral-300'
+            }`}
+          >
+            Upload file
+          </button>
+          <button
+            type="button"
+            onClick={() => setSourceMode('url')}
+            className={`flex-1 py-1.5 transition-colors ${
+              sourceMode === 'url'
+                ? 'bg-neutral-700 text-neutral-100'
+                : 'text-neutral-500 hover:text-neutral-300'
+            }`}
+          >
+            Enter URL
+          </button>
         </div>
 
-        <Field label="URL" error={errors.file_url?.message}>
-          <input type="url" {...register('file_url')} placeholder="https://..." className={INPUT} />
+        {sourceMode === 'file' ? (
+          <Field label="File">
+            <label className={`${INPUT} flex items-center gap-2 cursor-pointer`}>
+              <input
+                type="file"
+                className="sr-only"
+                onChange={handleFileChange}
+              />
+              <span className={`truncate ${selectedFile ? 'text-neutral-100' : 'text-neutral-600'}`}>
+                {selectedFile ? selectedFile.name : 'Choose file…'}
+              </span>
+            </label>
+          </Field>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Type">
+              <select {...register('file_type')} className={INPUT}>
+                <option value="pdf">PDF</option>
+                <option value="docx">DOCX</option>
+                <option value="link">Link</option>
+                <option value="other">Other</option>
+              </select>
+            </Field>
+            <Field label="URL" error={errors.file_url?.message}>
+              <input type="url" {...register('file_url')} placeholder="https://…" className={INPUT} />
+            </Field>
+          </div>
+        )}
+
+        <Field label="Visible to">
+          <select {...register('visibility')} className={INPUT}>
+            <option value="aggiex_mce">AggieX + MCE</option>
+            <option value="aggiex_only">AggieX only</option>
+          </select>
         </Field>
 
         {serverError && (
@@ -113,7 +215,7 @@ export default function AddDocForm() {
           disabled={isSubmitting}
           className="w-full rounded-md bg-neutral-100 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-50"
         >
-          {isSubmitting ? 'Adding...' : 'Add document'}
+          {isSubmitting ? 'Adding…' : 'Add document'}
         </button>
       </form>
     </div>
