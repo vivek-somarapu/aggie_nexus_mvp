@@ -10,44 +10,52 @@ interface ApiKeyRow {
   created_at: string;
 }
 
-function buildFullPrompt(apiKey: string): string {
-  return `## AggieX MCP Setup
+type Platform = 'mac' | 'windows';
 
-### 1. Install
+const INSTALL_COMMANDS: Record<Platform, string> = {
+  mac: 'mkdir -p ~/.aggiex && curl -fsSL https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/dist/index.js -o ~/.aggiex/server.js && chmod +x ~/.aggiex/server.js',
+  windows:
+    'New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.aggiex"; Invoke-WebRequest -Uri "https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/dist/index.js" -OutFile "$env:USERPROFILE\\.aggiex\\server.js"',
+};
 
-Run in your terminal:
-
-\`\`\`bash
-mkdir -p ~/.aggiex && curl -fsSL https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/dist/index.js -o ~/.aggiex/server.js && chmod +x ~/.aggiex/server.js
-\`\`\`
-
-### 2. Configure
-
-Add to \`.claude/settings.json\`:
-
-\`\`\`json
-{
+function buildMcpConfig(apiKey: string, platform: Platform): string {
+  if (platform === 'windows') {
+    return `{
   "mcpServers": {
     "aggiex": {
-      "command": "node",
-      "args": ["~/.aggiex/server.js"],
+      "command": "cmd.exe",
+      "args": ["/c", "node %USERPROFILE%\\\\.aggiex\\\\server.js"],
       "env": {
         "AGGIEX_API_KEY": "${apiKey}",
         "AGGIEX_BASE_URL": "https://accelerator.aggiex.org"
       }
     }
   }
+}`;
+  }
+  return `{
+  "mcpServers": {
+    "aggiex": {
+      "command": "/bin/bash",
+      "args": ["-lc", "node ~/.aggiex/server.js"],
+      "env": {
+        "AGGIEX_API_KEY": "${apiKey}",
+        "AGGIEX_BASE_URL": "https://accelerator.aggiex.org"
+      }
+    }
+  }
+}`;
 }
-\`\`\`
 
-## AggieX Accelerator Integration
+const AGENT_CONTEXT = `## AggieX Accelerator Integration
 
 You have access to the AggieX accelerator platform via the \`aggiex\` MCP server.
 
 **Available tools:**
+- \`update_aggiex_mcp\` — Fetch the latest setup instructions and version notes
 - \`get_team_status\` — Team name, current program week, and submission progress
 - \`get_pending_deliverables\` — Deliverables not yet submitted or needing revision
-- \`submit_deliverable(deliverable_id, text_content)\` — Submit a written response for a deliverable
+- \`submit_deliverable(deliverable_id, text_content)\` — Submit a written response
 - \`log_traction(metric_type, value, unit, notes?)\` — Log metrics: users, revenue, LOIs, pilots, retention
 - \`get_traction_history\` — View recent traction log entries
 
@@ -55,7 +63,31 @@ You have access to the AggieX accelerator platform via the \`aggiex\` MCP server
 - Session start: check \`get_team_status\` and \`get_pending_deliverables\`
 - User mentions growth metrics ("200 users", "closed 3 LOIs", "$5k MRR"): offer to \`log_traction\`
 - Work completes on a deliverable: offer to \`submit_deliverable\`
+- Connection errors or config issues: call \`update_aggiex_mcp\` for troubleshooting
 - Always confirm with the user before submitting or logging`;
+
+function buildFullPrompt(apiKey: string, platform: Platform): string {
+  const installLabel = platform === 'windows' ? 'PowerShell' : 'Terminal';
+  return `## AggieX MCP Setup
+
+### 1. Install (run once in ${installLabel})
+
+\`\`\`${platform === 'windows' ? 'powershell' : 'bash'}
+${INSTALL_COMMANDS[platform]}
+\`\`\`
+
+### 2. Configure — add to \`.claude/settings.json\`
+
+\`\`\`json
+${buildMcpConfig(apiKey, platform)}
+\`\`\`
+
+${AGENT_CONTEXT}`;
+}
+
+function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'mac';
+  return /Win/i.test(navigator.userAgent) ? 'windows' : 'mac';
 }
 
 export default function DeveloperPanel() {
@@ -63,8 +95,13 @@ export default function DeveloperPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newKey, setNewKey] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<Platform>('mac');
   const [promptCopied, setPromptCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlatform(detectPlatform());
+  }, []);
 
   const loadKeys = useCallback(async () => {
     setIsLoading(true);
@@ -98,7 +135,7 @@ export default function DeveloperPanel() {
 
   async function copyPrompt() {
     if (!newKey) return;
-    await navigator.clipboard.writeText(buildFullPrompt(newKey));
+    await navigator.clipboard.writeText(buildFullPrompt(newKey, platform));
     setPromptCopied(true);
     setTimeout(() => setPromptCopied(false), 2000);
   }
@@ -132,15 +169,40 @@ export default function DeveloperPanel() {
           )}
         </div>
       ) : (
-        <div>
-          <p className="mb-4 text-sm text-neutral-400">
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-neutral-400">
             Your setup prompt is ready. Paste it into your project&apos;s{' '}
             <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-300">CLAUDE.md</code>
             {' '}— it includes the install command, MCP config, and agent context with your API key embedded.
           </p>
+
+          {/* Platform toggle */}
+          <div className="flex items-center gap-1 self-start rounded-lg border border-neutral-800 bg-neutral-950 p-1">
+            <button
+              onClick={() => setPlatform('mac')}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                platform === 'mac'
+                  ? 'bg-neutral-700 text-neutral-100'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              Mac / Linux
+            </button>
+            <button
+              onClick={() => setPlatform('windows')}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                platform === 'windows'
+                  ? 'bg-neutral-700 text-neutral-100'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              Windows
+            </button>
+          </div>
+
           <button
             onClick={copyPrompt}
-            className="flex items-center gap-2 rounded-md border border-neutral-600 bg-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-400 hover:bg-neutral-700"
+            className="flex w-fit items-center gap-2 rounded-md border border-neutral-600 bg-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-400 hover:bg-neutral-700"
           >
             {promptCopied ? (
               <>
@@ -154,7 +216,8 @@ export default function DeveloperPanel() {
               </>
             )}
           </button>
-          <p className="mt-3 text-xs text-neutral-600">
+
+          <p className="text-xs text-neutral-600">
             Need to generate another?{' '}
             <button
               onClick={() => setNewKey(null)}
