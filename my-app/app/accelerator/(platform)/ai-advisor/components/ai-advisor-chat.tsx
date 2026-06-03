@@ -108,6 +108,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let receivedContent = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -115,17 +116,30 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
         for (const line of lines) {
-          // AI SDK data stream: text deltas are prefixed with "0:"
-          if (!line.startsWith('0:')) continue;
-          try {
-            const text = JSON.parse(line.slice(2));
-            if (typeof text === 'string' && text) {
-              setMessages((prev) =>
-                prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + text } : m)),
-              );
-            }
-          } catch { /* skip malformed lines */ }
+          // AI SDK data stream: "0:" = text delta, "3:" = stream-level error
+          if (line.startsWith('0:')) {
+            try {
+              const chunk = JSON.parse(line.slice(2));
+              if (typeof chunk === 'string' && chunk) {
+                receivedContent = true;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
+                );
+              }
+            } catch { /* skip malformed lines */ }
+          } else if (line.startsWith('3:')) {
+            try {
+              const errorText = JSON.parse(line.slice(2));
+              if (typeof errorText === 'string') {
+                setChatError(errorText);
+                setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+              }
+            } catch { /* skip malformed lines */ }
+          }
         }
+      }
+      if (!receivedContent) {
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
       }
     } catch (err) {
       if ((err as { name?: string }).name !== 'AbortError') {
