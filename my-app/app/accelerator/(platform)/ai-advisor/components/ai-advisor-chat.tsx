@@ -6,8 +6,8 @@ import Image from 'next/image';
 import { Send, Loader2, RotateCcw, X, AlertCircle, Mic, MicOff, CheckCircle2, Sparkles } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 import type { ExtractionResult } from '@/app/api/accelerator/ai-advisor/extract/route';
-import type { PendingAction } from '@/lib/ai/advisor-tools';
-import { PENDING_ACTION_PART_TYPE } from '@/lib/ai/advisor-tools';
+import type { PendingAction } from '@/lib/ai/advisor-types';
+import { PENDING_ACTION_PART_TYPE } from '@/lib/ai/advisor-types';
 
 type ExtractionWithTeam = ExtractionResult & { team_id: string };
 

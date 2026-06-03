@@ -9,35 +9,12 @@ import { handleFounderToolCall } from '@/app/api/mcp/founder/tools';
 import { handleToolCall } from '@/app/api/mcp/tools';
 import { getRedis } from '@/lib/redis';
 import type { AccelProfile } from '@/lib/accel-types';
+import type { PendingSubmit, PendingTraction } from '@/lib/ai/advisor-types';
 
-// The shape written to the UI message stream when a write tool is called.
-// The client ActionCard reads this to show a confirm card.
-export type PendingSubmit = {
-  status: 'pending_confirm';
-  action: 'submit_deliverable';
-  deliverable_id: string;
-  deliverable_title: string;
-  text_content: string;
-  text_preview: string;
-  team_id: string;
-  summary: string;
-};
-
-export type PendingTraction = {
-  status: 'pending_confirm';
-  action: 'log_traction';
-  metric_type: string;
-  value: number;
-  unit: string;
-  notes: string;
-  team_id: string;
-  summary: string;
-};
-
-export type PendingAction = PendingSubmit | PendingTraction;
-
-// The data-part type name written to the UI message stream.
-export const PENDING_ACTION_PART_TYPE = 'data-pending-action' as const;
+// Re-export shared types and constants so server-side callers only need one import.
+export type { PendingSubmit, PendingTraction } from '@/lib/ai/advisor-types';
+export type { PendingAction } from '@/lib/ai/advisor-types';
+export { PENDING_ACTION_PART_TYPE } from '@/lib/ai/advisor-types';
 
 // Tools that should trigger a data-pending-action chunk when they fire.
 export const ADVISOR_WRITE_TOOL_NAMES = new Set(['submit_deliverable', 'log_traction']);
