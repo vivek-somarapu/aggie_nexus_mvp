@@ -1,5 +1,6 @@
 import { createGroq } from '@ai-sdk/groq';
-import { streamText, convertToModelMessages, wrapLanguageModel, stepCountIs } from 'ai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { streamText, convertToModelMessages, stepCountIs } from 'ai';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
@@ -42,39 +43,25 @@ const RequestSchema = z
   })
   .passthrough();
 
-// ─── Models ───────────────────────────────────────────────────────────────────
+// ─── Model selection ──────────────────────────────────────────────────────────
+//
+// The system prompt is 5K+ tokens (role identity + program data + behavioral
+// rules). Groq's free tier is capped at 6K tokens per request — not enough to
+// include tool definitions and conversation history on top of that.
+//
+// Gemini Flash is the correct primary: 1M context window, high rate limits,
+// and it handles long system prompts without degrading quality.
+// Groq 70B is the fallback for when the Google key is not configured.
 
 const groqProvider = createGroq({ apiKey: process.env.GROQ_API_KEY });
+const googleProvider = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
 
-function isRateLimitError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const status = (err as { statusCode?: number; status?: number }).statusCode
-    ?? (err as { statusCode?: number; status?: number }).status;
-  return status === 429;
-}
-
-// On rate limit, fall back to llama-3.1-8b-instant on Groq (same API key,
-// 5× higher TPM limit) rather than Gemini which requires a separate env var.
-function buildModel() {
-  const fallbackModel = groqProvider('llama-3.1-8b-instant');
-
-  return wrapLanguageModel({
-    model: groqProvider('llama-3.3-70b-versatile'),
-    middleware: {
-      specificationVersion: 'v3',
-      wrapStream: async ({ doStream, params }) => {
-        try {
-          return await doStream();
-        } catch (err) {
-          if (isRateLimitError(err)) {
-            console.warn('[ai-advisor] Groq 70B rate limited, falling back to Groq 8B');
-            return fallbackModel.doStream(params);
-          }
-          throw err;
-        }
-      },
-    },
-  });
+function selectModel() {
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return googleProvider('gemini-2.0-flash');
+  }
+  console.warn('[ai-advisor] GOOGLE_GENERATIVE_AI_API_KEY not set — falling back to Groq 70B (context limits apply)');
+  return groqProvider('llama-3.3-70b-versatile');
 }
 
 function errorResponse(message: string, status: number): Response {
@@ -145,9 +132,9 @@ export async function POST(request: NextRequest) {
       ? buildStaffAdvisorTools(profile)
       : undefined;
 
-  // Tools are available on demand — the model calls them when the user's question
-  // requires live data. No proactive "call at session start" to keep simple
-  // questions fast (single LLM call, no tool roundtrip).
+  // Tools are available on demand — the model calls them when the user's
+  // question requires live data. No proactive calls to keep simple questions
+  // fast (single LLM call, no tool roundtrip).
   const addToolInstructions = advisorTools
     ? role === 'founder'
       ? `\n\nTOOLS AVAILABLE: Use get_pending_deliverables when asked about outstanding work, use get_submission_status when asked about feedback or review status, use get_traction_history when asked about metrics, use get_curriculum when asked about resources. Use refresh_context after the user mentions submitting something or logging traction.`
@@ -155,11 +142,13 @@ export async function POST(request: NextRequest) {
     : '';
 
   return streamText({
-    model: buildModel(),
+    model: selectModel(),
     system: fullSystemPrompt + addToolInstructions,
     messages: modelMessages,
     maxTokens: 1024,
     temperature: 0.3,
+    // AI SDK v6: maxSteps renamed to stopWhen; default stepCountIs(1) stops
+    // after the first tool call without generating a text response.
     ...(advisorTools ? { tools: advisorTools, stopWhen: stepCountIs(5) } : {}),
   }).toUIMessageStreamResponse({
     onError: (error) => {
