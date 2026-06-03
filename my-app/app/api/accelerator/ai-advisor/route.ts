@@ -55,9 +55,10 @@ function isRateLimitError(err: unknown): boolean {
   return status === 429;
 }
 
-// Groq→Gemini fallback at the model layer so streamText() can be returned
-// directly — avoiding the nested ReadableStream pattern that causes 502s.
-function buildModelWithFallback() {
+// Groq→Gemini fallback at the model layer. wrapLanguageModel middleware
+// intercepts the doStream call so the fallback happens before the response
+// is initiated — no nested ReadableStream, no 502.
+function buildModel() {
   const geminiModel = googleProvider('gemini-2.0-flash');
 
   return wrapLanguageModel({
@@ -154,14 +155,14 @@ export async function POST(request: NextRequest) {
     : '';
 
   return streamText({
-    model: buildModelWithFallback(),
+    model: buildModel(),
     system: fullSystemPrompt + addToolInstructions,
     messages: modelMessages,
     maxTokens: 1024,
     temperature: 0.3,
     ...(advisorTools ? { tools: advisorTools, maxSteps: 5 } : {}),
-  }).toDataStreamResponse({
-    getErrorMessage: (error) => {
+  }).toUIMessageStreamResponse({
+    onError: (error) => {
       console.error('[ai-advisor] Stream error:', error);
       return 'Something went wrong. Please try again.';
     },

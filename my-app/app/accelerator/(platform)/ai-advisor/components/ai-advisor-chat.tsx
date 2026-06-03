@@ -113,28 +113,24 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          // AI SDK data stream: "0:" = text delta, "3:" = stream-level error
-          if (line.startsWith('0:')) {
+        // SSE format: events are separated by blank lines, each line is "data: ..."
+        const events = buffer.split('\n\n');
+        buffer = events.pop() ?? '';
+        for (const event of events) {
+          for (const line of event.split('\n')) {
+            if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
             try {
-              const chunk = JSON.parse(line.slice(2));
-              if (typeof chunk === 'string' && chunk) {
+              const chunk = JSON.parse(line.slice(6)) as { type: string; delta?: string; errorText?: string };
+              if (chunk.type === 'text-delta' && typeof chunk.delta === 'string' && chunk.delta) {
                 receivedContent = true;
                 setMessages((prev) =>
-                  prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
+                  prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk.delta } : m)),
                 );
-              }
-            } catch { /* skip malformed lines */ }
-          } else if (line.startsWith('3:')) {
-            try {
-              const errorText = JSON.parse(line.slice(2));
-              if (typeof errorText === 'string') {
-                setChatError(errorText);
+              } else if (chunk.type === 'error' && typeof chunk.errorText === 'string') {
+                setChatError(chunk.errorText);
                 setMessages((prev) => prev.filter((m) => m.id !== assistantId));
               }
-            } catch { /* skip malformed lines */ }
+            } catch { /* skip malformed events */ }
           }
         }
       }
