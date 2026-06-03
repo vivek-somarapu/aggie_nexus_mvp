@@ -38,7 +38,7 @@ mkdir -p ~/.aggiex && curl -fsSL https://raw.githubusercontent.com/vivek-somarap
       "args": ["-lc", "node ~/.aggiex/server.js"],
       "env": {
         "AGGIEX_API_KEY": "YOUR_KEY",
-        "AGGIEX_BASE_URL": "https://accelerator.aggiex.org"
+        "AGGIEX_BASE_URL": "https://www.accelerator.aggiex.org"
       }
     }
   }
@@ -65,7 +65,7 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.aggiex"; Invoke-Web
       "args": ["/c", "node %USERPROFILE%\\.aggiex\\server.js"],
       "env": {
         "AGGIEX_API_KEY": "YOUR_KEY",
-        "AGGIEX_BASE_URL": "https://accelerator.aggiex.org"
+        "AGGIEX_BASE_URL": "https://www.accelerator.aggiex.org"
       }
     }
   }
@@ -93,7 +93,7 @@ Re-run the install command for your platform above to pull the latest binary. Af
 ## Troubleshooting
 
 **"AGGIEX_API_KEY environment variable is required"**
-→ The `env` block in your settings.json is missing or the key is empty. Generate a new key at `https://accelerator.aggiex.org/accelerator/my-team/developer`.
+→ The `env` block in your settings.json is missing or the key is empty. Generate a new key at `https://www.accelerator.aggiex.org/accelerator/my-team/developer`.
 
 **"spawn /bin/bash ENOENT" or node not found**
 → Try replacing `/bin/bash` with `/bin/zsh` (macOS default since Catalina). Or find your node path with `which node` in Terminal and use it directly: `"args": ["-lc", "/usr/local/bin/node ~/.aggiex/server.js"]`.
@@ -102,4 +102,4 @@ Re-run the install command for your platform above to pull the latest binary. Af
 → Your API key has been revoked or is invalid. Generate a new one at the Developer API page and update your settings.json.
 
 **Server connects but tools return errors**
-→ Verify `AGGIEX_BASE_URL` is set to `https://accelerator.aggiex.org` (no trailing slash).
+→ Verify `AGGIEX_BASE_URL` is set to `https://www.accelerator.aggiex.org` (no trailing slash).

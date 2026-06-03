@@ -148,6 +148,31 @@ export const STAFF_TOOLS = [
       required: ['title', 'file_url', 'file_type'],
     },
   },
+  {
+    name: 'add_internal_doc',
+    description:
+      'Add an internal document visible only to AggieX/MCE staff. ' +
+      'Use for SOPs, meeting recaps, internal notes, or any file not meant for founders.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Document title (max 200 chars)' },
+        description: { type: 'string', description: 'Brief description of the document (max 1000 chars)' },
+        file_url: { type: 'string', description: 'URL of the file or external link' },
+        file_type: {
+          type: 'string',
+          enum: ['pdf', 'docx', 'link', 'other'],
+          description: 'Type of the document',
+        },
+        visibility: {
+          type: 'string',
+          enum: ['aggiex_only', 'aggiex_mce'],
+          description: 'aggiex_only = AggieX team only; aggiex_mce = AggieX + MCE staff (default)',
+        },
+      },
+      required: ['title', 'file_url', 'file_type'],
+    },
+  },
 ];
 
 // ─── Tool implementations ────────────────────────────────────────────────────
@@ -353,6 +378,25 @@ export async function handleToolCall(
 
     if (error) throw new Error(error.message);
     return text(`Curriculum item created: "${data.title}" (${data.id})`);
+  }
+
+  if (name === 'add_internal_doc') {
+    const { data, error } = await admin
+      .from('accel_internal_docs')
+      .insert({
+        title: args.title as string,
+        description: (args.description as string) ?? null,
+        file_url: args.file_url as string,
+        file_type: args.file_type as string,
+        visibility: (args.visibility as string) ?? 'aggiex_mce',
+        program_id: (await admin.from('accel_programs').select('id').eq('is_active', true).single()).data?.id,
+        uploader_id: profile.id,
+      })
+      .select('id, title')
+      .single();
+
+    if (error) throw new Error(error.message);
+    return text(`Internal doc created: "${data.title}" (${data.id})`);
   }
 
   return text(`Unknown tool: ${name}`);

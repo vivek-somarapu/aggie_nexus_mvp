@@ -15454,7 +15454,7 @@ var StdioServerTransport = class {
 
 // src/index.ts
 var API_KEY = process.env.AGGIEX_API_KEY;
-var BASE_URL = (process.env.AGGIEX_BASE_URL ?? "https://accelerator.aggiex.org").replace(/\/$/, "");
+var BASE_URL = (process.env.AGGIEX_BASE_URL ?? "https://www.accelerator.aggiex.org").replace(/\/$/, "");
 var INSTRUCTIONS_URL = "https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/AGENT_INSTRUCTIONS.md";
 if (!API_KEY) {
   console.error("AGGIEX_API_KEY environment variable is required.");

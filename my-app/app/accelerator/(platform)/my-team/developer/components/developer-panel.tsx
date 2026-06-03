@@ -30,7 +30,7 @@ function buildMcpConfig(apiKey: string, platform: Platform): string {
       "args": ["/c", "node %USERPROFILE%\\\\.aggiex\\\\server.js"],
       "env": {
         "AGGIEX_API_KEY": "${apiKey}",
-        "AGGIEX_BASE_URL": "https://accelerator.aggiex.org"
+        "AGGIEX_BASE_URL": "https://www.accelerator.aggiex.org"
       }
     }
   }
@@ -43,7 +43,7 @@ function buildMcpConfig(apiKey: string, platform: Platform): string {
       "args": ["-lc", "node ~/.aggiex/server.js"],
       "env": {
         "AGGIEX_API_KEY": "${apiKey}",
-        "AGGIEX_BASE_URL": "https://accelerator.aggiex.org"
+        "AGGIEX_BASE_URL": "https://www.accelerator.aggiex.org"
       }
     }
   }
