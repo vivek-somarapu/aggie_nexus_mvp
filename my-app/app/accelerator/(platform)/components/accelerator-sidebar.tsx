@@ -181,6 +181,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: Settings,
         roles: ['aggiex_team'],
       },
+      {
+        label: 'Coding Agent',
+        href: '/accelerator/settings/developer',
+        icon: Code2,
+        roles: ['aggiex_team', 'mce_staff'],
+      },
     ],
   },
 ];
