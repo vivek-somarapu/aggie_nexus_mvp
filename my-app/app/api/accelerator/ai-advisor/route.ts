@@ -1,6 +1,5 @@
 import { createGroq } from '@ai-sdk/groq';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { streamText, convertToModelMessages, wrapLanguageModel } from 'ai';
+import { streamText, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
@@ -43,41 +42,9 @@ const RequestSchema = z
   })
   .passthrough();
 
-// ─── Models ───────────────────────────────────────────────────────────────────
+// ─── Model ────────────────────────────────────────────────────────────────────
 
 const groqProvider = createGroq({ apiKey: process.env.GROQ_API_KEY });
-const googleProvider = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY });
-
-function isRateLimitError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const status = (err as { statusCode?: number; status?: number }).statusCode
-    ?? (err as { statusCode?: number; status?: number }).status;
-  return status === 429;
-}
-
-// Groq→Gemini fallback at the model layer so streamText() can be returned
-// directly — avoiding the nested ReadableStream pattern that causes 502s.
-function buildModelWithFallback() {
-  const geminiModel = googleProvider('gemini-2.0-flash');
-
-  return wrapLanguageModel({
-    model: groqProvider('llama-3.3-70b-versatile'),
-    middleware: {
-      specificationVersion: 'v3',
-      wrapStream: async ({ doStream, params }) => {
-        try {
-          return await doStream();
-        } catch (err) {
-          if (isRateLimitError(err)) {
-            console.warn('[ai-advisor] Groq rate limited, falling back to Gemini Flash');
-            return geminiModel.doStream(params);
-          }
-          throw err;
-        }
-      },
-    },
-  });
-}
 
 function errorResponse(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
@@ -154,7 +121,7 @@ export async function POST(request: NextRequest) {
     : '';
 
   return streamText({
-    model: buildModelWithFallback(),
+    model: groqProvider('llama-3.3-70b-versatile'),
     system: fullSystemPrompt + addToolInstructions,
     messages: modelMessages,
     maxTokens: 1024,
