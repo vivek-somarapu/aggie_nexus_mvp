@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     maxTokens: 1024,
     temperature: 0.3,
     ...(advisorTools ? { tools: advisorTools, maxSteps: 5 } : {}),
-  }).toDataStreamResponse({
+  }).toUIMessageStreamResponse({
     getErrorMessage: (error) => {
       console.error('[ai-advisor] Stream error:', error);
       return 'Something went wrong. Please try again.';
