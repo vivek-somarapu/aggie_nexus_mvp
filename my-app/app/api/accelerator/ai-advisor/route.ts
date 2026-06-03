@@ -1,6 +1,6 @@
 import { createGroq } from '@ai-sdk/groq';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { streamText, convertToModelMessages, wrapLanguageModel } from 'ai';
+import { streamText, convertToModelMessages, wrapLanguageModel, stepCountIs } from 'ai';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
@@ -160,7 +160,9 @@ export async function POST(request: NextRequest) {
     messages: modelMessages,
     maxTokens: 1024,
     temperature: 0.3,
-    ...(advisorTools ? { tools: advisorTools, maxSteps: 5 } : {}),
+    // AI SDK v6: maxSteps renamed to stopWhen; default is stepCountIs(1) which
+    // stops after the first tool call and never generates a text response.
+    ...(advisorTools ? { tools: advisorTools, stopWhen: stepCountIs(5) } : {}),
   }).toUIMessageStreamResponse({
     onError: (error) => {
       console.error('[ai-advisor] Stream error:', error);
