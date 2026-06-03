@@ -43,6 +43,7 @@ const TOOLS_OVERVIEW = `## AggieX Staff MCP — Available Tools
 - \`update_submission_status\` — Approve, flag, or request revision on a submission
 - \`unlock_week\` — Make a week visible to founders
 - \`create_curriculum_item\` — Add a resource or file to a program week
+- \`add_internal_doc\` — Add an internal document visible to AggieX/MCE staff only (SOPs, recaps, notes)
 
 **Tips:**
 - After connecting, run \`get_program_overview\` to orient the agent on the current program state
