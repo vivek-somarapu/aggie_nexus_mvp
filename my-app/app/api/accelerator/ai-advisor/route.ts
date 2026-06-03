@@ -144,11 +144,15 @@ export async function POST(request: NextRequest) {
           maxTokens: 1024,
           temperature: 0.3,
           ...(advisorTools ? { tools: advisorTools, maxSteps: 5 } : {}),
+          onChunk({ chunk }) {
+            if (chunk.type === 'text-delta') {
+              controller.enqueue(encoder.encode(chunk.textDelta));
+            }
+          },
         });
 
-        for await (const chunk of result.textStream) {
-          controller.enqueue(encoder.encode(chunk));
-        }
+        // Await full completion (including all tool-call steps).
+        await result.text;
       };
 
       try {
