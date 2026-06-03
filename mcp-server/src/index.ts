@@ -6,7 +6,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 const API_KEY = process.env.AGGIEX_API_KEY;
-const BASE_URL = (process.env.AGGIEX_BASE_URL ?? 'https://accelerator.aggiex.org').replace(/\/$/, '');
+const BASE_URL = (process.env.AGGIEX_BASE_URL ?? 'https://www.accelerator.aggiex.org').replace(/\/$/, '');
 
 const INSTRUCTIONS_URL =
   'https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/AGENT_INSTRUCTIONS.md';

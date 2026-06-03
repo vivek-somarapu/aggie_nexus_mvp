@@ -13,7 +13,7 @@ interface ApiKeyRow {
 type KeyStatus = 'idle' | 'verifying' | 'ok' | 'error';
 
 const SESSION_STORAGE_KEY = 'aggiex_staff_raw_key';
-const MCP_URL = 'https://accelerator.aggiex.org/api/mcp';
+const MCP_URL = 'https://www.accelerator.aggiex.org/api/mcp';
 
 function buildSettingsJson(apiKey: string): string {
   return `{
