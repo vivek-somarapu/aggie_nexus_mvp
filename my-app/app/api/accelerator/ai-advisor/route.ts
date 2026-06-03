@@ -63,6 +63,7 @@ function buildModelWithFallback() {
   return wrapLanguageModel({
     model: groqProvider('llama-3.3-70b-versatile'),
     middleware: {
+      specificationVersion: 'v3',
       wrapStream: async ({ doStream, params }) => {
         try {
           return await doStream();
