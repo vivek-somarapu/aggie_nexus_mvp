@@ -107,13 +107,25 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
-        );
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          // AI SDK data stream: text deltas are prefixed with "0:"
+          if (!line.startsWith('0:')) continue;
+          try {
+            const text = JSON.parse(line.slice(2));
+            if (typeof text === 'string' && text) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + text } : m)),
+              );
+            }
+          } catch { /* skip malformed lines */ }
+        }
       }
     } catch (err) {
       if ((err as { name?: string }).name !== 'AbortError') {
