@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
 import Image from 'next/image';
 import { Send, Loader2, RotateCcw, X, AlertCircle, Mic, MicOff, CheckCircle2, Sparkles } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 import type { ExtractionResult } from '@/app/api/accelerator/ai-advisor/extract/route';
-import type { PendingAction } from '@/lib/ai/advisor-types';
-import { PENDING_ACTION_PART_TYPE } from '@/lib/ai/advisor-types';
 
 type ExtractionWithTeam = ExtractionResult & { team_id: string };
 
@@ -72,30 +70,8 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   const isFounder = accelRole === 'founder';
   const starterPrompts = ROLE_STARTER_PROMPTS[accelRole] ?? [];
 
-  // Ref so onData always has access to the latest actionPhase without stale closure.
-  const actionPhaseRef = useRef<ActionPhase | null>(null);
-  useEffect(() => { actionPhaseRef.current = actionPhase; }, [actionPhase]);
-
-  const handlePendingAction = useCallback((pending: PendingAction) => {
-    if (actionPhaseRef.current) return; // already showing a card
-    const extraction = pendingActionToExtraction(pending);
-    if (!extraction) return;
-    const total = extraction.deliverables.length + extraction.traction.length;
-    setActionPhase({
-      tag: 'review',
-      transcript: '',
-      extraction,
-      selected: new Set(Array.from({ length: total }, (_, i) => i)),
-    });
-  }, []);
-
   const { messages, sendMessage, setMessages, status, error } = useChat({
     api: '/api/accelerator/ai-advisor',
-    onData: (dataPart) => {
-      if ((dataPart as { type: string }).type !== PENDING_ACTION_PART_TYPE) return;
-      const pending = (dataPart as { data: PendingAction }).data;
-      handlePendingAction(pending);
-    },
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
@@ -714,38 +690,6 @@ function StatusCard({ icon, label, sublabel }: { icon: 'mic' | 'spinner'; label:
       )}
     </div>
   );
-}
-
-// ─── Pending action → ExtractionResult adapter ────────────────────────────────
-
-function pendingActionToExtraction(pending: PendingAction): (ExtractionResult & { team_id: string }) | null {
-  if (pending.action === 'submit_deliverable') {
-    return {
-      deliverables: [{
-        id: pending.deliverable_id,
-        title: pending.deliverable_title,
-        text_content: pending.text_content,
-        confidence: 1,
-      }],
-      traction: [],
-      team_id: pending.team_id,
-      summary: pending.summary,
-    };
-  }
-  if (pending.action === 'log_traction') {
-    return {
-      deliverables: [],
-      traction: [{
-        metric_type: pending.metric_type as ExtractionResult['traction'][number]['metric_type'],
-        value: pending.value,
-        unit: pending.unit,
-        notes: pending.notes || undefined,
-      }],
-      team_id: pending.team_id,
-      summary: pending.summary,
-    };
-  }
-  return null;
 }
 
 // ─── Text extraction ───────────────────────────────────────────────────────────

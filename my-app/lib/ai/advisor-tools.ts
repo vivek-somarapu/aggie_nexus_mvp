@@ -1,23 +1,12 @@
 // Tool definitions for the AI Advisor agent.
-// Read tools execute immediately; write tools return pending_confirm so the
-// client ActionCard handles the actual commit — no LLM behavioral trust required.
+// All tools are read-only — writes are handled by the existing extraction + ActionCard flow.
 
 import { tool } from 'ai';
 import { z } from 'zod';
-import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { handleFounderToolCall } from '@/app/api/mcp/founder/tools';
 import { handleToolCall } from '@/app/api/mcp/tools';
 import { getRedis } from '@/lib/redis';
 import type { AccelProfile } from '@/lib/accel-types';
-import type { PendingSubmit, PendingTraction } from '@/lib/ai/advisor-types';
-
-// Re-export shared types and constants so server-side callers only need one import.
-export type { PendingSubmit, PendingTraction } from '@/lib/ai/advisor-types';
-export type { PendingAction } from '@/lib/ai/advisor-types';
-export { PENDING_ACTION_PART_TYPE } from '@/lib/ai/advisor-types';
-
-// Tools that should trigger a data-pending-action chunk when they fire.
-export const ADVISOR_WRITE_TOOL_NAMES = new Set(['submit_deliverable', 'log_traction']);
 
 function firstText(content: Array<{ type: 'text'; text: string }>): string {
   return content.map((c) => c.text).join('');
@@ -64,7 +53,7 @@ export function buildFounderAdvisorTools(profile: AccelProfile) {
 
     refresh_context: tool({
       description:
-        'Re-fetch current program state (pending deliverables + recent traction). Call this after the user confirms a submission or traction log to reflect the updated state.',
+        'Re-fetch current program state (pending deliverables + recent traction). Call this when the user says they just submitted something or logged traction.',
       parameters: z.object({}),
       execute: async () => {
         const redis = getRedis();
@@ -74,61 +63,6 @@ export function buildFounderAdvisorTools(profile: AccelProfile) {
           handleFounderToolCall('get_traction_history', {}, profile),
         ]);
         return `Context refreshed.\n\n${firstText(deliverables)}\n\n${firstText(traction)}`;
-      },
-    }),
-
-    // Write tools return pending_confirm — the client ActionCard commits the actual write.
-    submit_deliverable: tool({
-      description:
-        'Prepare a deliverable submission for user confirmation. Returns a preview — does NOT submit until the user clicks Confirm in the action card.',
-      parameters: z.object({
-        deliverable_id: z.string().describe('UUID of the deliverable from get_pending_deliverables'),
-        text_content: z.string().describe('The written response to submit'),
-      }),
-      execute: async ({ deliverable_id, text_content }): Promise<PendingSubmit | string> => {
-        if (!profile.team_id) return 'No team assigned — cannot submit.';
-        const admin = createAdminClient();
-        const { data: deliverable } = await admin
-          .from('accel_deliverables')
-          .select('title')
-          .eq('id', deliverable_id)
-          .single();
-        if (!deliverable) return `Deliverable ${deliverable_id} not found.`;
-
-        return {
-          status: 'pending_confirm',
-          action: 'submit_deliverable',
-          deliverable_id,
-          deliverable_title: deliverable.title,
-          text_content,
-          text_preview: text_content.slice(0, 200) + (text_content.length > 200 ? '…' : ''),
-          team_id: profile.team_id,
-          summary: `Prepared submission for "${deliverable.title}"`,
-        };
-      },
-    }),
-
-    log_traction: tool({
-      description:
-        'Prepare a traction metric log for user confirmation. Returns a preview — does NOT log until the user clicks Confirm in the action card.',
-      parameters: z.object({
-        metric_type: z.enum(['revenue', 'users', 'lois', 'pilots', 'retention', 'churn', 'other']),
-        value: z.number().describe('Numeric value'),
-        unit: z.string().describe('Unit of measurement e.g. "users", "USD/mo", "%"'),
-        notes: z.string().optional().describe('Optional context or notes'),
-      }),
-      execute: async ({ metric_type, value, unit, notes }): Promise<PendingTraction | string> => {
-        if (!profile.team_id) return 'No team assigned — cannot log traction.';
-        return {
-          status: 'pending_confirm',
-          action: 'log_traction',
-          metric_type,
-          value,
-          unit,
-          notes: notes ?? '',
-          team_id: profile.team_id,
-          summary: `Ready to log ${value} ${unit} (${metric_type})`,
-        };
       },
     }),
   };

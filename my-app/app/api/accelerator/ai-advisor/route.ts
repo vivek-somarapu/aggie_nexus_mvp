@@ -13,8 +13,6 @@ import { buildSystemPrompt, buildSemanticContext } from '@/lib/ai/context-builde
 import {
   buildFounderAdvisorTools,
   buildStaffAdvisorTools,
-  ADVISOR_WRITE_TOOL_NAMES,
-  PENDING_ACTION_PART_TYPE,
 } from '@/lib/ai/advisor-tools';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -152,24 +150,6 @@ export async function POST(request: NextRequest) {
           maxTokens: 1024,
           temperature: 0.3,
           ...(advisorTools ? { tools: advisorTools, maxSteps: 5 } : {}),
-          onStepFinish: ({ toolCalls, toolResults }) => {
-            for (let i = 0; i < (toolCalls?.length ?? 0); i++) {
-              const tc = toolCalls[i];
-              if (!ADVISOR_WRITE_TOOL_NAMES.has(tc.toolName)) continue;
-              const tr = toolResults?.[i];
-              if (!tr) continue;
-              const result = tr.result;
-              if (
-                typeof result === 'object' &&
-                result !== null &&
-                'status' in result &&
-                (result as { status: string }).status === 'pending_confirm'
-              ) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                writer.write({ type: PENDING_ACTION_PART_TYPE, data: result } as any);
-              }
-            }
-          },
         });
 
         for await (const chunk of result.toUIMessageStream()) {
