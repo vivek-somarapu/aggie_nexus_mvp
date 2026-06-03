@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useChat } from '@ai-sdk/react';
-import { TextStreamChatTransport } from 'ai';
 import Image from 'next/image';
 import { Send, Loader2, RotateCcw, X, AlertCircle, Mic, MicOff, CheckCircle2, Sparkles } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 import type { ExtractionResult } from '@/app/api/accelerator/ai-advisor/extract/route';
+
+type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string };
 
 type ExtractionWithTeam = ExtractionResult & { team_id: string };
 
@@ -71,12 +71,59 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   const isFounder = accelRole === 'founder';
   const starterPrompts = ROLE_STARTER_PROMPTS[accelRole] ?? [];
 
-  const [transport] = useState(
-    () => new TextStreamChatTransport({ url: '/api/accelerator/ai-advisor' }),
-  );
-  const { messages, sendMessage, setMessages, status, error } = useChat({ transport });
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const isLoading = status === 'submitted' || status === 'streaming';
+  async function sendMessage(text: string) {
+    if (!text.trim() || isLoading) return;
+    setChatError(null);
+    const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: 'user', content: text };
+    const assistantId = `a-${Date.now()}`;
+    const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', content: '' };
+    const next = [...messages, userMsg, assistantMsg];
+    setMessages(next);
+    setIsLoading(true);
+
+    abortRef.current = new AbortController();
+    try {
+      const response = await fetch('/api/accelerator/ai-advisor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortRef.current.signal,
+        body: JSON.stringify({
+          messages: next.slice(0, -1).map((m) => ({
+            id: m.id,
+            role: m.role,
+            parts: [{ type: 'text', text: m.content }],
+          })),
+        }),
+      });
+      if (!response.ok || !response.body) {
+        setChatError(`Error ${response.status}. Please try again.`);
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        return;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
+        );
+      }
+    } catch (err) {
+      if ((err as { name?: string }).name !== 'AbortError') {
+        setChatError('Something went wrong. Please try again.');
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   const [input, setInput] = useState('');
   const [actionPhase, setActionPhase] = useState<ActionPhase | null>(null);
@@ -102,9 +149,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
     const text = input.trim();
     if (!text || isLoading) return;
     setInput('');
-    sendMessage({ text });
-    // Silently run extraction in the background for founders — no loading state.
-    // ActionCard appears only when something actionable is actually detected.
+    sendMessage(text);
     if (isFounder && !actionPhase) runExtractionSilently(text);
   };
 
@@ -148,7 +193,10 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
   };
 
   const reset = () => {
+    abortRef.current?.abort();
     setMessages([]);
+    setIsLoading(false);
+    setChatError(null);
     setInput('');
     setActionPhase(null);
     setActionError(null);
@@ -379,7 +427,7 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
           /* Message thread + action card */
           <div className="mx-auto w-full max-w-2xl flex flex-col gap-4">
             {messages.map((message) => {
-              const textContent = extractText(message);
+              const textContent = message.content;
               if (!textContent && message.role !== 'user') return null;
 
               return (
@@ -436,13 +484,10 @@ export default function AiAdvisorChat({ role, userName, onClose }: AiAdvisorChat
             )}
 
             {/* Chat error */}
-            {status === 'error' && error && (
+            {chatError && (
               <div className="flex items-start gap-2.5 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3">
                 <AlertCircle size={13} className="mt-0.5 shrink-0 text-red-400" />
-                <div>
-                  <p className="text-xs font-medium text-red-300">Something went wrong</p>
-                  <p className="mt-0.5 text-xs text-red-400/70">{error.message}</p>
-                </div>
+                <p className="text-xs text-red-300">{chatError}</p>
               </div>
             )}
 
@@ -692,23 +737,6 @@ function StatusCard({ icon, label, sublabel }: { icon: 'mic' | 'spinner'; label:
       )}
     </div>
   );
-}
-
-// ─── Text extraction ───────────────────────────────────────────────────────────
-
-function extractText(message: { parts?: unknown; content?: unknown }): string {
-  if (Array.isArray(message.parts)) {
-    const text = message.parts
-      .filter((p): p is { type: string; text: string } =>
-        typeof p === 'object' && p !== null && (p as Record<string, unknown>).type === 'text',
-      )
-      .map((p) => p.text)
-      .join('');
-    if (text) return text;
-  }
-
-  if (typeof message.content === 'string') return message.content;
-  return '';
 }
 
 // ─── Message content renderer ─────────────────────────────────────────────────
