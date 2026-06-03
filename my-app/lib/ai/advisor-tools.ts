@@ -47,8 +47,11 @@ export function buildFounderAdvisorTools(profile: AccelProfile) {
           .optional()
           .describe('Week number (defaults to current unlocked week)'),
       }),
-      execute: async ({ week_number }) =>
-        firstText(await handleFounderToolCall('get_curriculum', { week_number }, profile)),
+      // AI SDK v6 may pass null when no args are provided — guard with ?? {}
+      execute: async (args) => {
+        const { week_number } = args ?? {};
+        return firstText(await handleFounderToolCall('get_curriculum', { week_number }, profile));
+      },
     }),
 
     refresh_context: tool({
@@ -80,7 +83,10 @@ export function buildStaffAdvisorTools(profile: AccelProfile) {
       parameters: z.object({
         week_number: z.number().optional().describe('Week number (defaults to current)'),
       }),
-      execute: async ({ week_number }) => call('get_all_teams_status', { week_number }),
+      execute: async (args) => {
+        const { week_number } = args ?? {};
+        return call('get_all_teams_status', { week_number });
+      },
     }),
 
     get_team_details: tool({
@@ -88,7 +94,10 @@ export function buildStaffAdvisorTools(profile: AccelProfile) {
       parameters: z.object({
         team_name: z.string().describe('Team name (partial match supported)'),
       }),
-      execute: async ({ team_name }) => call('get_team_details', { team_name }),
+      execute: async (args) => {
+        const { team_name } = args ?? {};
+        return call('get_team_details', { team_name });
+      },
     }),
 
     get_submissions_for_review: tool({
@@ -98,8 +107,10 @@ export function buildStaffAdvisorTools(profile: AccelProfile) {
         week_number: z.number().optional(),
         status_filter: z.string().optional().describe('e.g. "submitted", "under_review"'),
       }),
-      execute: async ({ week_number, status_filter }) =>
-        call('get_submissions_for_review', { week_number, status_filter }),
+      execute: async (args) => {
+        const { week_number, status_filter } = args ?? {};
+        return call('get_submissions_for_review', { week_number, status_filter });
+      },
     }),
 
     get_recent_activity: tool({
@@ -107,7 +118,10 @@ export function buildStaffAdvisorTools(profile: AccelProfile) {
       parameters: z.object({
         limit: z.number().optional().describe('Number of entries (default 20)'),
       }),
-      execute: async ({ limit }) => call('get_recent_activity', { limit }),
+      execute: async (args) => {
+        const { limit } = args ?? {};
+        return call('get_recent_activity', { limit });
+      },
     }),
 
     create_curriculum_item: tool({
@@ -122,7 +136,7 @@ export function buildStaffAdvisorTools(profile: AccelProfile) {
           .enum(['all', 'founders_only', 'mentors_and_staff', 'aggiex_internal'])
           .optional(),
       }),
-      execute: async (args) => call('create_curriculum_item', args),
+      execute: async (args) => call('create_curriculum_item', args ?? {}),
     }),
 
     add_internal_doc: tool({
@@ -132,7 +146,7 @@ export function buildStaffAdvisorTools(profile: AccelProfile) {
         content: z.string(),
         doc_type: z.string().optional(),
       }),
-      execute: async (args) => call('add_internal_doc', args),
+      execute: async (args) => call('add_internal_doc', args ?? {}),
     }),
   };
 }
