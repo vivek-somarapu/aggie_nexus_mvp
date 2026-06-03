@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAccelAuth } from '@/lib/accel-auth';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/accel-admin';
 
 export async function GET(request: NextRequest) {
@@ -8,13 +7,12 @@ export async function GET(request: NextRequest) {
   if (error) return error;
 
   const admin = createAdminClient();
-  const supabase = await createClient();
 
   const [teamResult, weekResult] = await Promise.all([
     profile.team_id
       ? admin.from('accel_teams').select('id, name, venture_stage').eq('id', profile.team_id).single()
       : Promise.resolve({ data: null }),
-    supabase
+    admin
       .from('accel_weeks')
       .select('week_number, theme')
       .eq('is_unlocked', true)

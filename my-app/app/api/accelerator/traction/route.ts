@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAccelRole, requireAccelAuth } from '@/lib/accel-auth';
-import { createClient } from '@/lib/supabase/server';
+import { requireAccelAuth } from '@/lib/accel-auth';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 
 const CreateTractionSchema = z.object({
   team_id: z.string().uuid(),
@@ -17,7 +17,7 @@ const CreateTractionSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const { error } = await requireAccelRole([
+  const { error } = await requireAccelAuth(request, [
     'founder', 'aggiex_team', 'mce_staff', 'mentor',
   ]);
   if (error) return error;
@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
   const teamId = searchParams.get('team_id');
   const metricType = searchParams.get('metric_type');
 
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  let query = supabase
+  let query = admin
     .from('accel_traction_entries')
     .select('*, accel_weeks(week_number)')
     .order('entry_date', { ascending: false })
@@ -71,9 +71,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  const { data, error: dbError } = await supabase
+  const { data, error: dbError } = await admin
     .from('accel_traction_entries')
     .insert({ ...parsed.data, logged_by: profile.id })
     .select()
