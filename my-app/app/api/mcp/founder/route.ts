@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAccelAuth } from '@/lib/accel-auth';
-import { STAFF_TOOLS, handleToolCall } from './tools';
+import { FOUNDER_TOOLS, handleFounderToolCall } from './tools';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 const SERVER_INFO = {
-  name: 'aggiex-staff',
+  name: 'aggiex-founder',
   version: '1.0.0',
   instructions:
-    'AggieX staff tools for program management. ' +
-    'Use process_meeting_notes to analyze a photo of meeting notes and extract action items. ' +
-    'Use add_deliverable to create deliverables for teams. ' +
-    'All reads return live data from the AggieX platform.',
+    'AggieX founder tools. Start with whoami, then get_pending_deliverables to see what needs to be done. ' +
+    'Use submit_deliverable to submit text responses, log_traction to record metrics.',
 };
 
 interface McpMessage {
@@ -31,7 +29,7 @@ function mcpError(id: string | number | null | undefined, code: number, message:
 }
 
 export async function POST(request: NextRequest) {
-  const { profile, error: authError } = await requireAccelAuth(request, ['aggiex_team', 'mce_staff']);
+  const { profile, error: authError } = await requireAccelAuth(request, ['founder']);
   if (authError) return authError;
 
   let body: McpMessage;
@@ -43,7 +41,6 @@ export async function POST(request: NextRequest) {
 
   const { method, params, id } = body;
 
-  // Notifications (no id) expect no JSON response — 202 Accepted
   if (id === undefined && method.startsWith('notifications/')) {
     return new NextResponse(null, { status: 202 });
   }
@@ -60,7 +57,7 @@ export async function POST(request: NextRequest) {
       return ok(id, {});
 
     case 'tools/list':
-      return ok(id, { tools: STAFF_TOOLS });
+      return ok(id, { tools: FOUNDER_TOOLS });
 
     case 'tools/call': {
       const { name, arguments: args = {} } = params as {
@@ -68,7 +65,7 @@ export async function POST(request: NextRequest) {
         arguments?: Record<string, unknown>;
       };
       try {
-        const content = await handleToolCall(name, args, profile, keyId);
+        const content = await handleFounderToolCall(name, args, profile);
         return ok(id, { content });
       } catch (err) {
         return ok(id, {
@@ -83,10 +80,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET is required by the Streamable HTTP spec for SSE streaming sessions.
-// We don't support persistent streaming — return 405 so clients fall back to polling.
 export async function GET() {
-  return new NextResponse('Streaming sessions not supported — use POST for tool calls.', {
-    status: 405,
-  });
+  return new NextResponse('Use POST for tool calls.', { status: 405 });
 }

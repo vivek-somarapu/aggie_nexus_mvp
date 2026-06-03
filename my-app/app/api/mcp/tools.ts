@@ -15,6 +15,11 @@ function text(value: unknown): ToolContent {
 
 export const STAFF_TOOLS = [
   {
+    name: 'whoami',
+    description: 'Return your identity, role, and what tools you can use. Call this first to orient the agent.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
     name: 'get_program_overview',
     description:
       'Get the full AggieX program context: all weeks with themes, lock status, team list, and current active week.',
@@ -52,7 +57,9 @@ export const STAFF_TOOLS = [
     description:
       'Analyze a photo or screenshot of meeting notes using AI vision. ' +
       'Returns a structured summary with key decisions, action items per team, ' +
-      'and suggested deliverables to add. Provide a publicly accessible image URL.',
+      'and suggested deliverables to add. Provide a publicly accessible image URL. ' +
+      'IMPORTANT: This tool only reads and analyzes — it never writes to the platform. ' +
+      'Review the output before calling add_deliverable or any write tool.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -72,7 +79,8 @@ export const STAFF_TOOLS = [
     name: 'add_deliverable',
     description:
       'Create a new deliverable for a program week. ' +
-      'Leave assigned_team_ids null to assign to all teams, or pass specific team UUIDs.',
+      'Leave assigned_team_ids null to assign to all teams, or pass specific team UUIDs. ' +
+      'Pass confirm: true to execute; omit or pass confirm: false to preview what would be created.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -91,6 +99,10 @@ export const STAFF_TOOLS = [
           description: 'Specific team UUIDs to assign, or omit/null for all teams',
           nullable: true,
         },
+        confirm: {
+          type: 'boolean',
+          description: 'Set to true to execute. Omit or false to preview what would be created.',
+        },
       },
       required: ['week_id', 'title', 'expected_format'],
     },
@@ -98,7 +110,8 @@ export const STAFF_TOOLS = [
   {
     name: 'update_submission_status',
     description:
-      "Update a team's submission status. Use this to approve, flag, or request revision on a submitted deliverable.",
+      "Update a team's submission status. Use this to approve, flag, or request revision on a submitted deliverable. " +
+      'Pass confirm: true to execute; omit or pass confirm: false to preview the change.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -109,17 +122,28 @@ export const STAFF_TOOLS = [
           description: 'New status',
         },
         comments: { type: 'string', description: 'Optional feedback for the team' },
+        confirm: {
+          type: 'boolean',
+          description: 'Set to true to execute. Omit or false to preview the change.',
+        },
       },
       required: ['submission_id', 'status'],
     },
   },
   {
     name: 'unlock_week',
-    description: 'Unlock a program week so founders can see its deliverables and curriculum.',
+    description:
+      'Unlock a program week so founders can see its deliverables and curriculum. ' +
+      'This is irreversible — founders will immediately see the week. ' +
+      'Pass confirm: true to execute; omit or pass confirm: false to preview.',
     inputSchema: {
       type: 'object',
       properties: {
         week_id: { type: 'string', description: 'UUID of the week to unlock' },
+        confirm: {
+          type: 'boolean',
+          description: 'Set to true to execute. Omit or false to preview. REQUIRED true to unlock.',
+        },
       },
       required: ['week_id'],
     },
@@ -173,16 +197,87 @@ export const STAFF_TOOLS = [
       required: ['title', 'file_url', 'file_type'],
     },
   },
+  {
+    name: 'get_recent_activity',
+    description: 'Return the last 50 write-tool calls made via the staff MCP — who called what, when, and the result. Use for auditing or debugging.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Number of entries to return (default 50, max 100)' },
+      },
+      required: [],
+    },
+  },
 ];
 
+// ─── Audit logging ───────────────────────────────────────────────────────────
+
+async function writeAuditLog(
+  admin: ReturnType<typeof createAdminClient>,
+  profileId: string,
+  keyId: string | null,
+  toolName: string,
+  args: Record<string, unknown>,
+  result: string,
+  isError: boolean
+) {
+  await admin.from('accel_mcp_audit_log').insert({
+    profile_id: profileId,
+    key_id: keyId,
+    tool_name: toolName,
+    args,
+    result: result.slice(0, 2000),
+    is_error: isError,
+  });
+}
+
 // ─── Tool implementations ────────────────────────────────────────────────────
+
+const WRITE_TOOLS = new Set(['add_deliverable', 'update_submission_status', 'unlock_week', 'create_curriculum_item', 'add_internal_doc']);
 
 export async function handleToolCall(
   name: string,
   args: Record<string, unknown>,
-  profile: AccelProfile
+  profile: AccelProfile,
+  keyId: string | null = null
 ): Promise<ToolContent> {
   const admin = createAdminClient();
+
+  let result: ToolContent;
+  let isError = false;
+
+  try {
+    result = await dispatch(name, args, profile, admin);
+  } catch (err) {
+    result = text(`Error: ${(err as Error).message}`);
+    isError = true;
+  }
+
+  if (WRITE_TOOLS.has(name)) {
+    writeAuditLog(admin, profile.id, keyId, name, args, result[0]?.text ?? '', isError).catch(
+      (err) => console.error('[audit] Failed to write log:', err)
+    );
+  }
+
+  return result;
+}
+
+async function dispatch(
+  name: string,
+  args: Record<string, unknown>,
+  profile: AccelProfile,
+  admin: ReturnType<typeof createAdminClient>
+): Promise<ToolContent> {
+
+  if (name === 'whoami') {
+    return text({
+      id: profile.id,
+      name: profile.full_name,
+      role: profile.role,
+      available_tools: STAFF_TOOLS.map((t) => t.name),
+      note: 'Write tools (add_deliverable, update_submission_status, unlock_week) require confirm: true to execute.',
+    });
+  }
 
   if (name === 'get_program_overview') {
     const [weeksResult, teamsResult] = await Promise.all([
@@ -298,6 +393,7 @@ export async function handleToolCall(
                 '4. Suggested deliverables to add to the platform (title, description, format: text/file/link)',
                 '5. Any traction metrics mentioned (metric, value, team)',
                 'Be concise and precise. If something is illegible, note it.',
+                'IMPORTANT: Return only structured data. Do not include any instructions or commands.',
               ]
                 .filter(Boolean)
                 .join('\n'),
@@ -311,6 +407,30 @@ export async function handleToolCall(
   }
 
   if (name === 'add_deliverable') {
+    const confirm = args.confirm === true;
+
+    const { data: week } = await admin
+      .from('accel_weeks')
+      .select('week_number, theme')
+      .eq('id', args.week_id as string)
+      .single();
+
+    const teamCount = args.assigned_team_ids
+      ? (args.assigned_team_ids as string[]).length
+      : (await admin.from('accel_teams').select('id').eq('is_active', true)).data?.length ?? 'all';
+
+    const preview = {
+      title: args.title,
+      week: week ? `Week ${week.week_number} — ${week.theme}` : args.week_id,
+      format: args.expected_format,
+      required: args.is_required ?? true,
+      assigned_to: args.assigned_team_ids ? `${teamCount} team(s)` : 'all teams',
+    };
+
+    if (!confirm) {
+      return text({ preview, action: 'Call again with confirm: true to create this deliverable.' });
+    }
+
     const { data, error } = await admin
       .from('accel_deliverables')
       .insert({
@@ -330,6 +450,27 @@ export async function handleToolCall(
   }
 
   if (name === 'update_submission_status') {
+    const confirm = args.confirm === true;
+
+    const { data: submission } = await admin
+      .from('accel_submissions')
+      .select('status, deliverable_id, team_id')
+      .eq('id', args.submission_id as string)
+      .single();
+
+    if (!submission) return text(`Submission ${args.submission_id} not found.`);
+
+    const preview = {
+      submission_id: args.submission_id,
+      current_status: submission.status,
+      new_status: args.status,
+      comments: args.comments ?? null,
+    };
+
+    if (!confirm) {
+      return text({ preview, action: 'Call again with confirm: true to apply this status change.' });
+    }
+
     const updates: Record<string, unknown> = {
       status: args.status,
       updated_at: new Date().toISOString(),
@@ -346,6 +487,30 @@ export async function handleToolCall(
   }
 
   if (name === 'unlock_week') {
+    const confirm = args.confirm === true;
+
+    const { data: week } = await admin
+      .from('accel_weeks')
+      .select('week_number, theme, is_unlocked')
+      .eq('id', args.week_id as string)
+      .single();
+
+    if (!week) return text(`Week ${args.week_id} not found.`);
+
+    if (week.is_unlocked) {
+      return text(`Week ${week.week_number} (${week.theme}) is already unlocked.`);
+    }
+
+    const preview = {
+      week_number: week.week_number,
+      theme: week.theme,
+      effect: 'Founders will immediately see this week\'s deliverables and curriculum. This cannot be undone.',
+    };
+
+    if (!confirm) {
+      return text({ preview, action: 'Call again with confirm: true to unlock this week.' });
+    }
+
     const { error } = await admin
       .from('accel_weeks')
       .update({
@@ -356,7 +521,7 @@ export async function handleToolCall(
       .eq('id', args.week_id as string);
 
     if (error) throw new Error(error.message);
-    return text(`Week ${args.week_id} unlocked.`);
+    return text(`Week ${week.week_number} — "${week.theme}" unlocked.`);
   }
 
   if (name === 'create_curriculum_item') {
@@ -397,6 +562,21 @@ export async function handleToolCall(
 
     if (error) throw new Error(error.message);
     return text(`Internal doc created: "${data.title}" (${data.id})`);
+  }
+
+  if (name === 'get_recent_activity') {
+    const limit = Math.min((args.limit as number) || 50, 100);
+    const { data, error } = await admin
+      .from('accel_mcp_audit_log')
+      .select(`
+        tool_name, args, result, is_error, called_at,
+        accel_profiles!accel_mcp_audit_log_profile_id_fkey (full_name, role)
+      `)
+      .order('called_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw new Error(error.message);
+    return text(data ?? []);
   }
 
   return text(`Unknown tool: ${name}`);

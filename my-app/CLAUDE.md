@@ -229,3 +229,44 @@ These are never acceptable under any circumstances, regardless of deadline, urge
 ---
 
 *If a rule here conflicts with a quick fix, the rule wins. If a rule here seems wrong for a new situation, update this file in a deliberate conversation — don't silently break it.*
+
+---
+
+## MCP / API Key Auth Invariants
+
+These rules exist because violations cause silent data loss or auth bypass. They were learned from bugs already fixed in production — do not reintroduce them.
+
+### 1. API-key-authenticated routes MUST use `createAdminClient()` for every DB query
+
+Any route that calls `requireAccelAuth()` (rather than `requireAccelRole()`) can be reached by a bearer token with no Supabase session. The standard `createClient()` in that context creates an **anonymous** Supabase client — RLS blocks every query and returns empty arrays with no error. The bug is silent: `response.ok` is true, but all data is empty.
+
+**Rule:** After `requireAccelAuth`, use only `createAdminClient()`. Never call `createClient()` in a route that is reachable via API key.
+
+Affected routes (non-exhaustive): `/api/mcp/*`, `/api/accelerator/traction`, `/api/accelerator/submissions`, `/api/accelerator/deliverables`, `/api/accelerator/me`.
+
+### 2. All external platform fetches use `https://www.accelerator.aggiex.org` (with `www.`)
+
+`accelerator.aggiex.org` (no `www.`) returns a Cloudflare 307 redirect to `www.`. HTTP clients do **not** follow 307 on POST — the body is lost and the request fails. MCP tool calls silently fail if the URL lacks `www.`.
+
+**Rule:** Every `fetch()` call and every hard-coded URL in client-side config (`developer-panel.tsx`, `staff-connect-panel.tsx`, `MCP_CONTEXT.md`) must use `https://www.accelerator.aggiex.org`. Never use the bare apex domain for API calls.
+
+### 3. `mcp-server/src/index.ts` must NOT contain `#!/usr/bin/env node`
+
+The shebang is injected by esbuild via `--banner:js` at build time. Adding it directly to the source file produces a duplicate shebang in the bundle, which breaks execution on some systems.
+
+### 4. Founder MCP bundle is CJS — no top-level `await`
+
+The `mcp-server` bundle targets CommonJS. Top-level `await` is an ESM feature and will throw at runtime in CJS. All async entry-point logic must be wrapped in a `main()` function:
+
+```typescript
+async function main() { ... }
+main().catch(console.error);
+```
+
+### 5. Destructive staff MCP tools require `confirm: true`
+
+Tools that mutate program state (`unlock_week`, `update_submission_status`, `add_deliverable`) must check `args.confirm` and return a preview when it is falsy. This is the human-in-the-loop gate that limits blast radius from prompt injection or agent mistakes. Never remove the confirm check without replacing it with an equivalent gate.
+
+### 6. Write tool calls are audit-logged
+
+All calls to `WRITE_TOOLS` in `/api/mcp/tools.ts` are written to `accel_mcp_audit_log` via `writeAuditLog()`. This is the only attribution trail since the admin Supabase client bypasses RLS and Postgres sees "service role" as the actor. Do not skip audit logging for new write tools — add the tool name to `WRITE_TOOLS`.

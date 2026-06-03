@@ -7,8 +7,8 @@ import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { createHash } from 'crypto';
 import type { AccelProfile, AccelRole } from '@/lib/accel-types';
 
-type AuthSuccess = { profile: AccelProfile; error: null };
-type AuthFailure = { profile: null; error: NextResponse };
+type AuthSuccess = { profile: AccelProfile; keyId: string | null; error: null };
+type AuthFailure = { profile: null; keyId: null; error: NextResponse };
 type AuthResult = AuthSuccess | AuthFailure;
 
 // Returns the caller's accel_profiles row if their role is in `allowedRoles`.
@@ -25,6 +25,7 @@ export async function requireAccelRole(
   if (!user) {
     return {
       profile: null,
+      keyId: null,
       error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     };
   }
@@ -38,6 +39,7 @@ export async function requireAccelRole(
   if (!profile) {
     return {
       profile: null,
+      keyId: null,
       error: NextResponse.json(
         { error: 'No accelerator account found for this user' },
         { status: 403 }
@@ -48,6 +50,7 @@ export async function requireAccelRole(
   if (!allowedRoles.includes(profile.role as AccelRole)) {
     return {
       profile: null,
+      keyId: null,
       error: NextResponse.json(
         { error: `Requires one of: ${allowedRoles.join(', ')}` },
         { status: 403 }
@@ -55,12 +58,12 @@ export async function requireAccelRole(
     };
   }
 
-  return { profile: profile as AccelProfile, error: null };
+  return { profile: profile as AccelProfile, keyId: null, error: null };
 }
 
 // Accepts either a Supabase session cookie OR an API key bearer token.
-// Used by routes exposed to the MCP server (submissions, traction).
-// API keys are only issued to founders; `allowedRoles` should include 'founder'.
+// Used by routes exposed to the MCP server (submissions, traction, etc.).
+// Returns keyId so callers can write to the audit log with full attribution.
 export async function requireAccelAuth(
   request: NextRequest,
   allowedRoles: AccelRole[]
@@ -75,7 +78,7 @@ export async function requireAccelAuth(
     const admin = createAdminClient();
     const { data: keyRow, error: keyLookupError } = await admin
       .from('accel_api_keys')
-      .select('profile_id, team_id')
+      .select('id, profile_id, team_id, expires_at')
       .eq('key_hash', keyHash)
       .single();
 
@@ -86,7 +89,16 @@ export async function requireAccelAuth(
     if (!keyRow) {
       return {
         profile: null,
+        keyId: null,
         error: NextResponse.json({ error: 'Invalid API key' }, { status: 401 }),
+      };
+    }
+
+    if (keyRow.expires_at && new Date(keyRow.expires_at) < new Date()) {
+      return {
+        profile: null,
+        keyId: null,
+        error: NextResponse.json({ error: 'API key expired' }, { status: 401 }),
       };
     }
 
@@ -94,7 +106,7 @@ export async function requireAccelAuth(
     admin
       .from('accel_api_keys')
       .update({ last_used_at: new Date().toISOString() })
-      .eq('key_hash', keyHash)
+      .eq('id', keyRow.id)
       .then(() => {});
 
     const { data: profile } = await admin
@@ -106,6 +118,7 @@ export async function requireAccelAuth(
     if (!profile) {
       return {
         profile: null,
+        keyId: null,
         error: NextResponse.json({ error: 'Profile not found' }, { status: 403 }),
       };
     }
@@ -113,6 +126,7 @@ export async function requireAccelAuth(
     if (!allowedRoles.includes(profile.role as AccelRole)) {
       return {
         profile: null,
+        keyId: null,
         error: NextResponse.json(
           { error: `Requires one of: ${allowedRoles.join(', ')}` },
           { status: 403 }
@@ -120,7 +134,7 @@ export async function requireAccelAuth(
       };
     }
 
-    return { profile: profile as AccelProfile, error: null };
+    return { profile: profile as AccelProfile, keyId: keyRow.id, error: null };
   }
 
   // Fall back to session-based auth

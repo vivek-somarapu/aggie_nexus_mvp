@@ -10,40 +10,23 @@ interface ApiKeyRow {
   created_at: string;
 }
 
-type Platform = 'mac' | 'windows';
 type KeyStatus = 'idle' | 'verifying' | 'ok' | 'error';
 
 const SESSION_STORAGE_KEY = 'aggiex_dev_raw_key';
+const MCP_URL = 'https://www.accelerator.aggiex.org/api/mcp/founder';
 
-const INSTALL_COMMANDS: Record<Platform, string> = {
-  mac: 'mkdir -p ~/.aggiex && curl -fsSL https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/dist/index.js -o ~/.aggiex/server.js && chmod +x ~/.aggiex/server.js',
-  windows:
-    'New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\\.aggiex"; Invoke-WebRequest -Uri "https://raw.githubusercontent.com/vivek-somarapu/aggie_nexus_mvp/main/mcp-server/dist/index.js" -OutFile "$env:USERPROFILE\\.aggiex\\server.js"',
-};
+function buildCliCommand(apiKey: string): string {
+  return `claude mcp add --transport http aggiex ${MCP_URL} --header "Authorization: Bearer ${apiKey}"`;
+}
 
-function buildMcpConfig(apiKey: string, platform: Platform): string {
-  if (platform === 'windows') {
-    return `{
-  "mcpServers": {
-    "aggiex": {
-      "command": "cmd.exe",
-      "args": ["/c", "node %USERPROFILE%\\\\.aggiex\\\\server.js"],
-      "env": {
-        "AGGIEX_API_KEY": "${apiKey}",
-        "AGGIEX_BASE_URL": "https://www.accelerator.aggiex.org"
-      }
-    }
-  }
-}`;
-  }
+function buildSettingsJson(apiKey: string): string {
   return `{
   "mcpServers": {
     "aggiex": {
-      "command": "/bin/bash",
-      "args": ["-lc", "node ~/.aggiex/server.js"],
-      "env": {
-        "AGGIEX_API_KEY": "${apiKey}",
-        "AGGIEX_BASE_URL": "https://www.accelerator.aggiex.org"
+      "type": "http",
+      "url": "${MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}"
       }
     }
   }
@@ -55,43 +38,21 @@ const AGENT_CONTEXT = `## AggieX Accelerator Integration
 You have access to the AggieX accelerator platform via the \`aggiex\` MCP server.
 
 **Available tools:**
-- \`update_aggiex_mcp\` — Fetch the latest setup instructions and version notes
+- \`whoami\` — Your identity, team, current week, and available tools (call this first)
 - \`get_team_status\` — Team name, current program week, and submission progress
 - \`get_pending_deliverables\` — Deliverables not yet submitted or needing revision
+- \`get_submission_status\` — Review status of all submissions, including staff feedback
+- \`get_curriculum\` — Resources and materials for the current or any program week
 - \`submit_deliverable(deliverable_id, text_content)\` — Submit a written response
-- \`log_traction(metric_type, value, unit, notes?)\` — Log metrics: users, revenue, LOIs, pilots, retention
-- \`get_traction_history\` — View recent traction log entries
+- \`log_traction(metric_type, value, unit, notes?)\` — Log metrics: users, revenue, LOIs, pilots
+- \`get_traction_history\` — Recent traction log entries
 
 **Use proactively:**
-- Session start: check \`get_team_status\` and \`get_pending_deliverables\`
+- Session start: call \`whoami\`, then \`get_pending_deliverables\`
 - User mentions growth metrics ("200 users", "closed 3 LOIs", "$5k MRR"): offer to \`log_traction\`
 - Work completes on a deliverable: offer to \`submit_deliverable\`
-- Connection errors or config issues: call \`update_aggiex_mcp\` for troubleshooting
+- User asks about resources or curriculum: call \`get_curriculum\`
 - Always confirm with the user before submitting or logging`;
-
-function buildFullPrompt(apiKey: string, platform: Platform): string {
-  const installLabel = platform === 'windows' ? 'PowerShell' : 'Terminal';
-  return `## AggieX MCP Setup
-
-### 1. Install (run once in ${installLabel})
-
-\`\`\`${platform === 'windows' ? 'powershell' : 'bash'}
-${INSTALL_COMMANDS[platform]}
-\`\`\`
-
-### 2. Configure — add to \`.claude/settings.json\`
-
-\`\`\`json
-${buildMcpConfig(apiKey, platform)}
-\`\`\`
-
-${AGENT_CONTEXT}`;
-}
-
-function detectPlatform(): Platform {
-  if (typeof navigator === 'undefined') return 'mac';
-  return /Win/i.test(navigator.userAgent) ? 'windows' : 'mac';
-}
 
 export default function DeveloperPanel() {
   const [keys, setKeys] = useState<ApiKeyRow[]>([]);
@@ -100,13 +61,10 @@ export default function DeveloperPanel() {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [keyStatus, setKeyStatus] = useState<KeyStatus>('idle');
   const [keyStatusMessage, setKeyStatusMessage] = useState<string>('');
-  const [platform, setPlatform] = useState<Platform>('mac');
-  const [promptCopied, setPromptCopied] = useState(false);
+  const [copied, setCopied] = useState<Record<string, boolean>>({});
   const [generateError, setGenerateError] = useState<string | null>(null);
 
   useEffect(() => {
-    setPlatform(detectPlatform());
-    // Restore key from session storage so page refreshes don't break the flow
     const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) {
       setActiveKey(stored);
@@ -128,6 +86,12 @@ export default function DeveloperPanel() {
     loadKeys();
   }, [loadKeys]);
 
+  async function copyToClipboard(text: string, id: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied((prev) => ({ ...prev, [id]: true }));
+    setTimeout(() => setCopied((prev) => ({ ...prev, [id]: false })), 2000);
+  }
+
   async function verifyKey(rawKey: string) {
     setKeyStatus('verifying');
     setKeyStatusMessage('');
@@ -136,10 +100,9 @@ export default function DeveloperPanel() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ raw_key: rawKey }),
     });
-    const data = await response.json() as { valid: boolean; reason?: string; label?: string };
+    const data = await response.json() as { valid: boolean; reason?: string };
     if (data.valid) {
       setKeyStatus('ok');
-      setKeyStatusMessage('');
     } else {
       setKeyStatus('error');
       setKeyStatusMessage(data.reason ?? 'Verification failed — contact support.');
@@ -164,29 +127,14 @@ export default function DeveloperPanel() {
     verifyKey(data.raw_key);
   }
 
-  async function copyPrompt() {
-    if (!activeKey) return;
-    await navigator.clipboard.writeText(buildFullPrompt(activeKey, platform));
-    setPromptCopied(true);
-    setTimeout(() => setPromptCopied(false), 2000);
-  }
-
   async function revokeKey(id: string) {
     const response = await fetch(`/api/accelerator/api-keys/${id}`, { method: 'DELETE' });
     if (response.ok) {
       setKeys((prev) => prev.filter((key) => key.id !== id));
-      // If the active key was the revoked one, clear it
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
       setActiveKey(null);
       setKeyStatus('idle');
     }
-  }
-
-  function resetToGenerate() {
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    setActiveKey(null);
-    setKeyStatus('idle');
-    setKeyStatusMessage('');
   }
 
   return (
@@ -195,8 +143,8 @@ export default function DeveloperPanel() {
       {!activeKey ? (
         <div>
           <p className="mb-4 text-sm text-neutral-400">
-            Generate an API key to get your one-click setup prompt for Claude Code, Cursor, or any
-            MCP-compatible coding agent.
+            Generate an API key to connect Claude Code, Cursor, or any MCP-compatible coding agent
+            to AggieX — no installation required.
           </p>
           <button
             onClick={generateKey}
@@ -212,8 +160,7 @@ export default function DeveloperPanel() {
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
-          {/* Verification status */}
+        <div className="flex flex-col gap-6">
           {keyStatus === 'verifying' && (
             <div className="flex items-center gap-2 text-xs text-neutral-500">
               <Loader2 size={12} className="animate-spin" />
@@ -223,7 +170,7 @@ export default function DeveloperPanel() {
           {keyStatus === 'ok' && (
             <div className="flex items-center gap-1.5 text-xs text-emerald-500">
               <Check size={12} />
-              Key verified — ready to use
+              Key verified — ready to connect
             </div>
           )}
           {keyStatus === 'error' && (
@@ -233,71 +180,73 @@ export default function DeveloperPanel() {
                 Key verification failed
               </div>
               <p className="mt-1 text-xs text-red-400/80">{keyStatusMessage}</p>
-              <p className="mt-1 text-xs text-neutral-600">
-                This usually means the database migration hasn&apos;t been applied or the
-                server environment is misconfigured. Contact the AggieX team.
-              </p>
             </div>
           )}
 
-          <p className="text-sm text-neutral-400">
-            Your setup prompt is ready. Paste it into your project&apos;s{' '}
-            <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-300">
-              CLAUDE.md
-            </code>{' '}
-            — it includes the install command, MCP config, and agent context with your API key
-            embedded.
-          </p>
-
-          {/* Platform toggle */}
-          <div className="flex items-center gap-1 self-start rounded-lg border border-neutral-800 bg-neutral-950 p-1">
-            <button
-              onClick={() => setPlatform('mac')}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                platform === 'mac'
-                  ? 'bg-neutral-700 text-neutral-100'
-                  : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              Mac / Linux
-            </button>
-            <button
-              onClick={() => setPlatform('windows')}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                platform === 'windows'
-                  ? 'bg-neutral-700 text-neutral-100'
-                  : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-            >
-              Windows
-            </button>
+          {/* Claude Code CLI */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-neutral-300">Claude Code — run in terminal</p>
+            <div className="relative rounded-lg border border-neutral-800 bg-neutral-950">
+              <pre className="overflow-x-auto px-4 py-3 pr-12 font-mono text-xs text-neutral-300">
+                {buildCliCommand(activeKey)}
+              </pre>
+              <button
+                onClick={() => copyToClipboard(buildCliCommand(activeKey), 'cli')}
+                className="absolute right-2 top-2 flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
+              >
+                {copied['cli'] ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              </button>
+            </div>
           </div>
 
-          <button
-            onClick={copyPrompt}
-            disabled={keyStatus === 'error'}
-            className="flex w-fit items-center gap-2 rounded-md border border-neutral-600 bg-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-400 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {promptCopied ? (
-              <>
-                <Check size={14} className="text-emerald-400" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy size={14} />
-                Copy prompt
-              </>
-            )}
-          </button>
+          {/* Cursor / other editors */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-neutral-300">
+              Cursor / other editors — add to{' '}
+              <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-neutral-400">.cursor/mcp.json</code>{' '}
+              or equivalent
+            </p>
+            <div className="relative rounded-lg border border-neutral-800 bg-neutral-950">
+              <pre className="overflow-x-auto px-4 py-4 pr-12 font-mono text-xs text-neutral-300">
+                {buildSettingsJson(activeKey)}
+              </pre>
+              <button
+                onClick={() => copyToClipboard(buildSettingsJson(activeKey), 'json')}
+                className="absolute right-2 top-2 flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
+              >
+                {copied['json'] ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              </button>
+            </div>
+          </div>
+
+          {/* CLAUDE.md context */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-neutral-300">
+              CLAUDE.md context — paste into your project to guide the agent
+            </p>
+            <div className="relative rounded-lg border border-neutral-800 bg-neutral-950">
+              <pre className="overflow-x-auto whitespace-pre-wrap px-4 py-4 pr-12 font-mono text-xs text-neutral-300">
+                {AGENT_CONTEXT}
+              </pre>
+              <button
+                onClick={() => copyToClipboard(AGENT_CONTEXT, 'context')}
+                className="absolute right-2 top-2 flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
+              >
+                {copied['context'] ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              </button>
+            </div>
+          </div>
 
           <p className="text-xs text-neutral-600">
-            Need a new key?{' '}
             <button
-              onClick={resetToGenerate}
+              onClick={() => {
+                sessionStorage.removeItem(SESSION_STORAGE_KEY);
+                setActiveKey(null);
+                setKeyStatus('idle');
+              }}
               className="text-neutral-500 underline underline-offset-2 hover:text-neutral-300"
             >
-              Generate another
+              Generate a new key
             </button>
           </p>
         </div>
