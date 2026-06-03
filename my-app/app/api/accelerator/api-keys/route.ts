@@ -3,8 +3,10 @@ import { createHash, randomBytes } from 'crypto';
 import { requireAccelRole } from '@/lib/accel-auth';
 import { createClient } from '@/lib/supabase/server';
 
+const ALLOWED_ROLES = ['founder', 'aggiex_team', 'mce_staff'] as const;
+
 export async function GET() {
-  const { profile, error } = await requireAccelRole(['founder']);
+  const { profile, error } = await requireAccelRole([...ALLOWED_ROLES]);
   if (error) return error;
 
   const supabase = await createClient();
@@ -19,10 +21,11 @@ export async function GET() {
 }
 
 export async function POST() {
-  const { profile, error } = await requireAccelRole(['founder']);
+  const { profile, error } = await requireAccelRole([...ALLOWED_ROLES]);
   if (error) return error;
 
-  if (!profile.team_id) {
+  // Founders must be on a team; staff generate keys for themselves directly
+  if (profile.role === 'founder' && !profile.team_id) {
     return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
   }
 

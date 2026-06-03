@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/accel-admin';
 // the key is reachable via the admin client (catches missing migration,
 // missing SUPABASE_SERVICE_ROLE_KEY, and other infrastructure issues).
 export async function POST(request: NextRequest) {
-  const { error } = await requireAccelRole(['founder']);
+  const { error } = await requireAccelRole(['founder', 'aggiex_team', 'mce_staff']);
   if (error) return error;
 
   let body: unknown;
