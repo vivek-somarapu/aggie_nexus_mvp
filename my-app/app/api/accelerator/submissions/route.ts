@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAccelRole, requireAccelAuth } from '@/lib/accel-auth';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 
 const UpsertSubmissionSchema = z.object({
   deliverable_id: z.string().uuid(),
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'team_id required' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data, error: dbError } = await supabase
     .from('accel_submissions')
     .select('id, deliverable_id, status, version, submitted_at')
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Check for an existing latest submission to version correctly
   const { data: existing } = await supabase

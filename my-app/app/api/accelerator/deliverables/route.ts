@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAccelRole, requireAccelAuth } from '@/lib/accel-auth';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
 
 const CreateDeliverableSchema = z.object({
   week_id: z.string().uuid(),
@@ -21,9 +22,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const weekId = searchParams.get('week_id');
 
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  let query = supabase
+  let query = admin
     .from('accel_deliverables')
     .select(`
       id, week_id, title, description, is_required,
