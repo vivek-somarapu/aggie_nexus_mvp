@@ -31,7 +31,7 @@ function mcpError(id: string | number | null | undefined, code: number, message:
 }
 
 export async function POST(request: NextRequest) {
-  const { profile, error: authError } = await requireAccelAuth(request, ['aggiex_team', 'mce_staff']);
+  const { profile, keyId, error: authError } = await requireAccelAuth(request, ['aggiex_team', 'mce_staff']);
   if (authError) return authError;
 
   let body: McpMessage;
