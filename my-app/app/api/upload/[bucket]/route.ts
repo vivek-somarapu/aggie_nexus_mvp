@@ -8,6 +8,20 @@ import type { NextRequest } from "next/server";
 export const runtime = "nodejs";
 
 const ALLOWED = ["avatars", "resumes", "project-logos", "project-images", "event-posters", "organization-logos", "organization-images", "internal-docs", "submissions"];
+
+const IMAGES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const ALLOWED_TYPES: Record<string, string[]> = {
+  "avatars":            IMAGES,
+  "project-logos":      [...IMAGES, "image/svg+xml"],
+  "project-images":     IMAGES,
+  "event-posters":      IMAGES,
+  "organization-logos": [...IMAGES, "image/svg+xml"],
+  "organization-images": IMAGES,
+  "resumes":            ["application/pdf"],
+  "internal-docs":      ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"],
+  "submissions":        ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", ...IMAGES],
+};
+
 const storage = createStorageClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -36,7 +50,16 @@ export async function POST(
         );
       }
 
-      const ext = file.name.split(".").pop() || "";
+      const allowedMimes = ALLOWED_TYPES[bucket] ?? [];
+      if (!allowedMimes.includes(file.type)) {
+        return NextResponse.json(
+          { error: `File type '${file.type}' is not allowed for this bucket` },
+          { status: 415 }
+        );
+      }
+
+      // Use a UUID filename — never trust the original name or extension
+      const ext = file.name.split(".").pop()?.replace(/[^a-zA-Z0-9]/g, "") || "bin";
       const filename = `${uuid()}.${ext}`;
       const arrayBuffer = await file.arrayBuffer();
 
