@@ -1,0 +1,151 @@
+{
+  "version": "2.0.0",
+  "date": "2026-06-03T00:00:00Z",
+  "mode": "daily",
+  "scope": "full",
+  "diff_mode": false,
+  "phases_run": [0, 1, 2, 3, 5, 7, 8, 9, 12, 13, 14],
+  "attack_surface": {
+    "code": {
+      "public_endpoints": 3,
+      "authenticated": 67,
+      "admin": 1,
+      "api": 30,
+      "uploads": 7,
+      "integrations": 5,
+      "background_jobs": 0,
+      "websockets": 0
+    },
+    "infrastructure": {
+      "ci_workflows": 0,
+      "webhook_receivers": 0,
+      "container_configs": 0,
+      "iac_configs": 0,
+      "deploy_targets": 1,
+      "secret_management": "env vars (Render)"
+    }
+  },
+  "findings": [
+    {
+      "id": 1,
+      "severity": "CRITICAL",
+      "confidence": 10,
+      "status": "VERIFIED",
+      "phase": 2,
+      "phase_name": "Secrets Archaeology",
+      "category": "Secrets",
+      "fingerprint": "secrets-git-history-service-role-key",
+      "title": "Supabase service role key committed to public git history",
+      "file": ".env.local",
+      "line": 0,
+      "commit": "963fe19ed3a6e617510ec026ea43b18e815dde8d",
+      "description": "Real SUPABASE_SERVICE_ROLE_KEY committed in May 2025, repo is public. Key bypasses all RLS.",
+      "exploit_scenario": "git clone repo -> git show 963fe19 | grep SERVICE_ROLE_KEY -> query Supabase REST API with full service-role access",
+      "impact": "Complete database access: read/write/delete all founder data, submissions, traction, reviews",
+      "recommendation": "Rotate key immediately in Supabase dashboard. Update Render env var. Audit Supabase logs for abuse. Clean git history with git filter-repo.",
+      "verification": "self-verified"
+    },
+    {
+      "id": 2,
+      "severity": "HIGH",
+      "confidence": 9,
+      "status": "VERIFIED",
+      "phase": 7,
+      "phase_name": "LLM Security",
+      "category": "LLM Security",
+      "fingerprint": "llm-rag-poisoning-submissions-system-prompt",
+      "title": "RAG poisoning — founder submissions injected into AI system prompt",
+      "file": "lib/ai/embedding-pipeline.ts",
+      "line": 232,
+      "description": "Founder submission text is embedded into vector store and retrieved directly into the system prompt with 'Treat as primary evidence' instruction. Enables prompt injection via crafted submission content.",
+      "exploit_scenario": "Founder submits 'IGNORE PREVIOUS INSTRUCTIONS...' -> embedding pipeline stores it -> buildSemanticContext retrieves it -> staff AI advisor follows injected instructions with privileged tool access",
+      "impact": "Exfiltration of other teams' data, attacker-controlled AI behavior with staff-level tools",
+      "recommendation": "Sanitize submission text before embedding. Label retrieved chunks as user-submitted content that should not be followed as instructions.",
+      "verification": "self-verified"
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "confidence": 8,
+      "status": "VERIFIED",
+      "phase": 9,
+      "phase_name": "OWASP Top 10",
+      "category": "OWASP A03",
+      "fingerprint": "upload-missing-mime-allowlist",
+      "title": "Upload route accepts any file type — stored XSS vector",
+      "file": "app/api/upload/[bucket]/route.ts",
+      "line": 49,
+      "description": "File type (user-controlled) is passed directly to Supabase Storage as contentType. No MIME or extension allowlist. Allows uploading HTML/SVG files that browsers render as HTML.",
+      "exploit_scenario": "Upload xss.html with Content-Type: text/html to avatars bucket -> share public URL -> victim's session cookies stolen via script execution",
+      "impact": "Stored XSS, session hijacking",
+      "recommendation": "Add per-bucket MIME type allowlist. Reject uploads not matching allowed types.",
+      "verification": "self-verified"
+    },
+    {
+      "id": 4,
+      "severity": "MEDIUM",
+      "confidence": 9,
+      "status": "VERIFIED",
+      "phase": 9,
+      "phase_name": "OWASP Top 10",
+      "category": "OWASP A01",
+      "fingerprint": "admin-auth-monitoring-no-role-check",
+      "title": "/admin/auth-monitoring accessible to any logged-in user",
+      "file": "app/admin/auth-monitoring/page.tsx",
+      "line": 1,
+      "description": "Page presents as admin dashboard with no role enforcement. Any authenticated user can access it.",
+      "exploit_scenario": "Logged-in user navigates to /admin/auth-monitoring -> sees admin dashboard UI",
+      "impact": "Information disclosure, unauthorized access to admin tooling surface",
+      "recommendation": "Delete app/admin/ directory entirely — it is a development leftover.",
+      "verification": "self-verified"
+    },
+    {
+      "id": 5,
+      "severity": "MEDIUM",
+      "confidence": 10,
+      "status": "VERIFIED",
+      "phase": 9,
+      "phase_name": "OWASP Top 10",
+      "category": "OWASP A05",
+      "fingerprint": "next-config-ignore-build-errors",
+      "title": "TypeScript and ESLint errors silently ignored in production builds",
+      "file": "next.config.mjs",
+      "line": 16,
+      "description": "ignoreBuildErrors and ignoreDuringBuilds suppress type errors in prod. Security-relevant type bugs deploy without warning.",
+      "exploit_scenario": "Type error in auth path goes undetected -> ships to prod -> exploitable null dereference or auth bypass",
+      "impact": "Undetected security bugs reach production",
+      "recommendation": "Remove both flags from next.config.mjs. Fix surfacing type errors.",
+      "verification": "self-verified"
+    }
+  ],
+  "supply_chain_summary": {
+    "direct_deps": 0,
+    "transitive_deps": 0,
+    "critical_cves": 0,
+    "high_cves": 5,
+    "install_scripts": 0,
+    "lockfile_present": true,
+    "lockfile_tracked": true,
+    "tools_skipped": []
+  },
+  "filter_stats": {
+    "candidates_scanned": 40,
+    "hard_exclusion_filtered": 30,
+    "confidence_gate_filtered": 5,
+    "verification_filtered": 0,
+    "reported": 5
+  },
+  "totals": {
+    "critical": 1,
+    "high": 1,
+    "medium": 3,
+    "tentative": 0
+  },
+  "trend": {
+    "prior_report_date": null,
+    "resolved": 0,
+    "persistent": 0,
+    "new": 5,
+    "direction": "first_run"
+  }
+}

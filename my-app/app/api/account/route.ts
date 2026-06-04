@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function DELETE(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   
   try {
     // Delete the user account (using their own session credentials)

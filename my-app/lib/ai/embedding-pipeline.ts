@@ -19,6 +19,32 @@ import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { embedBatch } from '@/lib/ai/embedder';
 import { chunkText } from '@/lib/ai/chunker';
 
+// ─── Submission sanitization ──────────────────────────────────────────────────
+//
+// Strip prompt-injection patterns from founder submissions before they enter
+// the vector store. These patterns, if embedded, can be retrieved into the AI
+// advisor's system prompt and influence model behavior.
+//
+// The regex targets instruction-override phrasing. Legitimate submission content
+// describing products, metrics, and progress is unaffected.
+
+const INJECTION_PATTERNS: RegExp[] = [
+  /\bignore\b.{0,50}\b(previous|prior|above|all)\b.{0,30}\binstructions?\b/gi,
+  /\b(forget|disregard|override)\b.{0,30}\b(instructions?|rules?|prompt|context)\b/gi,
+  /\byou are now\b.{0,80}/gi,
+  /\bact as\b.{0,40}\b(an?\s+)?(?:unfiltered|unrestricted|jailbroken|dAN)/gi,
+  /^\s*system\s*:/gim,
+  /\b(reveal|expose|leak|print|output|show)\b.{0,30}\b(all|every|other|private)\b.{0,30}\b(teams?|data|submissions?|users?)\b/gi,
+];
+
+function sanitizeSubmissionForEmbedding(text: string): string {
+  let sanitized = text;
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '[removed]');
+  }
+  return sanitized;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type EmbeddingSource =
@@ -253,7 +279,7 @@ async function embedSubmissions(): Promise<EmbedSourceResult> {
 
   const documents = changed.map((submission) => ({
     id: submission.id,
-    fullText: submission.text_content as string,
+    fullText: sanitizeSubmissionForEmbedding(submission.text_content as string),
   }));
 
   const rows = await buildChunkedRows(source, documents);
