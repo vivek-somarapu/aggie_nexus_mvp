@@ -9,7 +9,12 @@ import {
   buildFounderAdvisorTools,
   buildStaffAdvisorTools,
 } from '@/lib/ai/advisor-tools';
+import { getRedis } from '@/lib/redis';
 import type { AccelRole } from '@/lib/accel-types';
+
+// 20 requests per user per minute
+const AI_RATE_LIMIT = 20;
+const AI_RATE_WINDOW_SECONDS = 60;
 
 export const maxDuration = 60;
 
@@ -77,6 +82,14 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return errorResponse('Unauthorized', 401);
+
+  const redis = getRedis();
+  if (redis) {
+    const rateLimitKey = `ai-advisor:rate:${user.id}`;
+    const count = await redis.incr(rateLimitKey);
+    if (count === 1) await redis.expire(rateLimitKey, AI_RATE_WINDOW_SECONDS);
+    if (count > AI_RATE_LIMIT) return errorResponse('Rate limit exceeded', 429);
+  }
 
   const { data: profile } = await supabase
     .from('accel_profiles')
