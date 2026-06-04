@@ -58,7 +58,7 @@ const googleProvider = createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_GEN
 
 function selectModel() {
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    return googleProvider('gemini-2.0-flash');
+    return googleProvider('gemini-2.5-flash');
   }
   console.warn('[ai-advisor] GOOGLE_GENERATIVE_AI_API_KEY not set — falling back to Groq 70B (context limits apply)');
   return groqProvider('llama-3.3-70b-versatile');
