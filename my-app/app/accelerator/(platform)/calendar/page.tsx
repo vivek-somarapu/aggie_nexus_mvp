@@ -14,6 +14,7 @@ import AcceleratorCalendarView, {
   type CalendarWeek,
   type CalendarCurriculumFile,
 } from './components/accelerator-calendar-view';
+import AddEventPanel from './components/add-event-panel';
 
 // ─── Data fetchers ────────────────────────────────────────────────────────────
 
@@ -353,14 +354,17 @@ export default async function CalendarPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
-      <div className="mb-8">
-        <p className="text-xs uppercase tracking-widest text-neutral-500">Program</p>
-        <h1 className="mt-1 text-xl font-semibold text-neutral-100">Calendar</h1>
-        <p className="mt-0.5 text-sm text-neutral-500">
-          {role === 'founder'
-            ? 'Deliverable due dates, curriculum resources, and program events.'
-            : 'Submission progress per team, curriculum, and program events.'}
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-neutral-500">Program</p>
+          <h1 className="mt-1 text-xl font-semibold text-neutral-100">Calendar</h1>
+          <p className="mt-0.5 text-sm text-neutral-500">
+            {role === 'founder'
+              ? 'Deliverable due dates, curriculum resources, and program events.'
+              : 'Submission progress per team, curriculum, and program events.'}
+          </p>
+        </div>
+        {role === 'aggiex_team' && <AddEventPanel />}
       </div>
 
       <AcceleratorCalendarView

@@ -198,6 +198,56 @@ export const STAFF_TOOLS = [
     },
   },
   {
+    name: 'add_program_event',
+    description:
+      'Create a program event visible on the calendar — speaker visits, demo days, social events, etc. ' +
+      'Pass confirm: true to execute; omit or pass confirm: false to preview what would be created.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        event_type: {
+          type: 'string',
+          enum: [
+            'speaker_day', 'demo_day', 'final_demo_day', 'social_event',
+            'mentor_day', 'one_on_one', 'crucible', 'week_start', 'week_end',
+            'off_day', 'program_close',
+          ],
+          description: 'Category of the event',
+        },
+        event_date: {
+          type: 'string',
+          description: 'Date of the event in YYYY-MM-DD format',
+        },
+        title: {
+          type: 'string',
+          description: 'Event title shown on the calendar (max 200 chars)',
+        },
+        description: {
+          type: 'string',
+          description: 'Details about the event — who is attending, agenda, logistics, links (max 2000 chars)',
+        },
+        is_mandatory: {
+          type: 'boolean',
+          description: 'Whether attendance is mandatory for founders (default false)',
+        },
+        visible_to: {
+          type: 'string',
+          enum: ['all', 'founders', 'mentors', 'aggiex_team'],
+          description: 'Who can see this event (default: all)',
+        },
+        week_number: {
+          type: 'number',
+          description: 'Optional week number (1–10) this event belongs to',
+        },
+        confirm: {
+          type: 'boolean',
+          description: 'Set to true to execute. Omit or false to preview what would be created.',
+        },
+      },
+      required: ['event_type', 'event_date', 'title'],
+    },
+  },
+  {
     name: 'get_recent_activity',
     description: 'Return the last 50 write-tool calls made via the staff MCP — who called what, when, and the result. Use for auditing or debugging.',
     inputSchema: {
@@ -233,7 +283,7 @@ async function writeAuditLog(
 
 // ─── Tool implementations ────────────────────────────────────────────────────
 
-const WRITE_TOOLS = new Set(['add_deliverable', 'update_submission_status', 'unlock_week', 'create_curriculum_item', 'add_internal_doc']);
+const WRITE_TOOLS = new Set(['add_deliverable', 'update_submission_status', 'unlock_week', 'create_curriculum_item', 'add_internal_doc', 'add_program_event']);
 
 export async function handleToolCall(
   name: string,
@@ -275,7 +325,7 @@ async function dispatch(
       name: profile.full_name,
       role: profile.role,
       available_tools: STAFF_TOOLS.map((t) => t.name),
-      note: 'Write tools (add_deliverable, update_submission_status, unlock_week) require confirm: true to execute.',
+      note: 'Write tools (add_deliverable, update_submission_status, unlock_week, add_program_event) require confirm: true to execute.',
     });
   }
 
@@ -562,6 +612,64 @@ async function dispatch(
 
     if (error) throw new Error(error.message);
     return text(`Internal doc created: "${data.title}" (${data.id})`);
+  }
+
+  if (name === 'add_program_event') {
+    const confirm = args.confirm === true;
+
+    const EVENT_TYPE_LABELS: Record<string, string> = {
+      speaker_day: 'Speaker Day', demo_day: 'Demo Day', final_demo_day: 'Final Demo Day',
+      social_event: 'Social Event', mentor_day: 'Mentor Day', one_on_one: '1-on-1 Sessions',
+      crucible: 'Crucible', week_start: 'Week Start', week_end: 'Week End',
+      off_day: 'Off Day', program_close: 'Program Close',
+    };
+
+    const preview = {
+      event_type: EVENT_TYPE_LABELS[args.event_type as string] ?? args.event_type,
+      event_date: args.event_date,
+      title: args.title,
+      description: args.description ?? null,
+      is_mandatory: args.is_mandatory ?? false,
+      visible_to: args.visible_to ?? 'all',
+      week_number: args.week_number ?? null,
+    };
+
+    if (!confirm) {
+      return text({ preview, action: 'Call again with confirm: true to create this event.' });
+    }
+
+    const { data: program } = await admin
+      .from('accel_programs')
+      .select('id')
+      .eq('is_active', true)
+      .single();
+
+    if (!program) throw new Error('No active program found.');
+
+    const { data, error } = await admin
+      .from('accel_program_events')
+      .insert({
+        program_id: program.id,
+        event_type: args.event_type as string,
+        event_date: args.event_date as string,
+        title: args.title as string,
+        description: (args.description as string) ?? null,
+        is_mandatory: (args.is_mandatory as boolean) ?? false,
+        visible_to: (args.visible_to as string) ?? 'all',
+        week_number: (args.week_number as number) ?? null,
+        created_by: profile.id,
+      })
+      .select('id, title, event_date')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(`An event of type "${args.event_type}" already exists on ${args.event_date}.`);
+      }
+      throw new Error(error.message);
+    }
+
+    return text(`Event created: "${data.title}" on ${data.event_date} (${data.id})`);
   }
 
   if (name === 'get_recent_activity') {
