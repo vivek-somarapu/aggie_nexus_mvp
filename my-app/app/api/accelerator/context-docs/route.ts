@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@/lib/supabase/server';
+import { extractTextFromBuffer } from '@/lib/ai/extract-file-text';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -77,23 +78,11 @@ async function extractTextFromFile(file: File): Promise<string> {
     throw new Error('File too large. Maximum upload size is 10 MB.');
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  const buffer = Buffer.from(await file.arrayBuffer());
   const name = file.name.toLowerCase();
 
-  if (name.endsWith('.pdf')) {
-    // Dynamic import keeps this out of the client bundle entirely.
-    const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
-    const result = await parser.getText();
-    return result.text;
-  }
-
-  if (name.endsWith('.docx')) {
-    const mammoth = await import('mammoth');
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value;
-  }
+  if (name.endsWith('.pdf')) return extractTextFromBuffer(buffer, 'pdf');
+  if (name.endsWith('.docx')) return extractTextFromBuffer(buffer, 'docx');
 
   // .txt / .md / .csv — plain UTF-8
   return buffer.toString('utf-8');

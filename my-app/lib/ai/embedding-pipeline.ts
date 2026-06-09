@@ -14,10 +14,10 @@
  * in chunk count cleanly.
  */
 
-import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/accel-admin';
 import { embedBatch } from '@/lib/ai/embedder';
 import { chunkText } from '@/lib/ai/chunker';
+import { extractTextFromStorageUrl, md5 } from '@/lib/ai/extract-file-text';
 
 // ─── Submission sanitization ──────────────────────────────────────────────────
 //
@@ -78,10 +78,6 @@ export interface EmbedAllResult {
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
-
-function md5(text: string): string {
-  return crypto.createHash('md5').update(text).digest('hex');
-}
 
 /**
  * Returns a map of source_id → content_hash for all existing rows in a source
@@ -154,7 +150,7 @@ async function replaceEmbeddings(
  */
 async function buildChunkedRows(
   source: EmbeddingSource,
-  documents: Array<{ id: string; fullText: string }>,
+  documents: Array<{ id: string; fullText: string; contentHash?: string }>,
 ): Promise<EmbeddingRow[]> {
   type FlatChunk = {
     sourceId: string;
@@ -167,7 +163,7 @@ async function buildChunkedRows(
 
   for (const doc of documents) {
     const chunks = chunkText(doc.fullText);
-    const contentHash = md5(doc.fullText);
+    const contentHash = doc.contentHash ?? md5(doc.fullText);
     for (let i = 0; i < chunks.length; i++) {
       flatChunks.push({ sourceId: doc.id, chunkIndex: i, chunkText: chunks[i], contentHash });
     }
@@ -191,13 +187,59 @@ async function buildChunkedRows(
 
 // ─── Source-specific embedders ────────────────────────────────────────────────
 
+// ─── Curriculum helpers ───────────────────────────────────────────────────────
+
+type CurriculumFileRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  file_type: string;
+  file_url: string;
+};
+
+/**
+ * Hash used to detect changes without fetching file bytes on every sync run.
+ * For uploaded files (pdf/docx), the Supabase Storage URL acts as a content
+ * address — every upload generates a new UUID path, so URL change ≡ content
+ * change. For link-type resources, only title and description matter.
+ */
+function buildCurriculumHash(file: CurriculumFileRow): string {
+  const base = `${file.title}${file.description ? `: ${file.description}` : ''}`;
+  if (file.file_type === 'pdf' || file.file_type === 'docx') {
+    return md5(`${base}\n${file.file_url}`);
+  }
+  return md5(base);
+}
+
+async function buildCurriculumFullText(file: CurriculumFileRow): Promise<string> {
+  const base = `${file.title}${file.description ? `: ${file.description}` : ''}`;
+  if (file.file_type === 'pdf' || file.file_type === 'docx') {
+    try {
+      const extracted = await extractTextFromStorageUrl(
+        file.file_url,
+        file.file_type as 'pdf' | 'docx',
+      );
+      return extracted ? `${base}\n\n${extracted}` : base;
+    } catch (extractError) {
+      console.error(
+        `[embedding] Could not extract text from curriculum file ${file.file_url}:`,
+        extractError,
+      );
+      return base;
+    }
+  }
+  return base;
+}
+
+// ─── Source embedders ─────────────────────────────────────────────────────────
+
 async function embedCurriculumFiles(): Promise<EmbedSourceResult> {
   const source: EmbeddingSource = 'accel_curriculum_files';
   const supabase = createAdminClient();
 
   const { data: files, error } = await supabase
     .from('accel_curriculum_files')
-    .select('id, title, description')
+    .select('id, title, description, file_type, file_url')
     .eq('is_active', true);
 
   if (error) throw new Error(`Failed to fetch curriculum files: ${error.message}`);
@@ -205,17 +247,19 @@ async function embedCurriculumFiles(): Promise<EmbedSourceResult> {
 
   const existingHashes = await fetchExistingHashes(source);
 
-  const changed = files.filter((file) => {
-    const text = `${file.title}${file.description ? `: ${file.description}` : ''}`;
-    return existingHashes.get(file.id) !== md5(text);
-  });
+  const changed = files.filter(
+    (file) => existingHashes.get(file.id) !== buildCurriculumHash(file),
+  );
 
   if (changed.length === 0) return { source, upserted: 0, skipped: files.length };
 
-  const documents = changed.map((file) => ({
-    id: file.id,
-    fullText: `${file.title}${file.description ? `: ${file.description}` : ''}`,
-  }));
+  const documents = await Promise.all(
+    changed.map(async (file) => ({
+      id: file.id,
+      fullText: await buildCurriculumFullText(file),
+      contentHash: buildCurriculumHash(file),
+    })),
+  );
 
   const rows = await buildChunkedRows(source, documents);
   await replaceEmbeddings(source, changed.map((f) => f.id), rows);
@@ -352,6 +396,53 @@ async function embedContextDocs(): Promise<EmbedSourceResult> {
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Embeds a single curriculum file by ID. Used for immediate background indexing
+ * after upload without waiting for a full sync. Skips if the hash is unchanged.
+ */
+export async function embedCurriculumFile(fileId: string): Promise<void> {
+  const source: EmbeddingSource = 'accel_curriculum_files';
+  const supabase = createAdminClient();
+
+  const { data: file, error } = await supabase
+    .from('accel_curriculum_files')
+    .select('id, title, description, file_type, file_url, is_active')
+    .eq('id', fileId)
+    .single();
+
+  if (error || !file) {
+    console.error(`[embedding] Failed to fetch curriculum file ${fileId}:`, error?.message);
+    return;
+  }
+
+  if (!file.is_active) return;
+
+  const existingHashes = await fetchExistingHashes(source);
+  const newHash = buildCurriculumHash(file);
+  if (existingHashes.get(file.id) === newHash) return;
+
+  const fullText = await buildCurriculumFullText(file);
+  const rows = await buildChunkedRows(source, [{ id: file.id, fullText, contentHash: newHash }]);
+  await replaceEmbeddings(source, [file.id], rows);
+}
+
+/**
+ * Removes all embedding rows for a curriculum file. Called on hard-delete or
+ * when is_active is set to false so the file is immediately excluded from RAG.
+ */
+export async function deleteCurriculumFileEmbeddings(fileId: string): Promise<void> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('accel_embeddings')
+    .delete()
+    .eq('source_table', 'accel_curriculum_files')
+    .eq('source_id', fileId);
+
+  if (error) {
+    console.error(`[embedding] Failed to delete embeddings for curriculum file ${fileId}:`, error.message);
+  }
+}
 
 /**
  * Re-embeds all five source tables in parallel. Idempotent: documents whose

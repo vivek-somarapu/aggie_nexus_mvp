@@ -1,7 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { requireAccelRole } from '@/lib/accel-auth';
 import { createClient } from '@/lib/supabase/server';
+import { embedCurriculumFile, deleteCurriculumFileEmbeddings } from '@/lib/ai/embedding-pipeline';
+
+const CONTENT_AFFECTING_FIELDS = new Set(['title', 'description', 'file_type', 'file_url', 'is_active']);
 
 const PatchCurriculumFileSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -54,6 +57,24 @@ export async function PATCH(
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
+  const hasContentChange = Object.keys(parsed.data).some((field) =>
+    CONTENT_AFFECTING_FIELDS.has(field),
+  );
+
+  if (hasContentChange) {
+    after(async () => {
+      try {
+        if (parsed.data.is_active === false) {
+          await deleteCurriculumFileEmbeddings(id);
+        } else {
+          await embedCurriculumFile(id);
+        }
+      } catch (embedError) {
+        console.error('[curriculum] Background embedding update failed:', embedError);
+      }
+    });
+  }
+
   return NextResponse.json(data);
 }
 
@@ -76,6 +97,14 @@ export async function DELETE(
   if (dbError) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
+
+  after(async () => {
+    try {
+      await deleteCurriculumFileEmbeddings(id);
+    } catch (embedError) {
+      console.error('[curriculum] Background embedding cleanup failed:', embedError);
+    }
+  });
 
   return new NextResponse(null, { status: 204 });
 }
