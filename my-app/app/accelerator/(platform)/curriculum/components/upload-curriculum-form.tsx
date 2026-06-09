@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,7 +24,7 @@ const UploadSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   description: z.string().max(1000).optional(),
   file_type: z.enum(['pdf', 'docx', 'video_link', 'external_link', 'other']),
-  file_url: z.string().url('Must be a valid URL'),
+  file_url: z.string().optional(),
   week_id: z.string().uuid().optional().or(z.literal('')),
   access_level: z.enum(['all', 'founders_only', 'aggiex_internal']),
   all_teams: z.boolean(),
@@ -32,6 +32,14 @@ const UploadSchema = z.object({
 });
 
 type UploadValues = z.infer<typeof UploadSchema>;
+type SourceMode = 'file' | 'url';
+
+function detectFileType(filename: string): AccelCurriculumFileType {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'docx' || ext === 'doc') return 'docx';
+  return 'other';
+}
 
 interface UploadCurriculumFormProps {
   weeks: Pick<AccelWeek, 'id' | 'week_number' | 'theme'>[];
@@ -40,6 +48,8 @@ interface UploadCurriculumFormProps {
 
 export default function UploadCurriculumForm({ weeks, teams }: UploadCurriculumFormProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [sourceMode, setSourceMode] = useState<SourceMode>('url');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [addedTitle, setAddedTitle] = useState<string | null>(null);
 
@@ -62,6 +72,18 @@ export default function UploadCurriculumForm({ weeks, teams }: UploadCurriculumF
 
   const allTeams = watch('all_teams');
   const selectedTeamIds = watch('team_ids') ?? [];
+  const fileType = watch('file_type');
+  const isLinkType = fileType === 'video_link' || fileType === 'external_link';
+
+  useEffect(() => {
+    if (isLinkType) setSourceMode('url');
+  }, [isLinkType]);
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    if (file) setValue('file_type', detectFileType(file.name));
+  }
 
   const toggleTeam = (teamId: string) => {
     const next = selectedTeamIds.includes(teamId)
@@ -73,10 +95,44 @@ export default function UploadCurriculumForm({ weeks, teams }: UploadCurriculumF
   const onSubmit = async (values: UploadValues) => {
     setServerError(null);
 
+    let resolvedUrl: string;
+
+    if (sourceMode === 'file') {
+      if (!selectedFile) {
+        setServerError('Please select a file to upload.');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const uploadResponse = await fetch('/api/upload/curriculum', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!uploadResponse.ok) {
+        const uploadData = await uploadResponse.json();
+        setServerError(uploadData.error ?? 'File upload failed.');
+        return;
+      }
+      const { publicUrl } = await uploadResponse.json();
+      resolvedUrl = publicUrl;
+    } else {
+      if (!values.file_url) {
+        setServerError('Please enter a URL.');
+        return;
+      }
+      try {
+        new URL(values.file_url);
+      } catch {
+        setServerError('Please enter a valid URL.');
+        return;
+      }
+      resolvedUrl = values.file_url;
+    }
+
     const payload: Record<string, unknown> = {
       title: values.title,
       file_type: values.file_type,
-      file_url: values.file_url,
+      file_url: resolvedUrl,
       access_level: values.access_level,
       assigned_team_ids: values.all_teams
         ? null
@@ -100,6 +156,7 @@ export default function UploadCurriculumForm({ weeks, teams }: UploadCurriculumF
 
     setAddedTitle(values.title);
     reset();
+    setSelectedFile(null);
     setIsOpen(false);
   };
 
@@ -127,7 +184,7 @@ export default function UploadCurriculumForm({ weeks, teams }: UploadCurriculumF
         <h3 className="text-sm font-semibold text-neutral-100">Add curriculum resource</h3>
         <button
           type="button"
-          onClick={() => { setIsOpen(false); setServerError(null); reset(); }}
+          onClick={() => { setIsOpen(false); setServerError(null); reset(); setSelectedFile(null); }}
           className="text-xs text-neutral-500 hover:text-neutral-300"
         >
           Cancel
@@ -183,17 +240,62 @@ export default function UploadCurriculumForm({ weeks, teams }: UploadCurriculumF
           </div>
         </div>
 
-        {/* URL */}
-        <div className="flex flex-col gap-1.5">
-          <label className={LABEL_CLASS}>URL</label>
-          <input
-            type="url"
-            {...register('file_url')}
-            placeholder="https://docs.google.com/... or https://youtube.com/..."
-            className={INPUT_CLASS}
-          />
-          {errors.file_url && <p className={ERROR_CLASS}>{errors.file_url.message}</p>}
-        </div>
+        {/* Source mode toggle (hidden for link-type resources) */}
+        {!isLinkType && (
+          <div className="flex overflow-hidden rounded-md border border-neutral-800 text-xs">
+            <button
+              type="button"
+              onClick={() => setSourceMode('file')}
+              className={`flex-1 py-1.5 transition-colors ${
+                sourceMode === 'file'
+                  ? 'bg-neutral-700 text-neutral-100'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              Upload file
+            </button>
+            <button
+              type="button"
+              onClick={() => setSourceMode('url')}
+              className={`flex-1 py-1.5 transition-colors ${
+                sourceMode === 'url'
+                  ? 'bg-neutral-700 text-neutral-100'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              Enter URL
+            </button>
+          </div>
+        )}
+
+        {/* File or URL input */}
+        {sourceMode === 'file' && !isLinkType ? (
+          <div className="flex flex-col gap-1.5">
+            <label className={LABEL_CLASS}>File (PDF or DOCX)</label>
+            <label className={`${INPUT_CLASS} flex cursor-pointer items-center gap-2`}>
+              <input
+                type="file"
+                className="sr-only"
+                accept=".pdf,.docx,.doc"
+                onChange={handleFileChange}
+              />
+              <span className={`truncate ${selectedFile ? 'text-neutral-100' : 'text-neutral-600'}`}>
+                {selectedFile ? selectedFile.name : 'Choose file…'}
+              </span>
+            </label>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <label className={LABEL_CLASS}>URL</label>
+            <input
+              type="url"
+              {...register('file_url')}
+              placeholder="https://docs.google.com/... or https://youtube.com/..."
+              className={INPUT_CLASS}
+            />
+            {errors.file_url && <p className={ERROR_CLASS}>{errors.file_url.message}</p>}
+          </div>
+        )}
 
         {/* Role visibility */}
         <div className="flex flex-col gap-1.5">

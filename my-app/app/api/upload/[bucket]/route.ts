@@ -7,9 +7,10 @@ import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
-const ALLOWED = ["avatars", "resumes", "project-logos", "project-images", "event-posters", "organization-logos", "organization-images", "internal-docs", "submissions"];
+const ALLOWED = ["avatars", "resumes", "project-logos", "project-images", "event-posters", "organization-logos", "organization-images", "internal-docs", "submissions", "curriculum"];
 
 const IMAGES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const DOCS = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
 const ALLOWED_TYPES: Record<string, string[]> = {
   "avatars":            IMAGES,
   "project-logos":      [...IMAGES, "image/svg+xml"],
@@ -18,8 +19,9 @@ const ALLOWED_TYPES: Record<string, string[]> = {
   "organization-logos": [...IMAGES, "image/svg+xml"],
   "organization-images": IMAGES,
   "resumes":            ["application/pdf"],
-  "internal-docs":      ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"],
-  "submissions":        ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", ...IMAGES],
+  "internal-docs":      [...DOCS, "text/plain"],
+  "submissions":        [...DOCS, "text/plain", ...IMAGES],
+  "curriculum":         DOCS,
 };
 
 const storage = createStorageClient(
