@@ -46,3 +46,4 @@ next-env.d.ts
 branch-specific-files/
 AI_ADVISOR_AGENT_CONTEXT.md
 .gstack/
+CHANGELOG.md

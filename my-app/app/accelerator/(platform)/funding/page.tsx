@@ -283,7 +283,7 @@ export default async function FundingPage() {
                   </div>
 
                   {/* Funding summary row */}
-                  <div className="grid grid-cols-2 gap-px border-b border-neutral-800 bg-neutral-800 sm:grid-cols-4">
+                  <div className="grid grid-cols-3 gap-px border-b border-neutral-800 bg-neutral-800">
                     <div className="bg-neutral-900/60 px-4 py-3">
                       <p className="text-xs text-neutral-600">Dilutive raised</p>
                       <p className="mt-1 text-sm font-semibold tabular-nums text-neutral-100">
@@ -297,19 +297,9 @@ export default async function FundingPage() {
                       </p>
                     </div>
                     <div className="bg-neutral-900/60 px-4 py-3">
-                      <p className="text-xs text-neutral-600">Program award (unlocked)</p>
+                      <p className="text-xs text-neutral-600">Total raised</p>
                       <p className="mt-1 text-sm font-semibold tabular-nums text-neutral-100">
-                        {team.milestoneFunding
-                          ? formatCurrency(team.milestoneFunding.amount_unlocked)
-                          : '—'}
-                      </p>
-                    </div>
-                    <div className="bg-neutral-900/60 px-4 py-3">
-                      <p className="text-xs text-neutral-600">Total award</p>
-                      <p className="mt-1 text-sm font-semibold tabular-nums text-neutral-100">
-                        {team.milestoneFunding
-                          ? formatCurrency(team.milestoneFunding.total_award)
-                          : '—'}
+                        {formatCurrency(team.dilutiveTotal + team.nonDilutiveTotal)}
                       </p>
                     </div>
                   </div>
