@@ -5,6 +5,8 @@ All notable changes to this project are documented here.
 ## [0.1.2] - 2026-06-09
 
 ### Added
+- Calendar event creation: AggieX staff can now add program events (speaker visits, demo days, social events, etc.) directly from the calendar page. Events support title, description, date, event type, visibility (all / founders / mentors / internal), and mandatory flag.
+- `add_program_event` staff MCP tool: AI assistants (Claude Desktop, Cursor, etc.) can now create calendar events via natural language with the standard confirm-gate pattern. Fully audit-logged.
 - Curriculum file upload: staff can now upload PDFs and DOCXs directly from the curriculum form instead of only entering URLs. Files are stored in Supabase Storage.
 - Automatic AI embedding of uploaded curriculum files: when a PDF or DOCX is uploaded as a curriculum resource, its full text content is extracted and indexed into the RAG pipeline automatically (via `next/server after()`). The AI Advisor can now answer questions about the actual content of uploaded slides and documents, not just their titles.
 - `lib/ai/extract-file-text.ts`: shared text extraction utility (pdf-parse, mammoth) used by both the embedding pipeline and the context-docs upload route.
