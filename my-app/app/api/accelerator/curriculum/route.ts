@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { requireAccelRole } from '@/lib/accel-auth';
 import { createClient } from '@/lib/supabase/server';
 import { AGGIEX_2026_PROGRAM_ID } from '@/lib/accel-types';
+import { embedCurriculumFile } from '@/lib/ai/embedding-pipeline';
 
 const CreateCurriculumFileSchema = z.object({
   title: z.string().min(1).max(200),
@@ -82,6 +83,14 @@ export async function POST(request: NextRequest) {
   if (dbError) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
+
+  after(async () => {
+    try {
+      await embedCurriculumFile(data.id);
+    } catch (embedError) {
+      console.error('[curriculum] Background embedding failed:', embedError);
+    }
+  });
 
   return NextResponse.json(data, { status: 201 });
 }
