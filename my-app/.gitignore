@@ -47,3 +47,12 @@ branch-specific-files/
 AI_ADVISOR_AGENT_CONTEXT.md
 .gstack/
 CHANGELOG.md
+
+# test/scratch scripts
+test-*.js
+test-*.ts
+test-*.tsx
+test-*.sql
+
+# scratch/temp dependency installs
+/tmp/
