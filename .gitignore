@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# mcp-server — built/deployed separately, not part of app repo
+mcp-server/
+
+# Supabase SQL — kept locally for reference, not committed
+supabase/migrations/
+supabase/seed.sql
+my-app/database-migrations/
+
+# gstack local state
+.gstack/
+
+# Context/notes files
+AI_ADVISOR_AGENT_CONTEXT.md
