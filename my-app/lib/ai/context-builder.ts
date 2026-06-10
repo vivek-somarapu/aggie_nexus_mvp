@@ -80,6 +80,7 @@ async function buildFounderContext(userId: string): Promise<string> {
     tractionResult,
     meetingsResult,
     upcomingEventsResult,
+    teamContextResult,
   ] = await Promise.all([
     supabase.from('accel_teams').select('name, industry_vertical, venture_stage').eq('id', teamId).single(),
 
@@ -122,6 +123,12 @@ async function buildFounderContext(userId: string): Promise<string> {
       .in('visible_to', ['all', 'founders'])
       .order('event_date')
       .limit(5),
+
+    supabase
+      .from('accel_team_context')
+      .select('context_key, content')
+      .eq('team_id', teamId)
+      .order('context_key'),
   ]);
 
   const team = teamResult.data;
@@ -213,10 +220,18 @@ async function buildFounderContext(userId: string): Promise<string> {
     `CURRENT USER: ${profile.full_name}`,
     currentWeek ? `CURRENT WEEK: Week ${currentWeek.week_number} — ${currentWeek.theme}` : 'No active week.',
     '',
-    '## DELIVERABLES',
-    ...deliverableLines,
-    '',
   ];
+
+  const teamContext = teamContextResult.data ?? [];
+  if (teamContext.length) {
+    lines.push('## COMPANY PROFILE');
+    for (const ctx of teamContext) {
+      lines.push(`  ${ctx.context_key}: ${ctx.content}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('## DELIVERABLES', ...deliverableLines, '');
 
   const mentors = mentorsResult.data ?? [];
   if (mentors.length) {
@@ -275,7 +290,7 @@ async function buildFounderContext(userId: string): Promise<string> {
 async function buildAdminContext(): Promise<string> {
   const supabase = await createClient();
 
-  const [teamsResult, currentWeekResult, tractionResult, mentorsResult, fundingEventsResult] =
+  const [teamsResult, currentWeekResult, tractionResult, mentorsResult, fundingEventsResult, teamContextsResult] =
     await Promise.all([
       supabase
         .from('accel_teams')
@@ -310,6 +325,11 @@ async function buildAdminContext(): Promise<string> {
         .eq('program_id', AGGIEX_2026_PROGRAM_ID)
         .order('acquired_at', { ascending: false })
         .limit(50),
+
+      supabase
+        .from('accel_team_context')
+        .select('team_id, context_key, content')
+        .order('context_key'),
     ]);
 
   const teams = teamsResult.data ?? [];
@@ -342,6 +362,14 @@ async function buildAdminContext(): Promise<string> {
         });
       }
     }
+  }
+
+  // Team context grouped by team_id
+  const contextByTeam = new Map<string, Array<{ context_key: string; content: string }>>();
+  for (const ctx of teamContextsResult.data ?? []) {
+    const existing = contextByTeam.get(ctx.team_id) ?? [];
+    existing.push({ context_key: ctx.context_key, content: ctx.content });
+    contextByTeam.set(ctx.team_id, existing);
   }
 
   // Latest traction per metric per team
@@ -387,6 +415,14 @@ async function buildAdminContext(): Promise<string> {
       }
     } else {
       lines.push(`  Traction: no entries logged`);
+    }
+
+    const teamContextEntries = contextByTeam.get(team.id) ?? [];
+    if (teamContextEntries.length) {
+      lines.push(`  Company profile:`);
+      for (const ctx of teamContextEntries) {
+        lines.push(`    - ${ctx.context_key}: ${ctx.content}`);
+      }
     }
   }
 
@@ -1072,7 +1108,7 @@ type HybridMatch = {
  * Returns a formatted block ready to append to the system prompt, or an
  * empty string if Jina is unconfigured, the query is empty, or nothing matches.
  */
-export async function buildSemanticContext(query: string): Promise<string> {
+export async function buildSemanticContext(query: string, teamId?: string): Promise<string> {
   if (!query.trim()) return '';
   if (!process.env.JINA_API_KEY) return '';
 
@@ -1093,6 +1129,7 @@ export async function buildSemanticContext(query: string): Promise<string> {
     query_embedding: queryVector,
     query_text: query,
     match_count: HYBRID_CANDIDATE_COUNT,
+    p_team_id: teamId ?? null,
   });
 
   if (rpcError) {
