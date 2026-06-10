@@ -1,11 +1,10 @@
-// Tool definitions for the AI Advisor agent.
-// All tools are read-only — writes are handled by the existing extraction + ActionCard flow.
-
 import { tool } from 'ai';
 import { z } from 'zod';
 import { handleFounderToolCall } from '@/app/api/mcp/founder/tools';
 import { handleToolCall } from '@/app/api/mcp/tools';
 import { getRedis } from '@/lib/redis';
+import { createAdminClient } from '@/lib/supabase/accel-admin';
+import { embedTeamContextEntry } from '@/lib/ai/embedding-pipeline';
 import type { AccelProfile } from '@/lib/accel-types';
 
 function firstText(content: Array<{ type: 'text'; text: string }>): string {
@@ -51,6 +50,41 @@ export function buildFounderAdvisorTools(profile: AccelProfile) {
       execute: async (args) => {
         const { week_number } = args ?? {};
         return firstText(await handleFounderToolCall('get_curriculum', { week_number }, profile));
+      },
+    }),
+
+    update_company_context: tool({
+      description:
+        'Save structured information about your company — ICP, market hypothesis, beachhead segment, solution description, or any label — so the advisor remembers it across sessions.',
+      parameters: z.object({
+        context_key: z
+          .string()
+          .describe('What type of information: icp, market_hypothesis, beachhead, solution, notes, or any label'),
+        content: z.string().describe('The information to save'),
+      }),
+      execute: async (args) => {
+        const { context_key, content } = args ?? {};
+        if (!profile.team_id) return 'No team assigned — cannot save context.';
+        const admin = createAdminClient();
+        const { error } = await admin.from('accel_team_context').upsert(
+          {
+            team_id: profile.team_id,
+            context_key,
+            content,
+            updated_by: 'founder',
+            source: 'ai_advisor',
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'team_id,context_key' },
+        );
+        if (error) throw new Error(`Failed to save context: ${error.message}`);
+        embedTeamContextEntry(profile.team_id, context_key, content)
+          .catch((err: Error) => console.error('[update_company_context] embed error:', err));
+        const redis = getRedis();
+        if (redis) {
+          redis.del(`accel:ctx:founder:${profile.id}`).catch(() => {});
+        }
+        return `Saved "${context_key}" to your company profile. I'll reference this in future sessions.`;
       },
     }),
 
@@ -147,6 +181,21 @@ export function buildStaffAdvisorTools(profile: AccelProfile) {
         doc_type: z.string().optional(),
       }),
       execute: async (args) => call('add_internal_doc', args ?? {}),
+    }),
+
+    upsert_team_context: tool({
+      description:
+        'Set or update a context field for a specific team (ICP, market hypothesis, beachhead, solution, etc.). ' +
+        'As staff, this also triggers cohort abstraction — the insight is generalized and added to the shared knowledge pool.',
+      parameters: z.object({
+        team_name: z.string().describe('Team name (partial match supported)'),
+        context_key: z
+          .string()
+          .describe('Context type: icp, market_hypothesis, beachhead, solution, traction_narrative, notes, or custom label'),
+        content: z.string().describe('The context content'),
+        confirm: z.boolean().optional().describe('Set true to execute; omit to preview'),
+      }),
+      execute: async (args) => call('upsert_team_context', args ?? {}),
     }),
   };
 }

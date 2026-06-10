@@ -118,12 +118,16 @@ export async function POST(request: NextRequest) {
     .join(' ')
     .trim() ?? '';
 
+  // Founders get their own team's private content + shared content.
+  // Staff/mentors get no filter — they can see across all teams.
+  const semanticTeamId = profile.role === 'founder' ? (profile.team_id ?? undefined) : undefined;
+
   let systemPrompt: string;
   let semanticContext: string;
   try {
     [systemPrompt, semanticContext] = await Promise.all([
       buildSystemPrompt(user.id, profile.role as AccelRole),
-      buildSemanticContext(lastUserText),
+      buildSemanticContext(lastUserText, semanticTeamId),
     ]);
   } catch (error) {
     console.error('[ai-advisor] Context build failed:', error);

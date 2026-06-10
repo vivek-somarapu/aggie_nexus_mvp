@@ -2,6 +2,8 @@ import { createGroq } from '@ai-sdk/groq';
 import { generateText } from 'ai';
 import { createAdminClient } from '@/lib/supabase/accel-admin';
 import type { AccelProfile } from '@/lib/accel-types';
+import { embedTeamContextEntry } from '@/lib/ai/embedding-pipeline';
+import { deriveAndStoreCohortLesson } from '@/lib/ai/cohort-abstraction';
 
 const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -258,6 +260,27 @@ export const STAFF_TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'upsert_team_context',
+    description:
+      'Set or update a structured context field for a specific team — ICP, market hypothesis, beachhead, solution description, traction narrative, or any custom key. ' +
+      'Content is immediately indexed into the AI advisor knowledge base for that team. ' +
+      'Because you are staff, this also triggers cohort abstraction: the insight is generalized and added to the shared cohort knowledge pool. ' +
+      'Pass confirm: true to execute; omit or false to preview.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        team_name: { type: 'string', description: 'Team name (partial match supported)' },
+        context_key: {
+          type: 'string',
+          description: 'Context type: icp, market_hypothesis, beachhead, solution, traction_narrative, notes, or any custom label',
+        },
+        content: { type: 'string', description: 'The context content to store' },
+        confirm: { type: 'boolean', description: 'Set true to execute; omit to preview' },
+      },
+      required: ['team_name', 'context_key', 'content'],
+    },
+  },
 ];
 
 // ─── Audit logging ───────────────────────────────────────────────────────────
@@ -283,7 +306,7 @@ async function writeAuditLog(
 
 // ─── Tool implementations ────────────────────────────────────────────────────
 
-const WRITE_TOOLS = new Set(['add_deliverable', 'update_submission_status', 'unlock_week', 'create_curriculum_item', 'add_internal_doc', 'add_program_event']);
+const WRITE_TOOLS = new Set(['add_deliverable', 'update_submission_status', 'unlock_week', 'create_curriculum_item', 'add_internal_doc', 'add_program_event', 'upsert_team_context']);
 
 export async function handleToolCall(
   name: string,
@@ -685,6 +708,63 @@ async function dispatch(
 
     if (error) throw new Error(error.message);
     return text(data ?? []);
+  }
+
+  if (name === 'upsert_team_context') {
+    const confirm = args.confirm === true;
+
+    const { data: teams, error: teamError } = await admin
+      .from('accel_teams')
+      .select('id, name')
+      .ilike('name', `%${args.team_name as string}%`)
+      .eq('is_active', true)
+      .limit(3);
+
+    if (teamError) throw new Error(teamError.message);
+    if (!teams?.length) throw new Error(`No active team found matching "${args.team_name}"`);
+    if (teams.length > 1) {
+      throw new Error(
+        `Multiple teams match "${args.team_name}": ${teams.map((t) => t.name).join(', ')} — be more specific`,
+      );
+    }
+
+    const team = teams[0];
+    const preview = {
+      team: team.name,
+      context_key: args.context_key,
+      content: args.content,
+      updated_by: 'aggiex_team',
+      source: 'mcp',
+    };
+
+    if (!confirm) {
+      return text({ preview, action: 'Call again with confirm: true to save.' });
+    }
+
+    const { error } = await admin
+      .from('accel_team_context')
+      .upsert(
+        {
+          team_id: team.id,
+          context_key: args.context_key as string,
+          content: args.content as string,
+          updated_by: 'aggiex_team',
+          source: 'mcp',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'team_id,context_key' },
+      );
+
+    if (error) throw new Error(error.message);
+
+    // Fire-and-forget: embed new content and derive cohort lesson in background
+    embedTeamContextEntry(team.id, args.context_key as string, args.content as string)
+      .catch((err: Error) => console.error('[upsert_team_context] embed error:', err));
+
+    deriveAndStoreCohortLesson(team.id, args.context_key as string, args.content as string)
+      .catch((err: Error) => console.error('[upsert_team_context] cohort abstraction error:', err));
+
+    return text(`Team context saved: ${team.name} → ${args.context_key}`);
   }
 
   return text(`Unknown tool: ${name}`);

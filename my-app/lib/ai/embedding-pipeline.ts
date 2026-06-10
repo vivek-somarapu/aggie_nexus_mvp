@@ -52,7 +52,9 @@ type EmbeddingSource =
   | 'accel_deliverables'
   | 'accel_submissions'
   | 'accel_meeting_records'
-  | 'accel_context_docs';
+  | 'accel_context_docs'
+  | 'accel_team_context'
+  | 'accel_cohort_lessons';
 
 interface EmbeddingRow {
   source_table: EmbeddingSource;
@@ -62,6 +64,7 @@ interface EmbeddingRow {
   content_hash: string;
   embedding: number[];
   embedded_at: string;
+  team_id: string | null;
 }
 
 export interface EmbedSourceResult {
@@ -150,13 +153,14 @@ async function replaceEmbeddings(
  */
 async function buildChunkedRows(
   source: EmbeddingSource,
-  documents: Array<{ id: string; fullText: string; contentHash?: string }>,
+  documents: Array<{ id: string; fullText: string; contentHash?: string; teamId?: string | null }>,
 ): Promise<EmbeddingRow[]> {
   type FlatChunk = {
     sourceId: string;
     chunkIndex: number;
     chunkText: string;
     contentHash: string;
+    teamId: string | null;
   };
 
   const flatChunks: FlatChunk[] = [];
@@ -165,7 +169,13 @@ async function buildChunkedRows(
     const chunks = chunkText(doc.fullText);
     const contentHash = doc.contentHash ?? md5(doc.fullText);
     for (let i = 0; i < chunks.length; i++) {
-      flatChunks.push({ sourceId: doc.id, chunkIndex: i, chunkText: chunks[i], contentHash });
+      flatChunks.push({
+        sourceId: doc.id,
+        chunkIndex: i,
+        chunkText: chunks[i],
+        contentHash,
+        teamId: doc.teamId ?? null,
+      });
     }
   }
 
@@ -182,6 +192,7 @@ async function buildChunkedRows(
     content_hash: chunk.contentHash,
     embedding: embedded[i].vector,
     embedded_at: now,
+    team_id: chunk.teamId,
   }));
 }
 
@@ -305,7 +316,7 @@ async function embedSubmissions(): Promise<EmbedSourceResult> {
   // Only embed finalized submissions — in_progress drafts are unstable.
   const { data: submissions, error } = await supabase
     .from('accel_submissions')
-    .select('id, text_content')
+    .select('id, text_content, team_id')
     .in('status', ['submitted', 'under_review', 'approved'])
     .not('text_content', 'is', null);
 
@@ -324,6 +335,7 @@ async function embedSubmissions(): Promise<EmbedSourceResult> {
   const documents = changed.map((submission) => ({
     id: submission.id,
     fullText: sanitizeSubmissionForEmbedding(submission.text_content as string),
+    teamId: submission.team_id as string | null,
   }));
 
   const rows = await buildChunkedRows(source, documents);
@@ -338,7 +350,7 @@ async function embedMeetingRecords(): Promise<EmbedSourceResult> {
 
   const { data: meetings, error } = await supabase
     .from('accel_meeting_records')
-    .select('id, notes')
+    .select('id, notes, team_id')
     .not('notes', 'is', null);
 
   if (error) throw new Error(`Failed to fetch meeting records: ${error.message}`);
@@ -356,6 +368,7 @@ async function embedMeetingRecords(): Promise<EmbedSourceResult> {
   const documents = changed.map((meeting) => ({
     id: meeting.id,
     fullText: meeting.notes as string,
+    teamId: meeting.team_id as string | null,
   }));
 
   const rows = await buildChunkedRows(source, documents);
@@ -395,7 +408,98 @@ async function embedContextDocs(): Promise<EmbedSourceResult> {
   return { source, upserted: rows.length, skipped: docs.length - changed.length };
 }
 
+async function embedTeamContext(): Promise<EmbedSourceResult> {
+  const source: EmbeddingSource = 'accel_team_context';
+  const supabase = createAdminClient();
+
+  const { data: contexts, error } = await supabase
+    .from('accel_team_context')
+    .select('id, team_id, context_key, content');
+
+  if (error) throw new Error(`Failed to fetch team context: ${error.message}`);
+  if (!contexts?.length) return { source, upserted: 0, skipped: 0 };
+
+  const existingHashes = await fetchExistingHashes(source);
+
+  const changed = contexts.filter((ctx) => {
+    const fullText = `${ctx.context_key}: ${ctx.content}`;
+    return existingHashes.get(ctx.id) !== md5(fullText);
+  });
+
+  if (changed.length === 0) return { source, upserted: 0, skipped: contexts.length };
+
+  const documents = changed.map((ctx) => ({
+    id: ctx.id,
+    fullText: `${ctx.context_key}: ${ctx.content}`,
+    teamId: ctx.team_id as string | null,
+  }));
+
+  const rows = await buildChunkedRows(source, documents);
+  await replaceEmbeddings(source, changed.map((ctx) => ctx.id), rows);
+
+  return { source, upserted: rows.length, skipped: contexts.length - changed.length };
+}
+
+async function embedCohortLessons(): Promise<EmbedSourceResult> {
+  const source: EmbeddingSource = 'accel_cohort_lessons';
+  const supabase = createAdminClient();
+
+  const { data: lessons, error } = await supabase
+    .from('accel_cohort_lessons')
+    .select('id, lesson_text');
+
+  if (error) throw new Error(`Failed to fetch cohort lessons: ${error.message}`);
+  if (!lessons?.length) return { source, upserted: 0, skipped: 0 };
+
+  const existingHashes = await fetchExistingHashes(source);
+
+  const changed = lessons.filter((lesson) => existingHashes.get(lesson.id) !== md5(lesson.lesson_text));
+
+  if (changed.length === 0) return { source, upserted: 0, skipped: lessons.length };
+
+  const documents = changed.map((lesson) => ({
+    id: lesson.id,
+    fullText: lesson.lesson_text,
+    teamId: null,
+  }));
+
+  const rows = await buildChunkedRows(source, documents);
+  await replaceEmbeddings(source, changed.map((l) => l.id), rows);
+
+  return { source, upserted: rows.length, skipped: lessons.length - changed.length };
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Embeds a single team context entry immediately after upsert without waiting
+ * for a full sync run. Used by the MCP handler and AI advisor tool.
+ */
+export async function embedTeamContextEntry(
+  teamId: string,
+  contextKey: string,
+  content: string,
+): Promise<void> {
+  const source: EmbeddingSource = 'accel_team_context';
+  const supabase = createAdminClient();
+
+  const { data: row } = await supabase
+    .from('accel_team_context')
+    .select('id')
+    .eq('team_id', teamId)
+    .eq('context_key', contextKey)
+    .single();
+
+  if (!row) return;
+
+  const fullText = `${contextKey}: ${content}`;
+  const existingHashes = await fetchExistingHashes(source);
+  const newHash = md5(fullText);
+  if (existingHashes.get(row.id) === newHash) return;
+
+  const rows = await buildChunkedRows(source, [{ id: row.id, fullText, teamId }]);
+  await replaceEmbeddings(source, [row.id], rows);
+}
 
 /**
  * Embeds a single curriculum file by ID. Used for immediate background indexing
@@ -457,6 +561,8 @@ export async function embedAllSources(): Promise<EmbedAllResult> {
     embedSubmissions(),
     embedMeetingRecords(),
     embedContextDocs(),
+    embedTeamContext(),
+    embedCohortLessons(),
   ]);
 
   const totalUpserted = results.reduce((sum, result) => sum + result.upserted, 0);
