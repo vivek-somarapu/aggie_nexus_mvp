@@ -53,3 +53,6 @@ test-*.js
 test-*.ts
 test-*.tsx
 test-*.sql
+
+# scratch/temp dependency installs
+/tmp/
