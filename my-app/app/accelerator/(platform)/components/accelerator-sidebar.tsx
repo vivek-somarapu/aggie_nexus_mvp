@@ -23,6 +23,7 @@ import {
   ExternalLink,
   X,
   Code2,
+  Network,
 } from 'lucide-react';
 import type { AccelRole } from '@/lib/accel-types';
 
@@ -126,6 +127,12 @@ const NAV_GROUPS: NavGroup[] = [
         label: 'My Team',
         href: '/accelerator/my-team',
         icon: Users,
+        roles: ['founder'],
+      },
+      {
+        label: 'Network',
+        href: '/accelerator/network',
+        icon: Network,
         roles: ['founder'],
       },
       {
